@@ -34,10 +34,10 @@ test("one poll shows forecast, alerts, queue, truth, surface, live vs simulated 
   await s.post("/ingest", power.map((r) => ({ ...r, sig: S.sign(r, "status-test-key") })));
   // market: scripted (simulated, unsigned) air and a sick resident asking for help
   await s.post("/ingest", s.R("sensor-02", market, "air", { co2_ppm: 1500 }));
-  await s.post("/ingest", s.R("watch-21", market, "vitals", { hr: 125, spo2: 90, temp_c: 39.2 }));
-  await s.post("/ingest", s.R("watch-21", market, "button", { type: "help" }));
-  await s.post("/ingest", s.R("watch-22", market, "button", { type: "help" }));
-  for (const d of ["watch-23", "watch-24"]) await s.post("/ingest", s.R(d, market, "button", { type: "symptom" }));
+  await s.post("/ingest", s.R("watch-21", market, "vitals", { hr_bpm: 125, spo2_pct: 90, temp_c: 39.2 }));
+  await s.post("/ingest", s.R("watch-21", market, "button", { button: "help" }));
+  await s.post("/ingest", s.R("watch-22", market, "button", { button: "help" }));
+  for (const d of ["watch-23", "watch-24"]) await s.post("/ingest", s.R(d, market, "button", { button: "symptom" }));
   await s.post("/official", { block: market, count: 1 });
   await s.post("/ingest", s.R("scout-01", "L0-crown-01", "surface", { co2_ppm: 430, o2_pct: 20.9, temp_c: 18, pm25_ugm3: 12, radiation_usv_h: 2.1 }));
 

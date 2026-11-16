@@ -10,17 +10,17 @@ const S = require("../sign");
 
 const KEY = "hollow-test-key-0001";
 const keysFile = path.join(os.tmpdir(), `ht-keys-${process.pid}.json`);
-fs.writeFileSync(keysFile, JSON.stringify({ _note: "test keys", "relay-07": KEY, "watch-01": "another-secret" }));
+fs.writeFileSync(keysFile, JSON.stringify({ _note: "test keys", "relay-l8-bore-bend": KEY, "watch-01": "another-secret" }));
 const s = makeServer({ KEYS: keysFile });
 before(() => s.start());
 after(async () => { await s.cleanup(); fs.rmSync(keysFile, { force: true }); });
 
 // The fixed vector that docs/FIRMWARE.md publishes for the ESP32 code.
 const VECTOR = {
-  reading: { id: "relay-07-000123", device: "relay-07", block: "L8-deepwell-03", time: "2026-11-01T14:02:11Z",
-    kind: "power", values: { battery_pct: 62, draw_w: 41.5, grid_hz: 59.97 } },
-  canonical: 'relay-07-000123|relay-07|L8-deepwell-03|2026-11-01T14:02:11Z|power|{"battery_pct":62,"draw_w":41.5,"grid_hz":59.97}',
-  sig: "179c1d3d9063acb856085095bd1556297c65e404aedb05024d3c10c748a18dd3",
+  reading: { id: "relay-l8-bore-bend-000123", device: "relay-l8-bore-bend", block: "l8-bore-bend", time: "2026-11-01T14:02:11Z",
+    kind: "power", values: { battery_wh: 412, draw_w: 96.5, supply_w: 40, grid_hz: 59.97 } },
+  canonical: 'relay-l8-bore-bend-000123|relay-l8-bore-bend|l8-bore-bend|2026-11-01T14:02:11Z|power|{"battery_wh":412,"draw_w":96.5,"grid_hz":59.97,"supply_w":40}',
+  sig: "7c9356baf24afb1dc3ab1d01b4abb9e1e7b3135569c75edbe010c44b33c40aea",
 };
 
 test("test vector: fixed key + reading give the published canonical string and sig", () => {
@@ -29,7 +29,7 @@ test("test vector: fixed key + reading give the published canonical string and s
   // computed independently of api/sign.js, straight from the documented rule
   assert.strictEqual(crypto.createHmac("sha256", KEY).update(VECTOR.canonical).digest("hex"), VECTOR.sig);
   // key order in the JSON the device sends does not matter: values keys are sorted before signing
-  const shuffled = { ...VECTOR.reading, values: { grid_hz: 59.97, battery_pct: 62, draw_w: 41.5 } };
+  const shuffled = { ...VECTOR.reading, values: { supply_w: 40, grid_hz: 59.97, battery_wh: 412, draw_w: 96.5 } };
   assert.strictEqual(S.sign(shuffled, KEY), VECTOR.sig);
   assert.deepStrictEqual(S.TEST_VECTOR.sig, VECTOR.sig);
 });
@@ -46,22 +46,22 @@ test("the same vector is printed in docs/FIRMWARE.md and by tools/sign.js", () =
 test("valid sig: stored with verified true (the vector itself, posted to a real server)", async () => {
   const r = await s.post("/ingest", { ...VECTOR.reading, sig: VECTOR.sig, source: "live" });
   assert.deepStrictEqual([r.status, r.body.added], [200, 1]);
-  const [got] = await s.get("/history?block=L8-deepwell-03&kind=power");
+  const [got] = await s.get("/history?block=l8-bore-bend&kind=power");
   assert.strictEqual(got.verified, true);
   assert.strictEqual(got.sig, VECTOR.sig, "the sig is kept so anyone holding the key can re-check the public record");
 });
 
 test("no sig: accepted but verified false, and a sender cannot just claim verified", async () => {
-  const plain = s.R("relay-07", "L8-deepwell-03", "power", { battery_pct: 61, grid_hz: 60 });
-  const liar = { ...s.R("relay-07", "L8-deepwell-03", "power", { battery_pct: 60, grid_hz: 60 }), verified: true };
+  const plain = s.R("relay-l8-bore-bend", "l8-bore-bend", "power", { battery_pct: 61, grid_hz: 60 });
+  const liar = { ...s.R("relay-l8-bore-bend", "l8-bore-bend", "power", { battery_pct: 60, grid_hz: 60 }), verified: true };
   assert.strictEqual((await s.post("/ingest", [plain, liar])).body.added, 2);
-  const hist = await s.get("/history?block=L8-deepwell-03&kind=power");
+  const hist = await s.get("/history?block=l8-bore-bend&kind=power");
   assert.strictEqual(hist.find((r) => r.id === plain.id).verified, false);
   assert.strictEqual(hist.find((r) => r.id === liar.id).verified, false);
 });
 
 test("bad signature: rejected with a reason and not stored", async () => {
-  const base = s.R("relay-07", "L8-deepwell-03", "power", { battery_pct: 10, grid_hz: 60 });
+  const base = s.R("relay-l8-bore-bend", "l8-bore-bend", "power", { battery_pct: 10, grid_hz: 60 });
   const good = S.sign(base, KEY);
   const cases = {
     "sig made with the wrong key": { ...base, sig: S.sign(base, "not-the-key") },
@@ -75,7 +75,7 @@ test("bad signature: rejected with a reason and not stored", async () => {
   for (const [name, r] of Object.entries(cases)) {
     const res = await s.post("/ingest", r);
     assert.strictEqual(res.status, 400, name);
-    assert.match(res.body.errors[0].err, /^bad signature for relay-07/, name);
+    assert.match(res.body.errors[0].err, /^bad signature for relay-l8-bore-bend/, name);
   }
   assert.ok(!(await s.get("/history")).some((r) => r.id === base.id), "none of the forgeries were stored");
   // the untouched original with its real sig is fine
@@ -83,7 +83,7 @@ test("bad signature: rejected with a reason and not stored", async () => {
 });
 
 test("a signed reading with no clock (1970) verifies against the time the device sent", async () => {
-  const r = { ...s.R("watch-01", "L1-gallery-02", "vitals", { hr: 72, spo2: 98, temp_c: 36.6 }), time: "1970-01-01T00:01:00Z" };
+  const r = { ...s.R("watch-01", "L1-gallery-02", "vitals", { hr_bpm: 72, spo2_pct: 98, temp_c: 36.6 }), time: "1970-01-01T00:01:00Z" };
   assert.strictEqual((await s.post("/ingest", { ...r, sig: S.sign(r, "another-secret") })).body.added, 1);
   const got = (await s.get("/history?block=L1-gallery-02"))[0];
   assert.deepStrictEqual([got.verified, got.time_estimated, got.device_time], [true, true, "1970-01-01T00:01:00Z"]);
@@ -98,7 +98,7 @@ test("sig from a device with no key on file: stored, but unverified and marked u
 });
 
 test("alerts say whether the reading that caused them was verified; verified survives a restart", async () => {
-  const bad = s.R("relay-07", "L8-deepwell-03", "power", { battery_pct: 59, grid_hz: 59.5 });
+  const bad = s.R("relay-l8-bore-bend", "l8-bore-bend", "power", { battery_pct: 59, grid_hz: 59.5 });
   await s.post("/ingest", { ...bad, sig: S.sign(bad, KEY) });
   const unsigned = s.R("relay-08", "L7-sump-03", "power", { battery_pct: 59, grid_hz: 59.5 });
   await s.post("/ingest", unsigned);
@@ -112,5 +112,5 @@ test("alerts say whether the reading that caused them was verified; verified sur
 test("keys.json is gitignored and an example is committed", () => {
   assert.match(fs.readFileSync(path.join(ROOT, ".gitignore"), "utf8"), /^shared\/keys\.json$/m);
   const ex = JSON.parse(fs.readFileSync(path.join(ROOT, "shared/keys.example.json"), "utf8"));
-  assert.strictEqual(ex["relay-07"], KEY, "the example holds the test-vector key so the docs can be tried as written");
+  assert.strictEqual(ex["relay-l8-bore-bend"], KEY, "the example holds the test-vector key so the docs can be tried as written");
 });

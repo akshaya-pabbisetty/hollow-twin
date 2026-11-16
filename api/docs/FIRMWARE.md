@@ -2,7 +2,7 @@
 
 Run every command in this guide from the `api` folder of the repository.
 
-Everything an ESP32 needs to talk to the backend. The reading format itself is in `shared/FORMAT.md`.
+Everything an ESP32 needs to talk to the backend. The message format itself is `CONTRACT.md` at the top of the repository.
 
 `API` below is wherever the backend runs: `http://<laptop-ip>:8787` on the bench, or the deployed URL.
 
@@ -50,8 +50,8 @@ link returns, uploads them in a single POST whose body is a JSON array:
 
 ```json
 [
-  { "id": "watch-01-000007", "device": "watch-01", "block": "L8-deepwell-03", "time": "2026-11-17T14:02:11Z", "kind": "vitals", "values": { "hr": 81, "spo2": 97, "temp_c": 36.8 }, "source": "live" },
-  { "id": "watch-01-000008", "device": "watch-01", "block": "L8-deepwell-03", "time": "2026-11-17T14:02:41Z", "kind": "vitals", "values": { "hr": 83, "spo2": 96, "temp_c": 36.8 }, "source": "live" }
+  { "id": "watch-01-000007", "device": "watch-01", "block": "L8-deepwell-03", "time": "2026-11-17T14:02:11Z", "kind": "vitals", "values": { "hr_bpm": 81, "spo2_pct": 97, "temp_c": 36.8 }, "source": "live" },
+  { "id": "watch-01-000008", "device": "watch-01", "block": "L8-deepwell-03", "time": "2026-11-17T14:02:41Z", "kind": "vitals", "values": { "hr_bpm": 83, "spo2_pct": 96, "temp_c": 36.8 }, "source": "live" }
 ]
 ```
 
@@ -99,20 +99,20 @@ id|device|block|time|kind|VALUES
   even if it is 1970.
 - `VALUES` is the `values` object as JSON: **keys sorted alphabetically (plain ASCII order), no spaces**, strings in
   double quotes.
-- **Numbers must be written the way JavaScript writes them**: `62` not `62.0`, `41.5` not `41.50`, `60` not `60.00`,
+- **Numbers must be written the way JavaScript writes them**: `412` not `412.0`, `96.5` not `96.50`, `60` not `60.00`,
   no exponent, no leading `+`. The backend parses your JSON and re-prints the numbers before checking, so `60.00`
   in your body becomes `60` on its side and the sig will not match unless you also signed `60`. Use the `num()`
   helper below for every number and this cannot go wrong.
 - Keep strings in `values` to plain ASCII without `"` or `\`.
-- `source` and `sig` are not part of the signed string.
+- `source`, `sig`, `hops` and `via` are not part of the signed string (relays change `hops` and `via` on the way).
 
 ### Test vector (your code must reproduce this exactly)
 
 ```
 key:       hollow-test-key-0001
-reading:   {"id":"relay-07-000123","device":"relay-07","block":"L8-deepwell-03","time":"2026-11-01T14:02:11Z","kind":"power","values":{"battery_pct":62,"draw_w":41.5,"grid_hz":59.97}}
-canonical: relay-07-000123|relay-07|L8-deepwell-03|2026-11-01T14:02:11Z|power|{"battery_pct":62,"draw_w":41.5,"grid_hz":59.97}
-sig:       179c1d3d9063acb856085095bd1556297c65e404aedb05024d3c10c748a18dd3
+reading:   {"id":"relay-l8-bore-bend-000123","device":"relay-l8-bore-bend","block":"l8-bore-bend","time":"2026-11-01T14:02:11Z","kind":"power","values":{"battery_wh":412,"draw_w":96.5,"supply_w":40,"grid_hz":59.97}}
+canonical: relay-l8-bore-bend-000123|relay-l8-bore-bend|l8-bore-bend|2026-11-01T14:02:11Z|power|{"battery_wh":412,"draw_w":96.5,"grid_hz":59.97,"supply_w":40}
+sig:       7c9356baf24afb1dc3ab1d01b4abb9e1e7b3135569c75edbe010c44b33c40aea
 ```
 
 Print the vector from the backend's own code at any time:
@@ -135,8 +135,8 @@ node tools/sign.js hollow-test-key-0001 reading.json
 #include "mbedtls/md.h"
 
 const char* API        = "http://192.168.1.50:8787/ingest";
-const char* DEVICE     = "relay-07";
-const char* BLOCK      = "L8-deepwell-03";
+const char* DEVICE     = "relay-l8-bore-bend";
+const char* BLOCK      = "l8-bore-bend";
 const char* DEVICE_KEY = "hollow-test-key-0001";   // this device's secret, same as in shared/keys.json
 unsigned long seq = 0;
 
@@ -177,12 +177,13 @@ String isoNow() {
 
 // Builds one signed power reading. The values JSON is built ONCE, keys in alphabetical order,
 // and that same string goes into both the canonical string and the body.
-String signedPowerReading(double batteryPct, double drawW, double gridHz) {
+String signedPowerReading(double batteryWh, double drawW, double supplyW, double gridHz) {
   String id     = String(DEVICE) + "-" + String(++seq);
   String time   = isoNow();
-  String values = String("{\"battery_pct\":") + num(batteryPct, 0) +
+  String values = String("{\"battery_wh\":") + num(batteryWh, 0) +
                   ",\"draw_w\":" + num(drawW, 1) +
-                  ",\"grid_hz\":" + num(gridHz, 2) + "}";          // b < d < g: alphabetical
+                  ",\"grid_hz\":" + num(gridHz, 2) +
+                  ",\"supply_w\":" + num(supplyW, 1) + "}";      // b < d < g < s: alphabetical
   String canonical = id + "|" + DEVICE + "|" + BLOCK + "|" + time + "|power|" + values;
   String sig = hmacSha256Hex(DEVICE_KEY, canonical);
   return String("{\"id\":\"") + id + "\",\"device\":\"" + DEVICE + "\",\"block\":\"" + BLOCK +
@@ -193,10 +194,10 @@ String signedPowerReading(double batteryPct, double drawW, double gridHz) {
 void setup() {
   Serial.begin(115200);
   // Self-test against the published vector before trusting anything else:
-  String canonical = "relay-07-000123|relay-07|L8-deepwell-03|2026-11-01T14:02:11Z|power|"
-                     "{\"battery_pct\":62,\"draw_w\":41.5,\"grid_hz\":59.97}";
+  String canonical = "relay-l8-bore-bend-000123|relay-l8-bore-bend|l8-bore-bend|2026-11-01T14:02:11Z|power|"
+                     "{\"battery_wh\":412,\"draw_w\":96.5,\"grid_hz\":59.97,\"supply_w\":40}";
   String sig = hmacSha256Hex("hollow-test-key-0001", canonical);
-  Serial.println(sig == "179c1d3d9063acb856085095bd1556297c65e404aedb05024d3c10c748a18dd3"
+  Serial.println(sig == "7c9356baf24afb1dc3ab1d01b4abb9e1e7b3135569c75edbe010c44b33c40aea"
                  ? "sign self-test OK" : "sign self-test FAILED: " + sig);
   WiFi.begin("YOUR_WIFI", "YOUR_PASSWORD");
   while (WiFi.status() != WL_CONNECTED) delay(500);
@@ -207,7 +208,7 @@ void loop() {
   HTTPClient http;
   http.begin(API);
   http.addHeader("Content-Type", "application/json");
-  int code = http.POST(signedPowerReading(62, 41.5, 59.97));
+  int code = http.POST(signedPowerReading(412, 96.5, 40, 59.97));
   Serial.printf("POST %d: %s\n", code, http.getString().c_str());
   http.end();
   delay(10000);

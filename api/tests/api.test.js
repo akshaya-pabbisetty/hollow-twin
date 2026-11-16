@@ -36,7 +36,8 @@ test("format: valid readings stored, bad ones rejected with a reason", async () 
   assert.strictEqual(ok.body.added, 1);
   const bad = await post("/ingest", [{ id: "x" }, { ...R("s", "b", "smell", {}) }, { ...R("s", "b", "air", {}), time: "yesterday" }]);
   assert.strictEqual(bad.status, 400);
-  assert.deepStrictEqual(bad.body.errors.map((e) => e.err).sort(), ["bad time", "missing device", "unknown kind smell"]);
+  assert.deepStrictEqual(bad.body.errors.map((e) => e.err).sort(),
+    ["missing device; missing block; missing time; missing kind; missing values", "time is not ISO 8601", 'unknown kind "smell"']);
   assert.strictEqual((await post("/ingest", "{not json")).status, 400);
   assert.strictEqual((await post("/ingest", [null])).status, 400);
 });
@@ -102,7 +103,7 @@ test("shot 5, network dies: relay backlog arrives late and out of order, copies 
 
 test("shot 5, families: 'I'm OK' from L1 reaches family on L7 only", async () => {
   await post("/family", { group: "rao", devices: ["watch-11", "watch-71"] });
-  await post("/ingest", R("watch-11", "L1-gallery-02", "button", { type: "ok", to: "rao" }));
+  await post("/ingest", R("watch-11", "L1-gallery-02", "button", { button: "ok", family: "rao" }));
   const inbox = await get("/inbox?device=watch-71");
   assert.ok(inbox.some((a) => /watch-11 is OK/.test(a.values.text)));
   const stranger = await get("/inbox?device=watch-99");
@@ -113,7 +114,7 @@ test("shot 5, families: 'I'm OK' from L1 reaches family on L7 only", async () =>
 
 test("shot 6, bad water: salty cup -> do-not-drink reaches watches in that block", async () => {
   const b = "L3-farms-04";
-  await post("/ingest", R("watch-31", b, "vitals", { hr: 75, spo2: 98, temp_c: 36.7 }));
+  await post("/ingest", R("watch-31", b, "vitals", { hr_bpm: 75, spo2_pct: 98, temp_c: 36.7 }));
   await post("/ingest", R("sensor-03", b, "water", { tds_ppm: 240, turbidity_ntu: 0.8 }));
   assert.ok(!(await get("/inbox?device=watch-31")).some((a) => /Do not drink/.test(a.values.text)), "clean water: silent");
   await post("/ingest", R("sensor-03", b, "water", { tds_ppm: 1450, turbidity_ntu: 1.1 }));
@@ -122,19 +123,19 @@ test("shot 6, bad water: salty cup -> do-not-drink reaches watches in that block
 
 test("shot 7, truth: residents' count vs the Directorate's count", async () => {
   const b = "L8-deepwell-03";
-  for (let i = 0; i < 6; i++) await post("/ingest", R(`watch-8${i}`, b, "button", { type: "symptom" }));
-  for (let i = 0; i < 3; i++) await post("/ingest", R(`watch-9${i}`, b, "vitals", { hr: 96, spo2: 91, temp_c: 38.1 }));
-  await post("/ingest", R("watch-80", b, "button", { type: "symptom" })); // same person twice counts once
+  for (let i = 0; i < 6; i++) await post("/ingest", R(`watch-8${i}`, b, "button", { button: "symptom" }));
+  for (let i = 0; i < 3; i++) await post("/ingest", R(`watch-9${i}`, b, "vitals", { hr_bpm: 96, spo2_pct: 91, temp_c: 38.1 }));
+  await post("/ingest", R("watch-80", b, "button", { button: "symptom" })); // same person twice counts once
   await post("/official", { block: b, count: 2 });
   const row = (await get("/truth")).blocks.find((r) => r.block === b);
   assert.deepStrictEqual([row.residents, row.official, row.gap], [9, 2, 7]);
 });
 
 test("shot 8, care: help requests ranked by vitals, top one dispatched, nearest on ties", async () => {
-  await post("/ingest", R("watch-41", "L4-works-02", "vitals", { hr: 80, spo2: 97, temp_c: 36.8 }));
-  await post("/ingest", R("watch-42", "L8-deepwell-03", "vitals", { hr: 130, spo2: 89, temp_c: 39.0 }));
-  await post("/ingest", R("watch-41", "L4-works-02", "button", { type: "help" }));
-  await post("/ingest", R("watch-42", "L8-deepwell-03", "button", { type: "help" }));
+  await post("/ingest", R("watch-41", "L4-works-02", "vitals", { hr_bpm: 80, spo2_pct: 97, temp_c: 36.8 }));
+  await post("/ingest", R("watch-42", "L8-deepwell-03", "vitals", { hr_bpm: 130, spo2_pct: 89, temp_c: 39.0 }));
+  await post("/ingest", R("watch-41", "L4-works-02", "button", { button: "help" }));
+  await post("/ingest", R("watch-42", "L8-deepwell-03", "button", { button: "help" }));
   const q = await get("/queue");
   assert.strictEqual(q[0].device, "watch-42", "the sicker person is first");
   assert.ok(q[0].score > q[1].score);

@@ -44,17 +44,25 @@ test("unknown routes give 404 JSON", async () => {
   assert.strictEqual((await s.post("/nope", {})).status, 404);
 });
 
-test("future timestamp: more than 5 minutes ahead is rejected with a reason, a small clock drift is fine", async () => {
-  const b = "L4-works-02";
-  const ahead = await s.post("/ingest", s.R("sensor-04", b, "air", { co2_ppm: 800 }, Date.now() + 10 * MIN));
-  assert.strictEqual(ahead.status, 400);
-  assert.match(ahead.body.errors[0].err, /more than 5 minutes in the future \(server clock /);
-  const drift = await s.post("/ingest", s.R("sensor-04", b, "air", { co2_ppm: 801 }, Date.now() + 2 * MIN));
-  assert.strictEqual(drift.body.added, 1);
-  // in a mixed backlog only the future one is refused
-  const mix = await s.post("/ingest", [s.R("sensor-04", b, "air", { co2_ppm: 802 }), s.R("sensor-04", b, "air", { co2_ppm: 803 }, Date.now() + 3600e3)]);
-  assert.deepStrictEqual([mix.status, mix.body.added, mix.body.errors.length], [200, 1, 1]);
-  assert.deepStrictEqual((await s.get(`/history?block=${b}`)).map((r) => r.values.co2_ppm).sort(), [801, 802]);
+test("future timestamp: more than 5 minutes ahead never reaches the timeline (kept, stamped with the receive time, warned); a small drift is fine", async () => {
+  const b = "L4-works-02", t0 = Date.now();
+  const future = s.R("sensor-04", b, "air", { co2_ppm: 800 }, t0 + 10 * MIN);
+  const ahead = await s.post("/ingest", future);
+  assert.deepStrictEqual([ahead.status, ahead.body.added], [200, 1], "kept: a wrong clock must not lose a reading");
+  let got = (await s.get(`/history?block=${b}`)).find((r) => r.id === future.id);
+  assert.strictEqual(got.time_estimated, true);
+  assert.strictEqual(got.device_time, future.time, "what the device sent is kept beside it");
+  assert.ok(Math.abs(Date.parse(got.time) - t0) < 5000, `time ${got.time} should be the receive time, not the future`);
+  assert.match(got.warnings.join(" | "), /more than 5 minutes in the future \(server clock .*stored with the receive time/);
+  const drift = s.R("sensor-04", b, "air", { co2_ppm: 801 }, Date.now() + 2 * MIN);
+  assert.strictEqual((await s.post("/ingest", drift)).body.added, 1);
+  got = (await s.get(`/history?block=${b}`)).find((r) => r.id === drift.id);
+  assert.deepStrictEqual([got.time, got.time_estimated, got.warnings], [drift.time, undefined, undefined], "2 minutes ahead is left alone");
+  // a reading stamped far ahead cannot push itself to the end of the timeline or into a forecast
+  await s.post("/ingest", [s.R("sensor-04", b, "air", { co2_ppm: 802 }), s.R("sensor-04", b, "air", { co2_ppm: 803 }, Date.now() + 48 * 3600e3)]);
+  const hist = await s.get(`/history?block=${b}`);
+  assert.strictEqual(hist.length, 4);
+  assert.ok(hist.every((r) => Date.parse(r.time) <= Date.now() + 5 * MIN), "nothing stored is dated in the future");
 });
 
 test("1970 timestamp (ESP32 with no clock sync): accepted, stamped with the receive time, marked time_estimated", async () => {
@@ -64,6 +72,7 @@ test("1970 timestamp (ESP32 with no clock sync): accepted, stamped with the rece
   const [got] = await s.get(`/history?block=${b}`);
   assert.strictEqual(got.time_estimated, true);
   assert.strictEqual(got.device_time, "1970-01-01T00:00:07Z");
+  assert.match(got.warnings[0], /is before 2020 \(device clock not set\): stored with the receive time/);
   assert.ok(Math.abs(Date.parse(got.time) - t0) < 5000, `time ${got.time} should be the receive time`);
   assert.strictEqual((await s.get(`/history?block=${b}&since=2020-01-01T00:00:00Z`)).length, 1, "it shows up in recent history, not in 1970");
   // a reading with a real clock is left alone, and a sender cannot set the flag itself
@@ -78,7 +87,7 @@ test("1970 timestamp (ESP32 with no clock sync): accepted, stamped with the rece
 });
 
 test("rate limit: default allows 20 single posts a second per device", async () => {
-  const rs = await Promise.all(Array.from({ length: 20 }, (_, i) => s.post("/ingest", s.R("watch-20", "L2-market-01", "vitals", { hr: 70 + i, spo2: 98, temp_c: 36.6 }))));
+  const rs = await Promise.all(Array.from({ length: 20 }, (_, i) => s.post("/ingest", s.R("watch-20", "L2-market-01", "vitals", { hr_bpm: 70 + i, spo2_pct: 98, temp_c: 36.6 }))));
   assert.ok(rs.every((r) => r.status === 200 && r.body.added === 1));
 });
 

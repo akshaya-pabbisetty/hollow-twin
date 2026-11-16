@@ -30,7 +30,7 @@ test("README documents every endpoint the server has, and every documented GET r
 test("the original endpoints and fields kept their shape", async () => {
   const b = "L8-deepwell-03";
   await s.post("/ingest", s.R("relay-07", b, "power", { battery_pct: 62, draw_w: 41.5, grid_hz: 59.97 }));
-  await s.post("/ingest", s.R("watch-01", b, "button", { type: "help" }));
+  await s.post("/ingest", s.R("watch-01", b, "button", { button: "help" }));
   await s.post("/official", { block: b, count: 2 });
   const has = (obj, keys, what) => { for (const k of keys) assert.ok(k in obj, `${what} lost the field ${k}`); };
   const hist = await s.get("/history");
@@ -55,13 +55,27 @@ test("the original endpoints and fields kept their shape", async () => {
   assert.ok(Array.isArray(await s.get("/inbox?device=watch-01")));
 });
 
-test("FORMAT.md: every original field and kind is still there, new ones are marked optional", () => {
-  const f = read("shared/FORMAT.md");
-  for (const field of ["id", "device", "block", "time", "kind", "values"]) assert.ok(f.includes(`| \`${field}\` |`), field);
-  for (const kind of ["power", "vitals", "button", "water", "air", "flood", "tunnel", "surface", "alert"]) assert.ok(f.includes(`| \`${kind}\` |`), kind);
-  for (const v of ["battery_pct", "draw_w", "grid_hz", "hr", "spo2", "temp_c", "tds_ppm", "turbidity_ntu", "co2_ppm", "depth_cm", "photo_url", "radiation_usv_h"]) assert.ok(f.includes(v), v);
-  assert.match(f, /`source` \| OPTIONAL/); assert.match(f, /`sig` \| OPTIONAL/);
-  assert.match(f, /Optional additions: `o2_pct`.*`pm25_ugm3`/);
+test("CONTRACT.md: every field, kind and value the team agreed is still there; lane 1's additions are optional and in the changelog", () => {
+  const c = fs.readFileSync(path.join(ROOT, "..", "CONTRACT.md"), "utf8");
+  for (const field of ["id", "device", "block", "time", "kind", "values", "hops", "via"]) assert.ok(c.includes(`| \`${field}\` |`), field);
+  for (const kind of ["power", "vitals", "button", "checkin", "water", "air", "flood", "tunnel", "surface"]) assert.ok(c.includes(`| \`${kind}\` |`), kind);
+  for (const row of [
+    "| `power` | relay box | `battery_wh`, `draw_w`, `supply_w` |",
+    "| `vitals` | watch | `hr_bpm`, `spo2_pct`, `temp_c` |",
+    "| `button` | watch | `button`: `help`, `symptom` or `ok` |",
+    "| `checkin` | watch | `status`: `ok`; `family`: family group ID; `to`: list of watch IDs to reach |",
+    "| `water` | sensor node | `tds_ppm`, `turbidity_ntu` |",
+    "| `air` | sensor node | `co2_ppm`, `temp_c`, `humidity_pct` |",
+    "| `flood` | sensor node | `depth_cm` |",
+    "| `tunnel` | scout robot | `from_block`, `to_block`, `status`: `open` or `closed`, `reason`, `photo_url` |",
+    "| `surface` | surface scout | `co2_ppm`, `temp_c`, `radiation_usv_h`, `photo_url` |",
+  ]) assert.ok(c.includes(row), `the agreed row is untouched: ${row}`);
+  const log = c.slice(c.indexOf("## Changelog (lane 1)"));
+  assert.ok(c.includes("## Changelog (lane 1)") && log.length > 200, "the changelog section exists");
+  for (const added of ["`source`", "`sig`", "`volunteer`", "`o2_pct`", "`pm25_ugm3`", "`alert`", "`warnings`"]) {
+    assert.ok(c.includes(added), `CONTRACT.md documents ${added}`);
+    assert.ok(log.includes(added), `the changelog lists ${added}`);
+  }
 });
 
 test("the guides cover what each lane was promised", () => {

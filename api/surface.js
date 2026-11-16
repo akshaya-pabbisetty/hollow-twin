@@ -72,8 +72,8 @@ function surfaceHistory(readings) {
 //   volunteers only; in the people register; never sole caregivers; no open help request;
 //   latest vitals present, recent and inside the healthy ranges; then prefer needed skills, then who volunteered first.
 const HEALTHY = [
-  ["vitals_spo2_healthy_min_pct", "spo2", "SpO2"],
-  ["vitals_hr_healthy_min_bpm", "hr", "pulse"], ["vitals_hr_healthy_max_bpm", "hr", "pulse"],
+  ["vitals_spo2_healthy_min_pct", "spo2_pct", "SpO2"],
+  ["vitals_hr_healthy_min_bpm", "hr_bpm", "pulse"], ["vitals_hr_healthy_max_bpm", "hr_bpm", "pulse"],
   ["vitals_temp_healthy_min_c", "temp_c", "temperature"], ["vitals_temp_healthy_max_c", "temp_c", "temperature"],
 ];
 function firstwave(readings, openHelp, register, n = LIM.val("firstwave_default_n"), now = Date.now()) {
@@ -83,7 +83,7 @@ function firstwave(readings, openHelp, register, n = LIM.val("firstwave_default_
   const src = LIM.ref("vitals_spo2_healthy_min_pct").source;
   const volunteered = {}; // device -> first volunteer press
   for (const r of readings)
-    if (r.kind === "button" && r.values.type === "volunteer" && (!volunteered[r.device] || t(r) < t(volunteered[r.device]))) volunteered[r.device] = r;
+    if (r.kind === "button" && r.values.button === "volunteer" && (!volunteered[r.device] || t(r) < t(volunteered[r.device]))) volunteered[r.device] = r;
   const ranked = [], excluded = [];
   for (const [device, press] of Object.entries(volunteered)) {
     const p = people[device], out = [];
@@ -100,7 +100,7 @@ function firstwave(readings, openHelp, register, n = LIM.val("firstwave_default_
       const off = LIM.hits(HEALTHY.map(([key, f, label]) => [key, v.values[f], label]));
       if (gaps.length) out.push(`not enough data: latest vitals have no ${gaps.join(", ")}`);
       else if (off.length) out.push(...off.map((h) => `vitals outside the healthy range: ${h.why}`));
-      else reasons.push(`latest vitals healthy: SpO2 ${v.values.spo2} %, pulse ${v.values.hr} bpm, temperature ${v.values.temp_c} C (${src})`);
+      else reasons.push(`latest vitals healthy: SpO2 ${v.values.spo2_pct} %, pulse ${v.values.hr_bpm} bpm, temperature ${v.values.temp_c} C (${src})`);
     }
     const base = { device, name: p ? p.name : null, block: press.block, skills: p ? p.skills || [] : [], volunteered_at: press.time,
       vitals: v ? v.values : null, source: press.source };

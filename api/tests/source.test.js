@@ -52,7 +52,7 @@ test("/blocks says per block whether its latest data is live or simulated", asyn
 });
 
 test("source survives a restart, and other endpoints pass it through", async () => {
-  await s.post("/ingest", s.R("watch-41", "L4-works-02", "button", { type: "help" }, Date.now(), { source: "live" }));
+  await s.post("/ingest", s.R("watch-41", "L4-works-02", "button", { button: "help" }, Date.now(), { source: "live" }));
   const d = await s.post("/dispatch", { responder: "rover-01", block: "L4-works-02" });
   assert.strictEqual(d.body.assigned.device, "watch-41");
   await s.restart();

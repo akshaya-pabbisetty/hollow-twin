@@ -23,11 +23,11 @@ test("limits.json: every safety fact has a source and url, every design choice h
 });
 
 test("no threshold is hard-coded in the server code: the numbers in the rules all come from limits.json", () => {
-  for (const f of ["server.js", "logic.js"]) {
+  for (const f of ["server.js", "logic.js", "surface.js", "contract.js"]) {
     const code = fs.readFileSync(path.join(ROOT, f), "utf8")
       .split("\n").filter((line) => !line.trim().startsWith("//")).join("\n");
-    // a comparison of a reading field with a literal number, e.g. `v.co2_ppm > 2000` or `spo2 < 92`
-    const hard = code.match(/\b(tds_ppm|turbidity_ntu|co2_ppm|depth_cm|grid_hz|spo2|hr|temp_c|hours_left|o2_pct|pm25_ugm3|radiation_usv_h)\b\s*(-\s*\d+\s*\)\s*)?[<>]=?\s*-?\d/g);
+    // a comparison of a reading field with a literal number, e.g. `v.co2_ppm > 2000` or `spo2_pct < 92`
+    const hard = code.match(/\b(tds_ppm|turbidity_ntu|co2_ppm|depth_cm|grid_hz|spo2_pct|hr_bpm|spo2|hr|temp_c|humidity_pct|battery_wh|battery_pct|draw_w|supply_w|hours_left|o2_pct|pm25_ugm3|radiation_usv_h)\b\s*(-\s*\d+\s*\)\s*)?[<>]=?\s*-?\d/g);
     assert.strictEqual(hard, null, `${f} compares a reading with a literal: ${hard}`);
     assert.ok(!/WARN_HOURS\s*=\s*\d/.test(code), `${f} still defines WARN_HOURS`);
   }
@@ -96,16 +96,16 @@ test("battery warning: design-choice limit is named as one, with its reason", as
 test("triage: NEWS2 bands drive the score and each point is explained", async () => {
   const lim = (k) => limits[k].value;
   const base = lim("triage_base_points");
-  assert.strictEqual(L.triage({ hr: 70, spo2: 98, temp_c: 36.8 }), base, "healthy vitals add nothing");
-  assert.strictEqual(L.triage({ spo2: lim("vitals_spo2_severe_below_pct") - 1 }), base + lim("triage_spo2_severe_points"));
-  assert.strictEqual(L.triage({ spo2: lim("vitals_spo2_low_below_pct") - 1 }), base + lim("triage_spo2_low_points"));
-  assert.strictEqual(L.triage({ spo2: lim("vitals_spo2_low_below_pct") }), base, "at the limit is not below it");
-  assert.strictEqual(L.triage({ hr: lim("vitals_hr_high_above_bpm") + 1 }), base + lim("triage_hr_points"));
-  assert.strictEqual(L.triage({ hr: lim("vitals_hr_low_below_bpm") - 1 }), base + lim("triage_hr_points"));
+  assert.strictEqual(L.triage({ hr_bpm: 70, spo2_pct: 98, temp_c: 36.8 }), base, "healthy vitals add nothing");
+  assert.strictEqual(L.triage({ spo2_pct: lim("vitals_spo2_severe_below_pct") - 1 }), base + lim("triage_spo2_severe_points"));
+  assert.strictEqual(L.triage({ spo2_pct: lim("vitals_spo2_low_below_pct") - 1 }), base + lim("triage_spo2_low_points"));
+  assert.strictEqual(L.triage({ spo2_pct: lim("vitals_spo2_low_below_pct") }), base, "at the limit is not below it");
+  assert.strictEqual(L.triage({ hr_bpm: lim("vitals_hr_high_above_bpm") + 1 }), base + lim("triage_hr_points"));
+  assert.strictEqual(L.triage({ hr_bpm: lim("vitals_hr_low_below_bpm") - 1 }), base + lim("triage_hr_points"));
   assert.strictEqual(L.triage({ temp_c: lim("vitals_fever_above_c") + 0.1 }), base + lim("triage_fever_points"));
   assert.strictEqual(L.triage(undefined), base);
-  await s.post("/ingest", s.R("watch-42", "L8-deepwell-03", "vitals", { hr: 130, spo2: 89, temp_c: 39.0 }));
-  await s.post("/ingest", s.R("watch-42", "L8-deepwell-03", "button", { type: "help" }));
+  await s.post("/ingest", s.R("watch-42", "L8-deepwell-03", "vitals", { hr_bpm: 130, spo2_pct: 89, temp_c: 39.0 }));
+  await s.post("/ingest", s.R("watch-42", "L8-deepwell-03", "button", { button: "help" }));
   const q = await s.get("/queue");
   assert.strictEqual(q[0].reasons.length, 4);
   assert.match(q[0].reasons.join(" | "), /SpO2 89 % is below 92 % \(Royal College of Physicians.*pulse 130 bpm is above 110 bpm.*temperature 39 C is above 38 C/);

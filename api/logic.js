@@ -99,10 +99,10 @@ function triageDetail(v) {
     return true;
   };
   if (v) {
-    add("vitals_spo2_severe_below_pct", "triage_spo2_severe_points", v.spo2, "SpO2") ||
-      add("vitals_spo2_low_below_pct", "triage_spo2_low_points", v.spo2, "SpO2");
-    add("vitals_hr_high_above_bpm", "triage_hr_points", v.hr, "pulse") ||
-      add("vitals_hr_low_below_bpm", "triage_hr_points", v.hr, "pulse");
+    add("vitals_spo2_severe_below_pct", "triage_spo2_severe_points", v.spo2_pct, "SpO2") ||
+      add("vitals_spo2_low_below_pct", "triage_spo2_low_points", v.spo2_pct, "SpO2");
+    add("vitals_hr_high_above_bpm", "triage_hr_points", v.hr_bpm, "pulse") ||
+      add("vitals_hr_low_below_bpm", "triage_hr_points", v.hr_bpm, "pulse");
     add("vitals_fever_above_c", "triage_fever_points", v.temp_c, "temperature");
   } else reasons.push("no vitals on record for this watch");
   return { score, reasons };
@@ -110,7 +110,7 @@ function triageDetail(v) {
 const triage = (v) => triageDetail(v).score;
 
 function queue(readings, dispatched, now = Date.now()) {
-  const helps = readings.filter((r) => r.kind === "button" && r.values.type === "help" && !dispatched.has(r.id));
+  const helps = readings.filter((r) => r.kind === "button" && r.values.button === "help" && !dispatched.has(r.id));
   const grace = LIM.val("triage_vitals_grace_s") * 1000, per = LIM.val("triage_wait_minutes_per_point");
   return helps.map((h) => {
     const v = readings.filter((r) => r.device === h.device && r.kind === "vitals" && t(r) <= t(h) + grace)
@@ -140,8 +140,8 @@ function truth(readings, official, now = Date.now(), windowH = LIM.val("truth_wi
   const sick = {};
   for (const r of readings) {
     if (t(r) < since) continue;
-    const isSick = (r.kind === "button" && r.values.type === "symptom") ||
-      (r.kind === "vitals" && LIM.crossed("vitals_spo2_low_below_pct", r.values.spo2));
+    const isSick = (r.kind === "button" && r.values.button === "symptom") ||
+      (r.kind === "vitals" && LIM.crossed("vitals_spo2_low_below_pct", r.values.spo2_pct));
     if (isSick) (sick[r.block] ||= new Set()).add(r.device);
   }
   const blocks = new Set([...Object.keys(sick), ...Object.keys(official)]);

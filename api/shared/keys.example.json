@@ -1,8 +1,9 @@
 {
-  "_note": "Copy this file to shared/keys.json (gitignored, never commit it) and give every device its own long random secret. The same secret is flashed into that device. A device listed here can sign its readings (see docs/FIRMWARE.md); a device not listed is still accepted but stored as verified: false.",
+  "_note": "Copy this file to shared/keys.json (gitignored, never commit it) and give every device its own long random secret. The same secret is flashed into that device. A device listed here can sign its messages (see docs/FIRMWARE.md); a device not listed is still accepted but stored as verified: false.",
   "_make_a_secret": "node -e \"console.log(require('crypto').randomBytes(24).toString('hex'))\"",
-  "relay-07": "hollow-test-key-0001",
-  "watch-01": "replace-with-a-long-random-secret",
-  "sensor-01": "replace-with-a-long-random-secret",
-  "scout-01": "replace-with-a-long-random-secret"
+  "relay-l8-bore-bend": "hollow-test-key-0001",
+  "watch-0042": "replace-with-a-long-random-secret",
+  "sensor-l7-chalk-cut": "replace-with-a-long-random-secret",
+  "rover-01": "replace-with-a-long-random-secret",
+  "surface-01": "replace-with-a-long-random-secret"
 }

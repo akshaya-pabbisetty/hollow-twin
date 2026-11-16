@@ -7,9 +7,10 @@
 // where VALUES is the values object as JSON with its keys sorted alphabetically and no spaces,
 // and `time` is exactly the string the device sent. Example:
 //
-//   relay-07-000123|relay-07|L8-deepwell-03|2026-11-01T14:02:11Z|power|{"battery_pct":62,"draw_w":41.5,"grid_hz":59.97}
+//   relay-l8-bore-bend-000123|relay-l8-bore-bend|l8-bore-bend|2026-11-01T14:02:11Z|power|{"battery_wh":412,"draw_w":96.5,"grid_hz":59.97,"supply_w":40}
 //
-// Numbers are written the way JSON.stringify writes them: 62 not 62.0, 41.5 not 41.50, no exponent.
+// Numbers are written the way JSON.stringify writes them: 412 not 412.0, 96.5 not 96.50, no exponent.
+// The value names are the ones the device sent. hops and via are NOT signed: relays change them on the way.
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
@@ -44,10 +45,10 @@ function loadKeys() {
 // The published test vector: firmware must reproduce this sig exactly (see docs/FIRMWARE.md).
 const TEST_VECTOR = {
   key: "hollow-test-key-0001",
-  reading: { id: "relay-07-000123", device: "relay-07", block: "L8-deepwell-03", time: "2026-11-01T14:02:11Z",
-    kind: "power", values: { battery_pct: 62, draw_w: 41.5, grid_hz: 59.97 } },
-  canonical: 'relay-07-000123|relay-07|L8-deepwell-03|2026-11-01T14:02:11Z|power|{"battery_pct":62,"draw_w":41.5,"grid_hz":59.97}',
-  sig: "179c1d3d9063acb856085095bd1556297c65e404aedb05024d3c10c748a18dd3",
+  reading: { id: "relay-l8-bore-bend-000123", device: "relay-l8-bore-bend", block: "l8-bore-bend", time: "2026-11-01T14:02:11Z",
+    kind: "power", values: { battery_wh: 412, draw_w: 96.5, supply_w: 40, grid_hz: 59.97 } },
+  canonical: 'relay-l8-bore-bend-000123|relay-l8-bore-bend|l8-bore-bend|2026-11-01T14:02:11Z|power|{"battery_wh":412,"draw_w":96.5,"grid_hz":59.97,"supply_w":40}',
+  sig: "7c9356baf24afb1dc3ab1d01b4abb9e1e7b3135569c75edbe010c44b33c40aea",
 };
 
 module.exports = { canonical, sign, check, loadKeys, TEST_VECTOR };

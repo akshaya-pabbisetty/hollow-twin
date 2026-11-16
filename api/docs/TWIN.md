@@ -155,7 +155,7 @@ Surface verdicts: `suits OK` green, `sealed domes needed` amber, `stay undergrou
     "latest": [ { "id": "alert-...", "kind": "alert", "block": "L6-borebend-02", "seq": 186, "source": "simulated",
                   "values": { "level": "warn", "text": "L6-borebend-02 has about 7 h of battery left", "why": "...", "limit": { "...": "..." } } } ]
   },
-  "queue": { "length": 2, "top": { "id": "watch-43-...", "device": "watch-43", "block": "L5-rivet-01", "score": 65, "vitals": { "hr": 96, "spo2": 96, "temp_c": 38.4 }, "reasons": ["help pressed: 50 points", "+15: temperature 38.4 C is above 38 C (...)"] } },
+  "queue": { "length": 2, "top": { "id": "watch-43-...", "device": "watch-43", "block": "L5-rivet-01", "score": 65, "vitals": { "hr_bpm": 96, "spo2_pct": 96, "temp_c": 38.4 }, "reasons": ["help pressed: 50 points", "+15: temperature 38.4 C is above 38 C (...)"] } },
   "truth": { "window_h": 24, "residents_total": 12, "official_total": 2, "gap": 10,
              "blocks": [ { "block": "L8-deepwell-03", "residents": 12, "official": 2, "gap": 10 } ] },
   "surface": { "verdict": "sealed domes needed", "reasons": ["radiation 2.1 µSv/h is above 1 µSv/h (IAEA, ...)"], "missing": [], "source": "simulated" },

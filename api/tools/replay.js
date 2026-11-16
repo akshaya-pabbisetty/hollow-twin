@@ -21,7 +21,7 @@ setInterval(async () => {
   const batch = [
     reading("relay-07", "power", { battery_pct: Math.max(0, 90 - n), draw_w: 40 + Math.random() * 5,
       grid_hz: +(60 - 0.3 * drift + (Math.random() - 0.5) * 0.02).toFixed(3) }),
-    reading("watch-01", "vitals", { hr: 78 + Math.round(Math.random() * 6), spo2: 97 - Math.round(3 * drift), temp_c: 36.8 }),
+    reading("watch-01", "vitals", { hr_bpm: 78 + Math.round(Math.random() * 6), spo2_pct: 97 - Math.round(3 * drift), temp_c: 36.8 }),
     reading("sensor-01", "water", { tds_ppm: Math.round(250 + 900 * drift), turbidity_ntu: +(1 + 5 * drift).toFixed(1) }),
     reading("sensor-01", "air", { co2_ppm: Math.round(800 + 900 * drift) }),
     reading("sensor-01", "flood", { depth_cm: +(2 + 18 * drift).toFixed(1) }),

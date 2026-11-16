@@ -1,9 +1,10 @@
 // Hollow Twin backend. No dependencies: `node server.js` (from the api folder)
 // POST /ingest            one reading or an array (relay backlogs). Duplicates by id are dropped.
 //                         Limits: 5 MB body, 20 single posts per device per second (an array is one request, never dropped),
-//                         time more than 5 min ahead is rejected, time before 2020 is replaced by the receive time.
+//                         a time before 2020 or more than 5 min ahead is replaced by the receive time (time_estimated).
+//                         Messages use the CONTRACT.md format; the old value names (hr, spo2, button type) are accepted as aliases.
 //                         If the INGEST_KEY env var is set, every POST needs the header x-api-key.
-//                         Optional "sig" (HMAC-SHA256, see api/sign.js): valid = stored verified:true, wrong = rejected,
+//                         Optional "sig" (HMAC-SHA256, see sign.js): valid = stored verified:true, wrong = rejected,
 //                         none = stored verified:false.
 // GET  /feed              server-sent events: every new reading and alert, live. Each event has an id (the record's seq);
 //                         reconnect with the Last-Event-ID header or ?lastEventId= to get everything missed, in order
@@ -27,6 +28,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const C = require("./contract");
 const L = require("./logic");
 const LIM = require("./limits");
 const SIGN = require("./sign");
@@ -41,10 +43,8 @@ const MAX_BODY = LIM.val("ingest_max_body_bytes");
 const MAX_FUTURE_MS = LIM.val("ingest_max_future_min") * 60e3;
 const MIN_TIME = Date.parse(LIM.val("ingest_min_valid_time"));
 const KEYS = SIGN.loadKeys();                          // device -> secret, for checking signed readings
-const SOURCES = ["live", "simulated"];
 // Who people are: skills and whether someone depends on them alone. Used only by /firstwave.
 const PEOPLE = JSON.parse(fs.readFileSync(process.env.PEOPLE || path.join(__dirname, "shared/people.json"), "utf8"));
-const KINDS = ["power", "vitals", "button", "water", "air", "flood", "tunnel", "surface", "alert"];
 
 const readings = [];
 const seen = new Set();
@@ -70,6 +70,8 @@ function load() {
     if (r._meta) { applyMeta(r._meta); continue; }
     if (!r.source) r.source = "simulated"; // lines written before the field existed
     if (r.verified === undefined && r.kind !== "alert") r.verified = false;
+    // lines written before the contract: rename their values so everything served uses contract names
+    if (r.kind !== "alert" && r.values && typeof r.values === "object") r.values = C.normalise(r.kind, r.values).values;
     r.seq = lastSeq = Math.max(lastSeq + 1, r.seq || 0); // older files have no seq: number them in file order
     readings.push(r); seen.add(r.id);
     if (r.kind === "alert" && r.values && r.values.surface_verdict) surfaceVerdict = r.values.surface_verdict;
@@ -82,40 +84,43 @@ function applyMeta(m) {
 }
 function saveMeta(m) { applyMeta(m); fs.appendFileSync(DATA, JSON.stringify({ _meta: m }) + "\n"); }
 
-function validate(r) {
-  if (!r || typeof r !== "object") return "not an object";
-  for (const f of ["id", "device", "block", "time", "kind", "values"])
-    if (r[f] === undefined) return `missing ${f}`;
-  if (!KINDS.includes(r.kind)) return `unknown kind ${r.kind}`;
-  if (isNaN(Date.parse(r.time))) return "bad time";
-  if (typeof r.values !== "object" || r.values === null) return "values must be an object";
-  if (r.source !== undefined && !SOURCES.includes(r.source)) return "source must be live or simulated";
-  return null;
-}
-
-// Turns what a device sent into the record we store ({ rec }), or a reason for refusing it ({ id, err }).
+// Turns what a device sent into the record we store ({ rec }), or the reasons for refusing it ({ id, problems }).
+// The record uses contract names only: legacy value names are renamed here, on the way in.
 function accept(r, now) {
-  const err = validate(r);
-  if (err) return { id: r && r.id, err };
-  const rec = { ...r, source: r.source || "simulated" }; // honest default: only real hardware says "live"
-  for (const f of ["seq", "time_estimated", "device_time", "verified", "sig_unchecked"]) delete rec[f]; // these are ours to set, never the sender's
-  // Signature: checked against what the device sent (its own time string), before we touch anything.
-  rec.verified = false;
+  const bad = C.problems(r);
+  if (bad.length) return { id: (r && typeof r === "object" && r.id) ?? null, problems: bad };
+  // Signature: checked against exactly what the device sent (its own time string and value names), before we touch anything.
+  let verified = false, sigUnchecked;
   if (r.sig !== undefined) {
     const key = KEYS[r.device];
     if (key) {
-      if (!SIGN.check(r, key)) return { id: r.id, err: `bad signature for ${r.device}: sig does not match id|device|block|time|kind|values` };
-      rec.verified = true;
-    } else rec.sig_unchecked = `no key on file for ${r.device}`; // cannot check it, so it is stored as unverified
+      if (!SIGN.check(r, key)) return { id: r.id, problems: [`bad signature for ${r.device}: sig does not match id|device|block|time|kind|values`] };
+      verified = true;
+    } else sigUnchecked = `no key on file for ${r.device}`; // cannot check it, so it is stored as unverified
   }
-  const taken = Date.parse(r.time);
-  if (taken > now + MAX_FUTURE_MS)
-    return { id: r.id, err: `time ${r.time} is more than ${LIM.val("ingest_max_future_min")} minutes in the future (server clock ${new Date(now).toISOString()})` };
-  if (taken < MIN_TIME) { // an ESP32 that has not synced its clock yet reports 1970: keep the data, estimate the time
+  const { values, renamed } = C.normalise(r.kind, r.values);
+  const wrong = C.valueProblems(r.kind, values);
+  if (wrong.length) return { id: r.id, problems: wrong };
+  const route = C.route(r);
+  const warnings = [...route.warnings];
+  if (renamed.length) warnings.push(`old field names renamed to contract names: ${renamed.join(", ")}`);
+  const rec = { ...r, values, hops: route.hops, via: route.via, source: r.source || "simulated" }; // honest default: only real hardware says "live"
+  for (const f of ["seq", "time_estimated", "device_time", "verified", "sig_unchecked", "warnings"]) delete rec[f]; // these are ours to set, never the sender's
+  rec.verified = verified;
+  if (sigUnchecked) rec.sig_unchecked = sigUnchecked;
+  // A time we cannot trust never reaches the timeline: the reading is kept, stamped with the receive time and marked.
+  //   before 2020 = an ESP32 that has not synced its clock yet (it reports 1970)
+  //   more than a few minutes ahead of this server = a wrong clock, a wrong time zone, or a fixed sample time
+  const taken = Date.parse(r.time), early = taken < MIN_TIME, late = taken > now + MAX_FUTURE_MS;
+  if (early || late) {
     rec.device_time = r.time;
     rec.time = new Date(now).toISOString();
     rec.time_estimated = true;
+    warnings.push(early
+      ? `time ${r.time} is before ${LIM.val("ingest_min_valid_time").slice(0, 4)} (device clock not set): stored with the receive time`
+      : `time ${r.time} is more than ${LIM.val("ingest_max_future_min")} minutes in the future (server clock ${new Date(now).toISOString()}): stored with the receive time`);
   }
+  if (warnings.length) rec.warnings = warnings;
   return { rec };
 }
 
@@ -123,7 +128,7 @@ function alert(r, level, text, extra = {}, suffix = "0") {
   // an alert is as real as the reading that caused it: it inherits live/simulated
   return { id: `alert-${r.id}-${suffix}`, device: "backend", block: r.block,
     time: new Date().toISOString(), kind: "alert", values: { level, text, cause: r.id, cause_verified: r.verified === true, ...extra },
-    source: r.source || "simulated" };
+    hops: 0, via: [], source: r.source || "simulated" };
 }
 
 // Every rule compares a reading with a limit from shared/limits.json and says why it fired:
@@ -166,15 +171,23 @@ function rules(r) {
       surfaceVerdict = sv.verdict;
     }
   }
-  if (r.kind === "button" && v.type === "volunteer")
+  if (r.kind === "button" && v.button === "volunteer")
     out.push(alert(r, "info", `${r.device} volunteered for the first wave`, { to: [r.device], why: `${r.device} pressed the volunteer button` }, "vol"));
-  if (r.kind === "tunnel" && v.status === "closed")
-    out.push(alert(r, "warn", `Tunnel closed in ${r.block}: use another route`, { why: `${r.device} reported the tunnel closed` }));
-  if (r.kind === "button" && v.type === "help")
+  if (r.kind === "tunnel" && v.status === "closed") {
+    // a tunnel joins two blocks: residents of both are told (see /inbox), with the rover's reason and photo
+    const ends = [v.from_block, v.to_block].filter((b) => typeof b === "string" && b);
+    const where = ends.length === 2 ? `between ${ends[0]} and ${ends[1]}` : `in ${r.block}`;
+    const reason = typeof v.reason === "string" && v.reason ? v.reason : null;
+    out.push(alert(r, "warn", `Tunnel closed ${where}${reason ? ` (${reason})` : ""}: use another route`,
+      { why: `${r.device} reported the tunnel ${where} closed${reason ? `: ${reason}` : ""}`, blocks: [...new Set([r.block, ...ends])],
+        ...(ends.length === 2 ? { from_block: ends[0], to_block: ends[1] } : {}), ...(reason ? { reason } : {}),
+        ...(v.photo_url ? { photo_url: v.photo_url } : {}) }));
+  }
+  if (r.kind === "button" && v.button === "help")
     out.push(alert(r, "danger", `Help requested by ${r.device} in ${r.block}`, { why: `${r.device} pressed the help button` }));
-  if (r.kind === "button" && v.type === "ok" && v.to && families[v.to]) {
-    const to = families[v.to].filter((d) => d !== r.device);
-    out.push(alert(r, "info", `${r.device} is OK (${r.block})`, { to, group: v.to, sent: r.time, why: `${r.device} pressed OK for family group ${v.to}` }));
+  if (r.kind === "button" && v.button === "ok" && v.family && families[v.family]) {
+    const to = families[v.family].filter((d) => d !== r.device);
+    out.push(alert(r, "info", `${r.device} is OK (${r.block})`, { to, family: v.family, sent: r.time, why: `${r.device} pressed OK for family group ${v.family}` }));
   }
   return out;
 }
@@ -278,7 +291,7 @@ function route(req, res) {
     const recs = [];
     for (const r of [].concat(body)) {
       const a = accept(r, now);
-      if (a.err) errors.push({ id: a.id, err: a.err }); else recs.push(a.rec);
+      if (a.problems) errors.push({ id: a.id, err: a.problems.join("; ") }); else recs.push(a.rec);
     }
     recs.sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
     for (const r of recs) {
@@ -353,7 +366,7 @@ function route(req, res) {
     const devs = families[q.group];
     if (!devs) return send(res, 404, { error: "unknown group" });
     return send(res, 200, devs.map((d) => {
-      const last = readings.filter((r) => r.device === d && r.kind === "button" && r.values.type === "ok")
+      const last = readings.filter((r) => r.device === d && r.kind === "button" && r.values.button === "ok")
         .sort((a, b) => Date.parse(b.time) - Date.parse(a.time))[0];
       return { device: d, last_ok: last ? last.time : null, block: last ? last.block : null };
     }));
@@ -363,7 +376,7 @@ function route(req, res) {
     const afterSeq = Number(q.after_seq) || 0; // relays pass the last seq they forwarded to get only new alerts
     return send(res, 200, readings.filter((r) => r.kind === "alert" && r.seq > afterSeq &&
       ((r.values.to && r.values.to.includes(q.device)) ||
-       (!r.values.to && readings.some((x) => x.device === q.device && x.block === r.block)))));
+       (!r.values.to && readings.some((x) => x.device === q.device && (x.block === r.block || (r.values.blocks || []).includes(x.block)))))));
   }
   if (req.method === "POST" && p === "/official") return readBody(req, res, (e, b) => {
     if (e || !b || !b.block || typeof b.count !== "number") return send(res, 400, { error: "need block and count" });

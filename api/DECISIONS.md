@@ -117,3 +117,52 @@ and every assertion are unchanged.
 - Azure instructions use a code deploy (`az webapp up`) rather than the Dockerfile, because it needs no registry.
   The Dockerfile is for Render, local Docker, or Azure custom containers.
 - Nothing was deployed and nothing was pushed to a remote.
+
+---
+
+# Moving into the team repository and speaking CONTRACT.md (branch `lane1-backend`)
+
+Everything above was decided in the standalone backend. Everything below was decided while moving it into
+`api/` of the team repository and making it speak `CONTRACT.md`. Where a note above mentions an old field name
+(`hr`, `spo2`, `battery_pct`, button `type`), an old block id (`L8-deepwell-03`) or the old `/ingest` reply, the
+sections below replace it.
+
+## Step 0: the move
+
+- The backend was copied in, not merged with its history. The standalone repository keeps the old history
+  (its last commit is `f978607`); the team repository gets one commit for the move and one per task.
+- Server code sits at the top of `api/` (`server.js`, `logic.js`, ...), so both `npm start` inside `api/` and
+  `node api/server.js` from the repository root work. Hosts use the second form.
+- `api/` has its own `.gitignore` (data file, `shared/keys.json`). The repository's own `.gitignore` is not mine to
+  edit.
+- The Docker ignore file is `api/Dockerfile.dockerignore`, because the image is built from the repository root
+  (`docker build -f api/Dockerfile .`) and a `.dockerignore` there would be outside `api/`.
+
+## Task 1: contract message format
+
+- **Names.** Stored records and every response use the contract's value names. The old names are renamed on the way
+  in: vitals `hr` -> `hr_bpm`, `spo2` -> `spo2_pct`; button `type` -> `button`; and an old "I'm OK" press whose `to`
+  was a family group name becomes `family` (the contract's `to` is a list of watch ids). When both an old and a
+  contract name arrive, the contract name wins. A renamed message carries a `warnings` line so firmware authors see
+  it. Data files written before the contract are renamed the same way when the server loads them.
+- **`alert` is no longer accepted on `/ingest`.** The contract has nine kinds and `alert` is not one of them; before,
+  anyone could post an alert. Alerts are now written only by the API.
+- **A time more than 5 minutes in the future is no longer rejected.** It is kept, stamped with the receive time and
+  marked `time_estimated`, exactly like a 1970 time. Reason: the files in `contract/samples/` carry the fixed time
+  `2026-11-18T20:00:00Z` and must be accepted unchanged, and until that moment passes they are in the future. The
+  safety purpose of the old rule is kept (a future time still cannot reach the timeline or a forecast), and a
+  device with a wrong clock no longer loses its readings. The device is told through `warnings`.
+- **Signatures** are checked against exactly what the device sent, before any renaming. `hops` and `via` are not
+  signed, because relays change them. One consequence: a signed message that used old names cannot be re-checked
+  from the stored record (its values were renamed). Contract-named messages are not affected.
+- **`hops` and `via`** are stored and passed through. Missing ones become `0` and `[]`. Wrong types are repaired with
+  a warning instead of rejecting the message, so a relay bug cannot drop a help press.
+- **Light checks on values:** a `button` must be `help`, `symptom`, `ok` or `volunteer`; a `tunnel` status must be
+  `open` or `closed`; a `checkin` `to` must be a list. Anything else is rejected with the reason. Numeric values are
+  not range-checked: a missing or non-numeric reading simply never crosses a limit.
+- **Reasons for rejecting use the wording of `tools/catcher.mjs`** (`missing block`, `unknown kind "x"`,
+  `time is not ISO 8601`) and list every problem, not only the first, so a device sees the same text from both.
+- **Tunnel alerts** now name both ends, the rover's reason and the photo, and reach residents of both blocks.
+- **The signing test vector changed** to contract ids and names (`relay-l8-bore-bend`, `battery_wh`, ...).
+- `shared/FORMAT.md` was removed: `CONTRACT.md` is the one description of the format.
+- Additions written into `CONTRACT.md` in this task: sections 1.1 to 1.3 and 2.1, and the changelog.

@@ -112,14 +112,14 @@ test("/surface/history: append-only public record of every surface reading and e
 test("/firstwave: volunteers only, healthy, no open help request, never sole caregivers, needed skills first", async () => {
   const b = "L3-farms-04", now = Date.now();
   const vit = (d, values, time = now) => s.post("/ingest", s.R(d, b, "vitals", values, time));
-  const press = (d, type, time = now) => s.post("/ingest", s.R(d, b, "button", { type }, time));
-  const OK = { hr: 70, spo2: 98, temp_c: 36.7 };
+  const press = (d, type, time = now) => s.post("/ingest", s.R(d, b, "button", { button: type }, time));
+  const OK = { hr_bpm: 70, spo2_pct: 98, temp_c: 36.7 };
   // register (shared/people.json): 51 medic | 52 engineer+farmer | 53 farmer, sole caregiver | 54 engineer | 55 teacher
   //                                56 medic+engineer | 57 farmer | 58 cook | 60 engineer
   await vit("watch-51", OK); await press("watch-51", "volunteer", now - 50e3);
   await vit("watch-52", OK); await press("watch-52", "volunteer", now - 40e3);
   await vit("watch-53", OK); await press("watch-53", "volunteer", now - 90e3);          // sole caregiver
-  await vit("watch-54", { hr: 118, spo2: 93, temp_c: 38.6 }); await press("watch-54", "volunteer", now - 80e3); // unwell
+  await vit("watch-54", { hr_bpm: 118, spo2_pct: 93, temp_c: 38.6 }); await press("watch-54", "volunteer", now - 80e3); // unwell
   await vit("watch-55", OK); await press("watch-55", "volunteer", now - 70e3);          // healthy, no needed skill
   await vit("watch-56", OK);                                                            // healthy, best skills, did NOT volunteer
   await press("watch-57", "volunteer", now - 60e3);                                     // no vitals at all
@@ -158,7 +158,7 @@ test("/firstwave: volunteers only, healthy, no open help request, never sole car
   const f2 = await s.get("/firstwave");
   assert.deepStrictEqual(f2.ranked.map((p) => p.device), ["watch-52", "watch-51", "watch-60", "watch-55", "watch-58"]);
   // a volunteer whose latest vitals turn bad drops out
-  await vit("watch-52", { hr: 70, spo2: 91, temp_c: 36.7 }, now + 1000);
+  await vit("watch-52", { hr_bpm: 70, spo2_pct: 91, temp_c: 36.7 }, now + 1000);
   assert.ok(!(await s.get("/firstwave")).ranked.some((p) => p.device === "watch-52"));
 });
 

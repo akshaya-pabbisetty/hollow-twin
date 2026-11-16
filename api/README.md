@@ -299,7 +299,7 @@ GET /queue
 
 ```json
 [ { "id": "watch-42-9", "device": "watch-42", "block": "L8-deepwell-03", "time": "2026-11-17T14:03:00.000Z", "score": 115,
-    "vitals": { "hr": 132, "spo2": 89, "temp_c": 39.2 },
+    "vitals": { "hr_bpm": 132, "spo2_pct": 89, "temp_c": 39.2 },
     "reasons": ["help pressed: 50 points", "+30: SpO2 89 % is below 92 % (Royal College of Physicians, ...)",
                 "+20: pulse 132 bpm is above 110 bpm (...)", "+15: temperature 39.2 C is above 38 C (...)"] } ]
 ```
@@ -426,7 +426,7 @@ GET /firstwave?n=20
   "n": 20, "needed_skills": ["medic", "engineer", "farmer"], "volunteers": 6, "eligible": 3,
   "ranked": [
     { "rank": 1, "device": "watch-52", "name": "Tobin Okafor", "block": "L1-gallery-02", "skills": ["engineer", "farmer"], "score": 20,
-      "volunteered_at": "...", "vitals": { "hr": 70, "spo2": 98, "temp_c": 36.7 }, "source": "simulated",
+      "volunteered_at": "...", "vitals": { "hr_bpm": 70, "spo2_pct": 98, "temp_c": 36.7 }, "source": "simulated",
       "reasons": ["volunteered at ...", "not a sole caregiver", "no open help request",
                   "latest vitals healthy: SpO2 98 %, pulse 70 bpm, temperature 36.7 C (Royal College of Physicians, ...)",
                   "+10: skill \"engineer\" is needed", "+10: skill \"farmer\" is needed"] } ],

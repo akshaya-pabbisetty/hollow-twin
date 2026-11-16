@@ -157,7 +157,7 @@ shots.networkcut = async () => {
 shots.water = async () => {
   title("water: a clean cup, then a salty cup");
   const block = "L3-farms-04", sensor = "sensor-03", watch = "watch-31";
-  await send(R(watch, block, "vitals", { hr: 74, spo2: 98, temp_c: 36.7 }));
+  await send(R(watch, block, "vitals", { hr_bpm: 74, spo2_pct: 98, temp_c: 36.7 }));
   say(`Sensor ${sensor} tests the tap water in ${block}. ${watch} is a resident's watch in the same block.`);
   const inboxNow = async () => (await get(`/inbox?device=${watch}`)).filter((a) => a.id.includes(RUN) && /Do not drink/.test(a.values.text));
 
@@ -193,13 +193,13 @@ shots.outbreak = async () => {
     step(`${i + 1}. ${count} more residents: ${kind === "symptom" ? "they press the symptom button" : "their watches measure low blood oxygen"}`);
     for (let k = 0; k < count; k++) {
       const dev = `watch-8${RUN.slice(-3)}${++watchNo}`;
-      await send(kind === "symptom" ? R(dev, block, "button", { type: "symptom" }) : R(dev, block, "vitals", { hr: 104, spo2: 90, temp_c: 38.4 }));
+      await send(kind === "symptom" ? R(dev, block, "button", { button: "symptom" }) : R(dev, block, "vitals", { hr_bpm: 104, spo2_pct: 90, temp_c: 38.4 }));
     }
     r = await row();
     say(`residents' count: ${pad(r.residents, 4)} official count: ${pad(r.official, 4)} hidden: ${r.gap}`);
     await beat();
   }
-  await send(R(`watch-8${RUN.slice(-3)}1`, block, "button", { type: "symptom" }));
+  await send(R(`watch-8${RUN.slice(-3)}1`, block, "button", { button: "symptom" }));
   r = await row();
   say("(One resident pressed twice: a person is only counted once.)");
   say((await get("/truth")).rule);
@@ -212,15 +212,15 @@ shots.outbreak = async () => {
 shots.care = async () => {
   title("care: help requests ranked by need, then a robot is sent");
   const people = [
-    ["watch-41", "L4-works-02", { hr: 78, spo2: 98, temp_c: 36.8 }, "feels faint, vitals normal"],
-    ["watch-42", "L8-deepwell-03", { hr: 132, spo2: 89, temp_c: 39.2 }, "very low oxygen, racing pulse, high fever"],
-    ["watch-43", "L5-rivet-01", { hr: 96, spo2: 96, temp_c: 38.4 }, "fever"],
+    ["watch-41", "L4-works-02", { hr_bpm: 78, spo2_pct: 98, temp_c: 36.8 }, "feels faint, vitals normal"],
+    ["watch-42", "L8-deepwell-03", { hr_bpm: 132, spo2_pct: 89, temp_c: 39.2 }, "very low oxygen, racing pulse, high fever"],
+    ["watch-43", "L5-rivet-01", { hr_bpm: 96, spo2_pct: 96, temp_c: 38.4 }, "fever"],
   ];
   const mine = async () => (await get("/queue")).filter((q) => q.id.includes(RUN));
   step("1. Three residents press HELP, in this order");
   for (const [dev, block, vitals, text] of people) {
     await send(R(dev, block, "vitals", vitals));
-    await send(R(dev, block, "button", { type: "help" }));
+    await send(R(dev, block, "button", { button: "help" }));
     say(`${dev} in ${pad(block, 15)} ${text}`);
     await beat(1.2);
   }
@@ -278,14 +278,14 @@ shots.surface = async () => {
   await beat();
 
   step("3. Who goes up first? Residents volunteer from their watches");
-  const OK = { hr: 70, spo2: 98, temp_c: 36.7 };
+  const OK = { hr_bpm: 70, spo2_pct: 98, temp_c: 36.7 };
   const volunteers = [
     ["watch-51", OK], ["watch-52", OK], ["watch-53", OK],
-    ["watch-54", { hr: 118, spo2: 93, temp_c: 38.6 }], ["watch-55", OK], ["watch-57", null],
+    ["watch-54", { hr_bpm: 118, spo2_pct: 93, temp_c: 38.6 }], ["watch-55", OK], ["watch-57", null],
   ];
   for (const [dev, vitals] of volunteers) {
     if (vitals) await send(R(dev, home, "vitals", vitals));
-    await send(R(dev, home, "button", { type: "volunteer" }));
+    await send(R(dev, home, "button", { button: "volunteer" }));
     say(`${dev} volunteers`);
     await beat(0.6);
   }

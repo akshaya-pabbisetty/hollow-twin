@@ -34,6 +34,34 @@ Every reading, button press and status update is one JSON message:
 
 One sample of every kind is in [`contract/samples/`](contract/samples/).
 
+### 1.1 Optional fields a device may add (lane 1)
+
+Both are optional. A message without them is a valid contract message.
+
+| Field | Meaning |
+| --- | --- |
+| `source` | `live` (real hardware) or `simulated` (scripts, replays, the twin's own simulation). Left out, the API stores `simulated`, so only a real device can claim to be live. Any other value is rejected. |
+| `sig` | Proof that the device itself sent the message: lowercase hex HMAC-SHA256, keyed with that device's secret, over `id|device|block|time|kind|VALUES` (VALUES = the `values` JSON, keys sorted, no spaces). `hops` and `via` are not signed, because relays change them. Left out: stored with `verified: false`. Correct: `verified: true`. Wrong: rejected. Exact rule, test vector and ESP32 code: [`api/docs/FIRMWARE.md`](api/docs/FIRMWARE.md). |
+
+### 1.2 Fields the API adds to a stored message (lane 1)
+
+They appear on everything the API sends back (`/live`, `/history`, `/blocks/<block id>/latest` and so on). Devices never send them; if they do, the API overwrites them.
+
+| Field | Meaning |
+| --- | --- |
+| `seq` | Server sequence number, rising by one per stored message. It is also the event id on `/live`. |
+| `source` | Always present on the way out: `live` or `simulated` (section 1.1). |
+| `verified` | `true` only when the message carried a valid `sig`. |
+| `time_estimated`, `device_time` | Present only when the device's `time` could not be trusted (section 1.3). `time` is then the moment the API received the message and `device_time` is what the device sent. |
+| `warnings` | A list of plain sentences about things the API accepted but the sender should fix (for example an estimated time, or an old field name). Left out when there is nothing to say. |
+| `sig_unchecked` | Present when a `sig` arrived but the API holds no secret for that device, so it could not be checked. |
+
+### 1.3 How the API treats the fields above (lane 1)
+
+- `hops` and `via` are stored and passed through unchanged. If a message leaves them out, the API stores `"via": []` and `"hops": 0`.
+- `time` before 2020 (an ESP32 that has not synced its clock reports 1970) or more than 5 minutes ahead of the server clock: the message is kept, `time` is replaced by the receive time, and `time_estimated`, `device_time` and a warning are added. A wrong clock never loses a reading and never corrupts the timeline.
+- A message that cannot be used (a field missing, an unknown `kind`, a `time` that is not ISO 8601, a wrong `sig`) is rejected, and the reply says why (section 4).
+
 ## 2. Kinds
 
 | Kind | Sent by | `values` |
@@ -47,6 +75,16 @@ One sample of every kind is in [`contract/samples/`](contract/samples/).
 | `flood` | sensor node | `depth_cm` |
 | `tunnel` | scout robot | `from_block`, `to_block`, `status`: `open` or `closed`, `reason`, `photo_url` |
 | `surface` | surface scout | `co2_ppm`, `temp_c`, `radiation_usv_h`, `photo_url` |
+
+### 2.1 Optional values and one extra kind (lane 1)
+
+Everything in this table is optional. The rows above are unchanged.
+
+| Kind | Addition |
+| --- | --- |
+| `button` | `button` may also be `volunteer`: the wearer offers to join the first wave to the surface (`GET /firstwave`). |
+| `surface` | Optional `o2_pct` (oxygen, % by volume) and `pm25_ugm3` (fine dust, µg/m3). Every surface value is optional per message: send what you measure. The surface verdict needs all five readings (`co2_ppm`, `temp_c`, `radiation_usv_h`, `o2_pct`, `pm25_ugm3`); until a scout has sent each one at least once the verdict is `not enough data`. |
+| `alert` | A new kind written only by the API (`device` is `backend`), never accepted on `/ingest`. It is how warnings travel back down to watches and to the twin. `values`: `level` (`info`, `warn` or `danger`), `text` (one line for a watch screen), `why` (the reading, the limit it crossed and the limit's source), `cause` (the `id` of the message that triggered it), and `to` (a list of watch IDs) when it is addressed to particular watches. |
 
 ## 3. Device IDs
 
@@ -88,3 +126,16 @@ Until the real API is up, `node tools/catcher.mjs` serves `POST /ingest` and `GE
 | Flood depth | over 25 cm | over 45 cm (tunnel closes) |
 
 Water is still open: lanes 1 and 3 pick the `tds_ppm` and `turbidity_ntu` cut-offs after calibrating the probe with a clean cup and a salty cup.
+
+## Changelog (lane 1)
+
+Additions only. Nothing above was renamed or removed. Each row says where the addition is written down.
+
+| Date | Section | Added |
+| --- | --- | --- |
+| 2026-11-16 | 1.1 | Optional message fields `source` (`live` or `simulated`) and `sig` (device signature). |
+| 2026-11-16 | 1.2 | Fields the API adds on the way out: `seq`, `source`, `verified`, `time_estimated`, `device_time`, `warnings`, `sig_unchecked`. |
+| 2026-11-16 | 1.3 | Rules: missing `hops` / `via` are stored as `0` / `[]`; a `time` before 2020 or more than 5 minutes ahead is replaced by the receive time and marked. |
+| 2026-11-16 | 2.1 | `button` value `volunteer`. |
+| 2026-11-16 | 2.1 | `surface` optional values `o2_pct` and `pm25_ugm3`. |
+| 2026-11-16 | 2.1 | Kind `alert`, written only by the API. |
