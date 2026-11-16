@@ -1,0 +1,11 @@
+{
+  "name": "hollow-twin-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hollow Twin lane 1 backend: rule-based API for one sector of the Hollow. Zero dependencies.",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  }
+}

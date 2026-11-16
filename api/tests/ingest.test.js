@@ -1,0 +1,121 @@
+// Task 4: nothing a device (or an attacker) sends to the API can crash it or corrupt the timeline.
+const { test, before, after } = require("node:test");
+const assert = require("node:assert");
+const { makeServer } = require("./helper");
+
+const s = makeServer();
+const slow = makeServer({ RATE_LIMIT: "5" });      // a tight limit so the rate test is quick and certain
+const locked = makeServer({ INGEST_KEY: "s3cret" });
+before(() => Promise.all([s.start(), slow.start(), locked.start()]));
+after(() => Promise.all([s.cleanup(), slow.cleanup(), locked.cleanup()]));
+const MIN = 60e3;
+
+test("oversize body: 413 with a reason, and the server keeps serving", async () => {
+  const huge = JSON.stringify({ id: "big-1", device: "relay-01", block: "L1-gallery-02", time: new Date().toISOString(),
+    kind: "air", values: { co2_ppm: 1, pad: "x".repeat(6e6) } }); // 6 MB, limit is 5 MB
+  const r = await s.post("/ingest", huge);
+  assert.strictEqual(r.status, 413);
+  assert.match(r.body.error, /body too large/);
+  assert.strictEqual(r.body.limit_bytes, 5000000);
+  assert.strictEqual((await s.get("/history")).length, 0, "nothing from the oversize body was stored");
+  assert.strictEqual((await s.post("/ingest", s.R("relay-01", "L1-gallery-02", "air", { co2_ppm: 700 }))).body.added, 1);
+});
+
+test("malformed JSON on every POST endpoint: 400 JSON, never a crash", async () => {
+  for (const path of ["/ingest", "/dispatch", "/family", "/official"]) {
+    for (const body of ["{not json", "", "null", "42", '"text"', "[1,2", "[[]]", "{\"a\":"]) {
+      const r = await s.post(path, body);
+      assert.ok(r.status === 400 || (path === "/dispatch" && r.status === 200), `${path} with ${JSON.stringify(body)} gave ${r.status}`);
+      assert.strictEqual(typeof r.body, "object");
+    }
+  }
+  const mixed = await s.post("/ingest", [null, 7, "x", [], {}, s.R("relay-01", "L1-gallery-02", "air", { co2_ppm: 701 })]);
+  assert.strictEqual(mixed.body.added, 1, "the one good reading in a batch of junk is still stored");
+  assert.strictEqual(mixed.body.errors.length, 5);
+  assert.ok((await s.get("/history")).length >= 2, "server still alive");
+});
+
+test("unknown routes give 404 JSON", async () => {
+  for (const p of ["/nope", "/ingest/extra", "/"]) {
+    const r = await s.getRaw(p);
+    assert.strictEqual(r.status, 404);
+    assert.deepStrictEqual(r.body, { error: "not found" });
+  }
+  assert.strictEqual((await s.post("/nope", {})).status, 404);
+});
+
+test("future timestamp: more than 5 minutes ahead is rejected with a reason, a small clock drift is fine", async () => {
+  const b = "L4-works-02";
+  const ahead = await s.post("/ingest", s.R("sensor-04", b, "air", { co2_ppm: 800 }, Date.now() + 10 * MIN));
+  assert.strictEqual(ahead.status, 400);
+  assert.match(ahead.body.errors[0].err, /more than 5 minutes in the future \(server clock /);
+  const drift = await s.post("/ingest", s.R("sensor-04", b, "air", { co2_ppm: 801 }, Date.now() + 2 * MIN));
+  assert.strictEqual(drift.body.added, 1);
+  // in a mixed backlog only the future one is refused
+  const mix = await s.post("/ingest", [s.R("sensor-04", b, "air", { co2_ppm: 802 }), s.R("sensor-04", b, "air", { co2_ppm: 803 }, Date.now() + 3600e3)]);
+  assert.deepStrictEqual([mix.status, mix.body.added, mix.body.errors.length], [200, 1, 1]);
+  assert.deepStrictEqual((await s.get(`/history?block=${b}`)).map((r) => r.values.co2_ppm).sort(), [801, 802]);
+});
+
+test("1970 timestamp (ESP32 with no clock sync): accepted, stamped with the receive time, marked time_estimated", async () => {
+  const b = "L5-rivet-01", t0 = Date.now();
+  const r1970 = { ...s.R("sensor-05", b, "flood", { depth_cm: 3 }), time: "1970-01-01T00:00:07Z" };
+  assert.strictEqual((await s.post("/ingest", r1970)).body.added, 1);
+  const [got] = await s.get(`/history?block=${b}`);
+  assert.strictEqual(got.time_estimated, true);
+  assert.strictEqual(got.device_time, "1970-01-01T00:00:07Z");
+  assert.ok(Math.abs(Date.parse(got.time) - t0) < 5000, `time ${got.time} should be the receive time`);
+  assert.strictEqual((await s.get(`/history?block=${b}&since=2020-01-01T00:00:00Z`)).length, 1, "it shows up in recent history, not in 1970");
+  // a reading with a real clock is left alone, and a sender cannot set the flag itself
+  await s.post("/ingest", { ...s.R("sensor-05", b, "flood", { depth_cm: 4 }, Date.now() - MIN), time_estimated: true, seq: 999999 });
+  const real = (await s.get(`/history?block=${b}`)).find((r) => r.values.depth_cm === 4);
+  assert.strictEqual(real.time_estimated, undefined);
+  assert.notStrictEqual(real.seq, 999999);
+  // a whole backlog with no clock keeps the order it was sent in
+  const batch = [1, 2, 3, 4].map((i) => ({ ...s.R("sensor-55", "L0-crown-01", "flood", { depth_cm: i }), time: `1970-01-01T00:00:0${i}Z` }));
+  await s.post("/ingest", batch);
+  assert.deepStrictEqual((await s.get("/history?block=L0-crown-01")).map((r) => r.values.depth_cm), [1, 2, 3, 4]);
+});
+
+test("rate limit: default allows 20 single posts a second per device", async () => {
+  const rs = await Promise.all(Array.from({ length: 20 }, (_, i) => s.post("/ingest", s.R("watch-20", "L2-market-01", "vitals", { hr: 70 + i, spo2: 98, temp_c: 36.6 }))));
+  assert.ok(rs.every((r) => r.status === 200 && r.body.added === 1));
+});
+
+test("rate limit hit: 429 with Retry-After for single posts, but a 2,000-reading backlog array is never dropped", async () => {
+  const one = () => slow.post("/ingest", slow.R("relay-09", "L8-deepwell-03", "air", { co2_ppm: 600 }));
+  const rs = await Promise.all(Array.from({ length: 12 }, one)); // limit is 5 per second here
+  const ok = rs.filter((r) => r.status === 200), limited = rs.filter((r) => r.status === 429);
+  assert.strictEqual(ok.length + limited.length, 12);
+  assert.ok(ok.length >= 5 && limited.length >= 2, `expected some of each, got ${ok.length} ok and ${limited.length} limited`);
+  assert.match(limited[0].body.error, /rate limit: more than 5 requests per second from relay-09/);
+  assert.strictEqual(limited[0].headers.get("retry-after"), "1");
+  assert.strictEqual(limited[0].body.retry_after_s, 1);
+  // other devices are not affected by relay-09's flood
+  assert.strictEqual((await slow.post("/ingest", slow.R("relay-10", "L8-deepwell-03", "air", { co2_ppm: 600 }))).status, 200);
+  // the same relay, still over its limit, uploads a backlog as ONE array: all of it is stored
+  await Promise.all(Array.from({ length: 8 }, one));
+  const backlog = Array.from({ length: 2000 }, (_, i) => slow.R("relay-09", "L8-deepwell-03", "air", { co2_ppm: 600 + (i % 40) }, Date.now() - i * 1000));
+  const up = await slow.post("/ingest", backlog);
+  assert.deepStrictEqual([up.status, up.body.added, up.body.errors.length], [200, 2000, 0]);
+  // and after a second the device may post singles again
+  await new Promise((r) => setTimeout(r, 1100));
+  assert.strictEqual((await one()).status, 200);
+  const stored = (await slow.get("/history?block=L8-deepwell-03")).filter((r) => r.device === "relay-09").length;
+  assert.ok(stored >= ok.length + 2000 + 1, `every accepted reading is in history (${stored})`);
+});
+
+test("INGEST_KEY: POST endpoints need x-api-key, GET endpoints stay open", async () => {
+  const r = locked.R("sensor-01", "L1-gallery-02", "air", { co2_ppm: 700 });
+  const none = await locked.post("/ingest", r);
+  assert.strictEqual(none.status, 401);
+  assert.match(none.body.error, /x-api-key/);
+  assert.strictEqual((await locked.post("/ingest", r, { "x-api-key": "wrong" })).status, 401);
+  for (const [path, body] of [["/family", { group: "g", devices: ["watch-01"] }], ["/official", { block: "L1-gallery-02", count: 1 }], ["/dispatch", { responder: "rover-01" }]])
+    assert.strictEqual((await locked.post(path, body)).status, 401, `${path} must need the key`);
+  assert.deepStrictEqual(await locked.get("/history"), [], "nothing was stored without the key");
+  const ok = await locked.post("/ingest", r, { "x-api-key": "s3cret" });
+  assert.deepStrictEqual([ok.status, ok.body.added], [200, 1]);
+  assert.strictEqual((await locked.get("/history")).length, 1, "reading needs no key");
+  assert.strictEqual((await locked.getRaw("/blocks")).status, 200);
+});

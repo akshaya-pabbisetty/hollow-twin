@@ -1,0 +1,305 @@
+{
+  "_note": "Every threshold the backend uses. api/ reads its numbers from here and nowhere else. type 'safety fact' = a published real-world limit (source + url, checked on the publisher's own page unless verified is false). type 'design choice' = our own tuning, with a one-line reason. op is how a reading is compared with value: a reading 'crosses' the limit when (reading op value) is true.",
+  "limits": {
+    "water_tds_max_ppm": {
+      "value": 1000, "unit": "ppm", "op": ">", "type": "safety fact",
+      "source": "WHO, Total dissolved solids in drinking-water (background document, 2003)",
+      "url": "https://cdn.who.int/media/docs/default-source/wash-documents/wash-chemicals/tds.pdf",
+      "verified": true,
+      "note": "WHO: 'Water containing TDS concentrations below 1000 mg/litre is usually acceptable to consumers'. WHO sets no health-based TDS value; this is an acceptability limit, and a sudden rise means the supply changed. 1 mg/litre = 1 ppm in water."
+    },
+    "water_turbidity_max_ntu": {
+      "value": 5, "unit": "NTU", "op": ">", "type": "safety fact",
+      "source": "US EPA, National Primary Drinking Water Regulations (turbidity treatment technique)",
+      "url": "https://www.epa.gov/ground-water-and-drinking-water/national-primary-drinking-water-regulations",
+      "verified": true,
+      "note": "EPA: state limits 'must include turbidity at no time exceeding 5 NTUs' (1 NTU for conventional or direct filtration)."
+    },
+    "air_co2_stale_ppm": {
+      "value": 1000, "unit": "ppm", "op": ">", "type": "safety fact",
+      "source": "Health Canada, Residential indoor air quality guidelines: Carbon dioxide (2021)",
+      "url": "https://www.canada.ca/en/health-canada/services/publications/healthy-living/residential-indoor-air-quality-guidelines-carbon-dioxide.html",
+      "verified": true,
+      "note": "Recommended long-term exposure limit: 1,000 ppm (24-hour average). We compare single readings, so this is an early 'air going stale' warning."
+    },
+    "air_co2_danger_ppm": {
+      "value": 5000, "unit": "ppm", "op": ">", "type": "safety fact",
+      "source": "OSHA PEL / NIOSH REL for carbon dioxide (NIOSH Pocket Guide to Chemical Hazards)",
+      "url": "https://www.cdc.gov/niosh/npg/npgd0103.html",
+      "verified": true,
+      "note": "5,000 ppm as an 8-hour time-weighted average for workers."
+    },
+    "flood_depth_closed_cm": {
+      "value": 15, "unit": "cm", "op": ">", "type": "safety fact",
+      "source": "US National Weather Service, Flood Safety (Turn Around Don't Drown)",
+      "url": "https://www.weather.gov/box/flood_safety",
+      "verified": true,
+      "note": "NWS: 'Just six inches of fast-moving water can knock over and carry off an adult.' 6 in = 15.24 cm, rounded to 15."
+    },
+    "grid_nominal_hz": {
+      "value": 60, "unit": "Hz", "type": "safety fact",
+      "source": "NERC, Reliability Guideline: Primary Frequency Control (Sept 2023)",
+      "url": "https://www.nerc.com/comm/RSTC_Reliability_Guidelines/Primary_Frequency_Control_Reliability_Guideline_v_4.0_Clean_V3%20-%20DR.pdf",
+      "verified": true,
+      "note": "Scheduled frequency of the North American interconnections."
+    },
+    "grid_band_hz": {
+      "value": 0.036, "unit": "Hz", "op": ">", "type": "safety fact",
+      "source": "NERC, Reliability Guideline: Primary Frequency Control (Sept 2023), Tables 4.1 and 4.5",
+      "url": "https://www.nerc.com/comm/RSTC_Reliability_Guidelines/Primary_Frequency_Control_Reliability_Guideline_v_4.0_Clean_V3%20-%20DR.pdf",
+      "verified": true,
+      "note": "Recommended maximum governor deadband: +/- 0.036 Hz. Inside this band generators do not react; outside it the grid is actively fighting a disturbance. Compared with |reading - grid_nominal_hz|."
+    },
+    "vitals_spo2_severe_below_pct": {
+      "value": 92, "unit": "%", "op": "<", "type": "safety fact",
+      "source": "Royal College of Physicians, National Early Warning Score (NEWS2), SpO2 scale 1",
+      "url": "https://www.rcp.ac.uk/improving-care/resources/national-early-warning-score-news-2/",
+      "verified": true,
+      "note": "NEWS2 gives its top score (3) at SpO2 of 91% or less. Bands confirmed on NHS reproductions of the RCP chart; the RCP's own chart is a PDF linked from the url."
+    },
+    "vitals_spo2_low_below_pct": {
+      "value": 94, "unit": "%", "op": "<", "type": "safety fact",
+      "source": "Royal College of Physicians, National Early Warning Score (NEWS2), SpO2 scale 1",
+      "url": "https://www.rcp.ac.uk/improving-care/resources/national-early-warning-score-news-2/",
+      "verified": true,
+      "note": "NEWS2 scores 2 at SpO2 92-93%. Also the 'low oxygen' rule in the outbreak truth check."
+    },
+    "vitals_hr_high_above_bpm": {
+      "value": 110, "unit": "bpm", "op": ">", "type": "safety fact",
+      "source": "Royal College of Physicians, National Early Warning Score (NEWS2), pulse",
+      "url": "https://www.rcp.ac.uk/improving-care/resources/national-early-warning-score-news-2/",
+      "verified": true,
+      "note": "NEWS2 scores 2 at pulse 111-130 and 3 at 131 or more."
+    },
+    "vitals_hr_low_below_bpm": {
+      "value": 41, "unit": "bpm", "op": "<", "type": "safety fact",
+      "source": "Royal College of Physicians, National Early Warning Score (NEWS2), pulse",
+      "url": "https://www.rcp.ac.uk/improving-care/resources/national-early-warning-score-news-2/",
+      "verified": true,
+      "note": "NEWS2 scores 3 at pulse 40 or less."
+    },
+    "vitals_fever_above_c": {
+      "value": 38.0, "unit": "C", "op": ">", "type": "safety fact",
+      "source": "Royal College of Physicians, National Early Warning Score (NEWS2), temperature",
+      "url": "https://www.rcp.ac.uk/improving-care/resources/national-early-warning-score-news-2/",
+      "verified": true,
+      "note": "NEWS2 starts scoring at 38.1 C (band 38.1-39.0 scores 1, 39.1 or more scores 2)."
+    },
+
+    "vitals_spo2_healthy_min_pct": {
+      "value": 96, "unit": "%", "op": "<", "type": "safety fact",
+      "source": "Royal College of Physicians, National Early Warning Score (NEWS2)",
+      "url": "https://www.rcp.ac.uk/improving-care/resources/national-early-warning-score-news-2/",
+      "verified": true,
+      "note": "First-wave health check. NEWS2 scores 0 only at SpO2 of 96% or more (scale 1)."
+    },
+    "vitals_hr_healthy_min_bpm": {
+      "value": 51, "unit": "bpm", "op": "<", "type": "safety fact",
+      "source": "Royal College of Physicians, National Early Warning Score (NEWS2)",
+      "url": "https://www.rcp.ac.uk/improving-care/resources/national-early-warning-score-news-2/",
+      "verified": true,
+      "note": "First-wave health check. NEWS2 scores 0 for pulse 51-90."
+    },
+    "vitals_hr_healthy_max_bpm": {
+      "value": 90, "unit": "bpm", "op": ">", "type": "safety fact",
+      "source": "Royal College of Physicians, National Early Warning Score (NEWS2)",
+      "url": "https://www.rcp.ac.uk/improving-care/resources/national-early-warning-score-news-2/",
+      "verified": true,
+      "note": "First-wave health check. NEWS2 scores 0 for pulse 51-90."
+    },
+    "vitals_temp_healthy_min_c": {
+      "value": 36.1, "unit": "C", "op": "<", "type": "safety fact",
+      "source": "Royal College of Physicians, National Early Warning Score (NEWS2)",
+      "url": "https://www.rcp.ac.uk/improving-care/resources/national-early-warning-score-news-2/",
+      "verified": true,
+      "note": "First-wave health check. NEWS2 scores 0 for temperature 36.1-38.0 C."
+    },
+    "vitals_temp_healthy_max_c": {
+      "value": 38.0, "unit": "C", "op": ">", "type": "safety fact",
+      "source": "Royal College of Physicians, National Early Warning Score (NEWS2)",
+      "url": "https://www.rcp.ac.uk/improving-care/resources/national-early-warning-score-news-2/",
+      "verified": true,
+      "note": "First-wave health check. NEWS2 scores 0 for temperature 36.1-38.0 C."
+    },
+
+    "surface_radiation_domes_usv_h": {
+      "value": 1, "unit": "µSv/h", "op": ">", "type": "safety fact",
+      "source": "IAEA, Operational Intervention Levels for Reactor Emergencies (EPR-NPP-OILs 2017), OIL3",
+      "url": "https://www-pub.iaea.org/MTCD/Publications/PDF/EPR_NPP_OILs_2017_web.pdf",
+      "verified": true,
+      "note": "OIL3 default: 1 µSv/h above background at 1 m above ground. Above it, local produce, milk and rainwater are not to be consumed, so people need a sealed habitat with its own supplies. We compare the raw scout reading (background not subtracted, which errs on the safe side)."
+    },
+    "surface_radiation_stay_usv_h": {
+      "value": 25, "unit": "µSv/h", "op": ">", "type": "safety fact",
+      "source": "IAEA, Operational Intervention Levels for Reactor Emergencies (EPR-NPP-OILs 2017), OIL2",
+      "url": "https://www-pub.iaea.org/MTCD/Publications/PDF/EPR_NPP_OILs_2017_web.pdf",
+      "verified": true,
+      "note": "OIL2 default: 25 µSv/h at 1 m above ground (the value for later than 10 days after shutdown; 100 µSv/h in the first 10 days). Above it people are to be relocated: nobody should live there."
+    },
+    "surface_co2_domes_ppm": {
+      "value": 5000, "unit": "ppm", "op": ">", "type": "safety fact",
+      "source": "OSHA PEL / NIOSH REL for carbon dioxide (NIOSH Pocket Guide to Chemical Hazards)",
+      "url": "https://www.cdc.gov/niosh/npg/npgd0103.html",
+      "verified": true,
+      "note": "5,000 ppm 8-hour time-weighted average. Above it the open air is not fit for a working day."
+    },
+    "surface_co2_stay_ppm": {
+      "value": 40000, "unit": "ppm", "op": ">=", "type": "safety fact",
+      "source": "NIOSH, Immediately Dangerous to Life or Health (IDLH) value for carbon dioxide",
+      "url": "https://www.cdc.gov/niosh/idlh/124389.html",
+      "verified": true,
+      "note": "IDLH 40,000 ppm: a suit or dome leak at this level is immediately life-threatening."
+    },
+    "surface_o2_low_pct": {
+      "value": 19.5, "unit": "%", "op": "<", "type": "safety fact",
+      "source": "OSHA 29 CFR 1910.146(b), oxygen deficient atmosphere",
+      "url": "https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.146",
+      "verified": true,
+      "note": "'An atmosphere containing less than 19.5 percent oxygen by volume.'"
+    },
+    "surface_o2_high_pct": {
+      "value": 23.5, "unit": "%", "op": ">", "type": "safety fact",
+      "source": "OSHA 29 CFR 1910.146(b), oxygen enriched atmosphere",
+      "url": "https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.146",
+      "verified": true,
+      "note": "'An atmosphere containing more than 23.5 percent oxygen by volume' (fire hazard)."
+    },
+    "surface_temp_domes_c": {
+      "value": 39.4, "unit": "C", "op": ">=", "type": "safety fact",
+      "source": "US National Weather Service, heat index classification: Danger (103 F and above)",
+      "url": "https://www.weather.gov/ama/heatindex",
+      "verified": true,
+      "note": "103 F = 39.4 C: 'heat cramps or heat exhaustion likely, heat stroke possible'. NWS defines this on the heat index (temperature + humidity); the scout sends air temperature only, so this is an approximation that ignores humidity."
+    },
+    "surface_temp_stay_c": {
+      "value": 51.7, "unit": "C", "op": ">=", "type": "safety fact",
+      "source": "US National Weather Service, heat index classification: Extreme Danger (125 F or higher)",
+      "url": "https://www.weather.gov/ama/heatindex",
+      "verified": true,
+      "note": "125 F = 51.7 C: 'heat stroke highly likely'. Same approximation as surface_temp_domes_c."
+    },
+    "surface_temp_cold_c": {
+      "value": -28.3, "unit": "C", "op": "<=", "type": "safety fact",
+      "source": "US National Weather Service, wind chill: frostbite in 30 minutes at -19 F",
+      "url": "https://www.weather.gov/ama/windchill",
+      "verified": true,
+      "note": "-19 F = -28.3 C wind chill: 'exposed skin can freeze in 30 minutes'. NWS defines this on wind chill; the scout sends air temperature only, so wind is ignored."
+    },
+    "surface_pm25_domes_ugm3": {
+      "value": 225.5, "unit": "µg/m3", "op": ">=", "type": "safety fact",
+      "source": "US EPA, Air Quality Index for PM2.5 (2024 update): Hazardous",
+      "url": "https://www.epa.gov/system/files/documents/2024-02/pm-naaqs-air-quality-index-fact-sheet.pdf",
+      "verified": true,
+      "note": "24-hour PM2.5 of 225.5 µg/m3 and above is the Hazardous category (AQI 301+). We compare single readings."
+    },
+
+    "firstwave_default_n": {
+      "value": 20, "unit": "people", "type": "design choice",
+      "reason": "A first surface party of 20 is small enough to recall quickly and large enough to cover the needed skills."
+    },
+    "firstwave_skill_points": {
+      "value": 10, "unit": "points", "type": "design choice",
+      "reason": "Each needed skill a volunteer has adds 10 points, so people who cover more of what the party needs go first."
+    },
+    "firstwave_vitals_max_age_h": {
+      "value": 24, "unit": "h", "type": "design choice",
+      "reason": "'Latest vitals' must be from the last 24 hours; older readings do not prove someone is healthy today."
+    },
+    "battery_warn_hours": {
+      "value": 8, "unit": "h", "op": "<", "type": "design choice",
+      "reason": "One sleep or work shift: enough warning to charge watches, fill water and move people before the block goes dark."
+    },
+    "battery_rearm_margin_hours": {
+      "value": 2, "unit": "h", "type": "design choice",
+      "reason": "The warning can fire again only after the forecast recovers to battery_warn_hours + this margin, so watches are not spammed when the forecast hovers at the line."
+    },
+    "forecast_points": {
+      "value": 30, "unit": "readings", "type": "design choice",
+      "reason": "The battery slope is fitted over the latest 30 power readings: long enough to smooth noise, short enough to follow a change in drain."
+    },
+    "forecast_grid_avg_points": {
+      "value": 5, "unit": "readings", "type": "design choice",
+      "reason": "Grid frequency in /forecast is the mean of the latest 5 readings so one noisy sample does not flip grid_stress."
+    },
+    "forecast_min_drain_pct_per_h": {
+      "value": 0.01, "unit": "%/h", "type": "design choice",
+      "reason": "A slope flatter than this counts as 'not draining', so hours_left is null instead of a huge meaningless number."
+    },
+    "triage_base_points": {
+      "value": 50, "unit": "points", "type": "design choice",
+      "reason": "Every help press starts at the same score; vitals and waiting time only add to it."
+    },
+    "triage_spo2_severe_points": {
+      "value": 30, "unit": "points", "type": "design choice",
+      "reason": "Very low blood oxygen is the most urgent single sign, so it adds the most."
+    },
+    "triage_spo2_low_points": {
+      "value": 15, "unit": "points", "type": "design choice",
+      "reason": "Low but not critical oxygen adds half the severe weight."
+    },
+    "triage_hr_points": {
+      "value": 20, "unit": "points", "type": "design choice",
+      "reason": "A very fast or very slow pulse adds less than severe oxygen loss and more than fever."
+    },
+    "triage_fever_points": {
+      "value": 15, "unit": "points", "type": "design choice",
+      "reason": "Fever alone is the least urgent of the three vital signs."
+    },
+    "triage_wait_minutes_per_point": {
+      "value": 5, "unit": "min", "type": "design choice",
+      "reason": "Each 5 minutes of waiting adds one point so nobody is starved at the back of the queue."
+    },
+    "triage_wait_max_points": {
+      "value": 20, "unit": "points", "type": "design choice",
+      "reason": "Waiting can add at most 20 points, so a long wait never outranks a severe oxygen reading by itself."
+    },
+    "triage_vitals_grace_s": {
+      "value": 60, "unit": "s", "type": "design choice",
+      "reason": "Vitals taken up to 60 s after the help press still describe that emergency."
+    },
+    "ingest_max_body_bytes": {
+      "value": 5000000, "unit": "bytes", "type": "design choice",
+      "reason": "5 MB holds a relay backlog of about 30,000 readings; anything larger is refused so one bad client cannot exhaust memory."
+    },
+    "ingest_rate_limit_per_s": {
+      "value": 20, "unit": "requests/s per device", "type": "design choice",
+      "reason": "No real device needs more than 20 single posts a second; a backlog sent as one array counts as one request and is never dropped. Override with the RATE_LIMIT env var."
+    },
+    "ingest_max_future_min": {
+      "value": 5, "unit": "min", "type": "design choice",
+      "reason": "A reading stamped more than 5 minutes ahead of the server clock is a broken clock or a forgery, and would corrupt forecasts, so it is rejected."
+    },
+    "ingest_min_valid_time": {
+      "value": "2020-01-01T00:00:00Z", "unit": "UTC time", "type": "design choice",
+      "reason": "An ESP32 with no clock sync reports 1970. Any time before 2020 is treated as 'no clock': the reading is kept, stamped with the receive time and marked time_estimated."
+    },
+    "status_alert_window_min": {
+      "value": 60, "unit": "min", "type": "design choice",
+      "reason": "/status lists the alerts of the last hour: recent enough to act on, short enough to read at a glance."
+    },
+    "status_alert_max": {
+      "value": 100, "unit": "alerts", "type": "design choice",
+      "reason": "/status returns at most the 100 newest alerts of the window so a poll every few seconds stays small; the count is always the full number."
+    },
+    "ingest_drain_factor": {
+      "value": 10, "unit": "x body limit", "type": "design choice",
+      "reason": "An oversize upload is read and discarded so the sender gets a clear 413; past 10 times the limit the connection is simply cut."
+    },
+    "ingest_rate_table_max": {
+      "value": 5000, "unit": "devices", "type": "design choice",
+      "reason": "The rate-limit table is cleared when it holds more than 5,000 device names, so invented names cannot grow memory without bound."
+    },
+    "feed_retry_ms": {
+      "value": 2000, "unit": "ms", "type": "design choice",
+      "reason": "Browsers are told to wait 2 s before reconnecting to /feed: quick enough to look live, slow enough not to hammer a restarting server."
+    },
+    "feed_ping_s": {
+      "value": 20, "unit": "s", "type": "design choice",
+      "reason": "A comment line every 20 s keeps proxies and load balancers from closing an idle /feed connection."
+    },
+    "truth_window_h": {
+      "value": 24, "unit": "h", "type": "design choice",
+      "reason": "The residents' case count covers the last 24 hours, matching a daily official bulletin."
+    }
+  }
+}

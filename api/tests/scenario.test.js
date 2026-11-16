@@ -1,0 +1,113 @@
+// Task 8: every demo scenario runs clean in --fast mode against a fresh, empty server, and leaves the
+// outcome the video shot is meant to show.
+const { test, after } = require("node:test");
+const assert = require("node:assert");
+const { execFile } = require("child_process");
+const path = require("path");
+const { makeServer, ROOT } = require("./helper");
+
+const servers = [];
+after(() => Promise.all(servers.map((s) => s.cleanup())));
+
+// Starts a fresh server, runs `node tools/scenario.js <name> <url> --fast`, returns the server and the script's output.
+async function run(name, env = {}, serverEnv = {}) {
+  const s = await makeServer(serverEnv).start();
+  servers.push(s);
+  const { code, out } = await new Promise((res) =>
+    execFile(process.execPath, [path.join(ROOT, "tools/scenario.js"), name, s.api, "--fast"], { env: { ...process.env, INGEST_KEY: "", ...env } },
+      (err, stdout, stderr) => res({ code: err ? err.code : 0, out: stdout + stderr })));
+  return { s, code, out };
+}
+const clean = (r) => {
+  assert.strictEqual(r.code, 0, `scenario exited with ${r.code}:\n${r.out}`);
+  assert.ok(!/CHECK FAILED/.test(r.out), r.out);
+  assert.match(r.out, /All checks passed\./);
+};
+
+test("blackout: grid warning first, then the battery forecast drops under 8 h", async () => {
+  const r = await run("blackout"); clean(r);
+  const b = "L6-borebend-02";
+  const f = (await r.s.get(`/forecast?block=${b}`))[0];
+  assert.ok(f.hours_left < 8, `forecast ${f.hours_left}`);
+  const alerts = await r.s.get(`/history?kind=alert&block=${b}`);
+  const grid = alerts.find((a) => /power cut likely/.test(a.values.text)), fc = alerts.find((a) => a.values.hours_left !== undefined);
+  assert.ok(grid && fc && grid.seq < fc.seq, "grid warning is stored before the battery warning");
+  assert.strictEqual(alerts.filter((a) => a.values.hours_left !== undefined).length, 1, "the battery warning fired once");
+  const battAtWarning = (await r.s.get(`/history?kind=power&block=${b}`)).find((p) => p.id === grid.values.cause).values.battery_pct;
+  assert.strictEqual(battAtWarning, 100, "battery was still full when the grid warning fired");
+});
+
+test("fairshare: Directorate vs fair numbers for the same supply", async () => {
+  const r = await run("fairshare"); clean(r);
+  assert.match(r.out, /L8-deepwell-03\s+0%\s+DARK\s+69%/, "the table shows the deepest block dark under the Directorate and served under fair share");
+  assert.match(r.out, /Directorate 3\s+\|\s+fair share 0/);
+  assert.strictEqual((await r.s.get("/history")).length, 0, "this shot only reads: it stores nothing");
+});
+
+test("networkcut: relay holds readings, uploads the backlog, history shows no gap", async () => {
+  const r = await run("networkcut"); clean(r);
+  const hist = await r.s.get("/history?block=L7-sump-03&kind=air");
+  assert.strictEqual(hist.length, 12);
+  const gaps = hist.slice(1).map((x, i) => Date.parse(x.time) - Date.parse(hist[i].time));
+  assert.ok(gaps.every((g) => g === 5000), `gaps: ${gaps}`);
+  assert.deepStrictEqual(hist.map((x) => x.values.co2_ppm), Array.from({ length: 12 }, (_, i) => 820 + i * 3), "in the order they were taken");
+  assert.match(r.out, /added 6, duplicates dropped 1, errors 0/, "the backlog went up as one request and the duplicate was dropped");
+});
+
+test("water: clean cup is silent, salty cup gives do-not-drink", async () => {
+  const r = await run("water"); clean(r);
+  const inbox = (await r.s.get("/inbox?device=watch-31")).filter((a) => /Do not drink/.test(a.values.text));
+  assert.strictEqual(inbox.length, 1);
+  assert.strictEqual(inbox[0].values.limit.key, "water_tds_max_ppm");
+  assert.strictEqual((await r.s.get("/history?kind=water")).length, 2);
+});
+
+test("outbreak: residents' reports climb while the official count stays at 2", async () => {
+  const r = await run("outbreak"); clean(r);
+  const row = (await r.s.get("/truth")).blocks.find((b) => b.block === "L8-deepwell-03");
+  assert.deepStrictEqual([row.residents, row.official, row.gap], [12, 2, 10]);
+  const counts = [...r.out.matchAll(/residents' count: (\d+)\s+official count: (\d+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+  assert.deepStrictEqual(counts, [[3, 2], [6, 2], [9, 2], [12, 2]], "the narration shows the climb step by step");
+});
+
+test("care: help requests ranked, then a robot dispatched", async () => {
+  const r = await run("care"); clean(r);
+  const q = await r.s.get("/queue");
+  assert.deepStrictEqual(q.map((x) => x.device), ["watch-43", "watch-41"], "the dispatched request left the queue");
+  assert.ok((await r.s.get("/inbox?device=watch-42")).some((a) => /rover-01 sent to watch-42/.test(a.values.text)));
+});
+
+test("surface: readings arrive, the verdict and the first-wave list update", async () => {
+  const r = await run("surface"); clean(r);
+  const v = await r.s.get("/surface");
+  assert.strictEqual(v.verdict, "sealed domes needed");
+  const record = (await r.s.get("/surface/history")).filter((e) => e.type === "verdict").map((e) => e.verdict);
+  assert.deepStrictEqual(record, ["not enough data", "suits OK", "sealed domes needed"]);
+  const f = await r.s.get("/firstwave");
+  assert.deepStrictEqual(f.ranked.map((p) => p.device), ["watch-52", "watch-51", "watch-55"]);
+  assert.strictEqual(f.cleared, true);
+});
+
+test("all: every shot in order against one fresh server, and everything it sent is tagged simulated", async () => {
+  const r = await run("all"); clean(r);
+  const shots = [...r.out.matchAll(/SHOT: (\w+):/g)].map((m) => m[1]);
+  assert.deepStrictEqual(shots, ["blackout", "fairshare", "networkcut", "water", "outbreak", "care", "surface"]);
+  const st = await r.s.get("/status");
+  assert.strictEqual(st.readings.live, 0, "scripted data never claims to be live");
+  assert.ok(st.readings.simulated > 50);
+  assert.ok(Object.values(st.blocks).every((b) => b.source === "simulated"));
+  assert.strictEqual(st.surface.verdict, "sealed domes needed");
+  assert.ok(st.forecast.find((f) => f.block === "L6-borebend-02").hours_left < 8);
+});
+
+test("scenarios send the API key when INGEST_KEY is set, and explain themselves when it is missing", async () => {
+  const withKey = await run("water", { INGEST_KEY: "demo-key" }, { INGEST_KEY: "demo-key" }); clean(withKey);
+  const without = await run("water", {}, { INGEST_KEY: "demo-key" });
+  assert.strictEqual(without.code, 1);
+  assert.match(without.out, /set the INGEST_KEY environment variable/);
+});
+
+test("replay.js tags its readings simulated (static check: it runs forever, so it is not executed here)", () => {
+  const src = require("fs").readFileSync(path.join(ROOT, "tools/replay.js"), "utf8");
+  assert.match(src, /source: "simulated"/);
+});
