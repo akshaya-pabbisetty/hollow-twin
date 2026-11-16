@@ -1,0 +1,471 @@
+{
+  "levels": [
+    {
+      "code": "L0",
+      "name": "Gatehouse",
+      "depth_m": 60
+    },
+    {
+      "code": "L1",
+      "name": "Crown",
+      "depth_m": 240
+    },
+    {
+      "code": "L2",
+      "name": "Arcade",
+      "depth_m": 480
+    },
+    {
+      "code": "L3",
+      "name": "Foundry",
+      "depth_m": 760
+    },
+    {
+      "code": "L4",
+      "name": "Cistern",
+      "depth_m": 1050
+    },
+    {
+      "code": "L5",
+      "name": "Millrace",
+      "depth_m": 1380
+    },
+    {
+      "code": "L6",
+      "name": "Undercroft",
+      "depth_m": 1720
+    },
+    {
+      "code": "L7",
+      "name": "Marrow",
+      "depth_m": 2110
+    },
+    {
+      "code": "L8",
+      "name": "Deepwell",
+      "depth_m": 2560
+    }
+  ],
+  "blocks": [
+    {
+      "id": "l0-rail-wells",
+      "name": "Rail Wells",
+      "level": "L0",
+      "people": 88000
+    },
+    {
+      "id": "l0-rail-steps",
+      "name": "Rail Steps",
+      "level": "L0",
+      "people": 140000
+    },
+    {
+      "id": "l0-drift-yard",
+      "name": "Drift Yard",
+      "level": "L0",
+      "people": 98000
+    },
+    {
+      "id": "l0-rivet-gallery",
+      "name": "Rivet Gallery",
+      "level": "L0",
+      "people": 102000
+    },
+    {
+      "id": "l1-winch-gallery",
+      "name": "Winch Gallery",
+      "level": "L1",
+      "people": 178000
+    },
+    {
+      "id": "l1-ash-hollow",
+      "name": "Ash Hollow",
+      "level": "L1",
+      "people": 217000
+    },
+    {
+      "id": "l1-rail-bend",
+      "name": "Rail Bend",
+      "level": "L1",
+      "people": 223000
+    },
+    {
+      "id": "l1-ember-heading",
+      "name": "Ember Heading",
+      "level": "L1",
+      "people": 219000
+    },
+    {
+      "id": "l1-rivet-heading",
+      "name": "Rivet Heading",
+      "level": "L1",
+      "people": 239000
+    },
+    {
+      "id": "l1-bore-steps",
+      "name": "Bore Steps",
+      "level": "L1",
+      "people": 200000
+    },
+    {
+      "id": "l2-damp-bend",
+      "name": "Damp Bend",
+      "level": "L2",
+      "people": 209000
+    },
+    {
+      "id": "l2-chalk-gallery",
+      "name": "Chalk Gallery",
+      "level": "L2",
+      "people": 232000
+    },
+    {
+      "id": "l2-slag-wells",
+      "name": "Slag Wells",
+      "level": "L2",
+      "people": 213000
+    },
+    {
+      "id": "l2-tipple-junction",
+      "name": "Tipple Junction",
+      "level": "L2",
+      "people": 208000
+    },
+    {
+      "id": "l2-ember-junction",
+      "name": "Ember Junction",
+      "level": "L2",
+      "people": 235000
+    },
+    {
+      "id": "l2-tallow-wells",
+      "name": "Tallow Wells",
+      "level": "L2",
+      "people": 199000
+    },
+    {
+      "id": "l2-rail-hollow",
+      "name": "Rail Hollow",
+      "level": "L2",
+      "people": 285000
+    },
+    {
+      "id": "l3-ember-yard",
+      "name": "Ember Yard",
+      "level": "L3",
+      "people": 311000
+    },
+    {
+      "id": "l3-flint-row",
+      "name": "Flint Row",
+      "level": "L3",
+      "people": 351000
+    },
+    {
+      "id": "l3-sump-steps",
+      "name": "Sump Steps",
+      "level": "L3",
+      "people": 405000
+    },
+    {
+      "id": "l3-damp-steps",
+      "name": "Damp Steps",
+      "level": "L3",
+      "people": 256000
+    },
+    {
+      "id": "l3-flint-heading",
+      "name": "Flint Heading",
+      "level": "L3",
+      "people": 312000
+    },
+    {
+      "id": "l3-bore-face",
+      "name": "Bore Face",
+      "level": "L3",
+      "people": 366000
+    },
+    {
+      "id": "l3-pylon-steps",
+      "name": "Pylon Steps",
+      "level": "L3",
+      "people": 431000
+    },
+    {
+      "id": "l4-bore-heading",
+      "name": "Bore Heading",
+      "level": "L4",
+      "people": 315000
+    },
+    {
+      "id": "l4-tallow-gallery",
+      "name": "Tallow Gallery",
+      "level": "L4",
+      "people": 458000
+    },
+    {
+      "id": "l4-pitch-row",
+      "name": "Pitch Row",
+      "level": "L4",
+      "people": 293000
+    },
+    {
+      "id": "l4-flint-gallery",
+      "name": "Flint Gallery",
+      "level": "L4",
+      "people": 384000
+    },
+    {
+      "id": "l4-coke-yard",
+      "name": "Coke Yard",
+      "level": "L4",
+      "people": 421000
+    },
+    {
+      "id": "l4-gantry-court",
+      "name": "Gantry Court",
+      "level": "L4",
+      "people": 449000
+    },
+    {
+      "id": "l4-rivet-face",
+      "name": "Rivet Face",
+      "level": "L4",
+      "people": 336000
+    },
+    {
+      "id": "l4-lantern-face",
+      "name": "Lantern Face",
+      "level": "L4",
+      "people": 508000
+    },
+    {
+      "id": "l5-ash-court",
+      "name": "Ash Court",
+      "level": "L5",
+      "people": 397000
+    },
+    {
+      "id": "l5-cinder-court",
+      "name": "Cinder Court",
+      "level": "L5",
+      "people": 451000
+    },
+    {
+      "id": "l5-pylon-heading",
+      "name": "Pylon Heading",
+      "level": "L5",
+      "people": 445000
+    },
+    {
+      "id": "l5-ash-yard",
+      "name": "Ash Yard",
+      "level": "L5",
+      "people": 393000
+    },
+    {
+      "id": "l5-winch-heading",
+      "name": "Winch Heading",
+      "level": "L5",
+      "people": 583000
+    },
+    {
+      "id": "l5-coke-wells",
+      "name": "Coke Wells",
+      "level": "L5",
+      "people": 617000
+    },
+    {
+      "id": "l5-seam-row",
+      "name": "Seam Row",
+      "level": "L5",
+      "people": 422000
+    },
+    {
+      "id": "l5-sump-bend",
+      "name": "Sump Bend",
+      "level": "L5",
+      "people": 430000
+    },
+    {
+      "id": "l5-rail-face",
+      "name": "Rail Face",
+      "level": "L5",
+      "people": 340000
+    },
+    {
+      "id": "l6-seam-wells",
+      "name": "Seam Wells",
+      "level": "L6",
+      "people": 686000
+    },
+    {
+      "id": "l6-damp-court",
+      "name": "Damp Court",
+      "level": "L6",
+      "people": 543000
+    },
+    {
+      "id": "l6-pitch-face",
+      "name": "Pitch Face",
+      "level": "L6",
+      "people": 402000
+    },
+    {
+      "id": "l6-flint-face",
+      "name": "Flint Face",
+      "level": "L6",
+      "people": 723000
+    },
+    {
+      "id": "l6-slag-face",
+      "name": "Slag Face",
+      "level": "L6",
+      "people": 578000
+    },
+    {
+      "id": "l6-rail-row",
+      "name": "Rail Row",
+      "level": "L6",
+      "people": 578000
+    },
+    {
+      "id": "l6-lantern-heading",
+      "name": "Lantern Heading",
+      "level": "L6",
+      "people": 669000
+    },
+    {
+      "id": "l6-ember-gallery",
+      "name": "Ember Gallery",
+      "level": "L6",
+      "people": 592000
+    },
+    {
+      "id": "l6-chalk-bend",
+      "name": "Chalk Bend",
+      "level": "L6",
+      "people": 458000
+    },
+    {
+      "id": "l7-pylon-yard",
+      "name": "Pylon Yard",
+      "level": "L7",
+      "people": 617000
+    },
+    {
+      "id": "l7-rivet-row",
+      "name": "Rivet Row",
+      "level": "L7",
+      "people": 782000
+    },
+    {
+      "id": "l7-ember-wells",
+      "name": "Ember Wells",
+      "level": "L7",
+      "people": 781000
+    },
+    {
+      "id": "l7-flint-yard",
+      "name": "Flint Yard",
+      "level": "L7",
+      "people": 524000
+    },
+    {
+      "id": "l7-drift-heading",
+      "name": "Drift Heading",
+      "level": "L7",
+      "people": 644000
+    },
+    {
+      "id": "l7-tipple-court",
+      "name": "Tipple Court",
+      "level": "L7",
+      "people": 532000
+    },
+    {
+      "id": "l7-chalk-cut",
+      "name": "Chalk Cut",
+      "level": "L7",
+      "people": 784000
+    },
+    {
+      "id": "l7-ash-wells",
+      "name": "Ash Wells",
+      "level": "L7",
+      "people": 590000
+    },
+    {
+      "id": "l7-pitch-gallery",
+      "name": "Pitch Gallery",
+      "level": "L7",
+      "people": 608000
+    },
+    {
+      "id": "l7-gantry-yard",
+      "name": "Gantry Yard",
+      "level": "L7",
+      "people": 642000
+    },
+    {
+      "id": "l8-bore-bend",
+      "name": "Bore Bend",
+      "level": "L8",
+      "people": 772000
+    },
+    {
+      "id": "l8-gantry-bend",
+      "name": "Gantry Bend",
+      "level": "L8",
+      "people": 523000
+    },
+    {
+      "id": "l8-winch-wells",
+      "name": "Winch Wells",
+      "level": "L8",
+      "people": 739000
+    },
+    {
+      "id": "l8-canary-bend",
+      "name": "Canary Bend",
+      "level": "L8",
+      "people": 898000
+    },
+    {
+      "id": "l8-lamp-cut",
+      "name": "Lamp Cut",
+      "level": "L8",
+      "people": 758000
+    },
+    {
+      "id": "l8-sump-row",
+      "name": "Sump Row",
+      "level": "L8",
+      "people": 729000
+    },
+    {
+      "id": "l8-slag-yard",
+      "name": "Slag Yard",
+      "level": "L8",
+      "people": 766000
+    },
+    {
+      "id": "l8-canary-row",
+      "name": "Canary Row",
+      "level": "L8",
+      "people": 850000
+    },
+    {
+      "id": "l8-rail-junction",
+      "name": "Rail Junction",
+      "level": "L8",
+      "people": 744000
+    },
+    {
+      "id": "l8-drift-hollow",
+      "name": "Drift Hollow",
+      "level": "L8",
+      "people": 646000
+    }
+  ]
+}

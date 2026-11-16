@@ -1,0 +1,12 @@
+{
+  "id": "sensor-l6-flint-face-000918",
+  "device": "sensor-l6-flint-face",
+  "block": "l6-flint-face",
+  "time": "2026-11-18T20:00:00Z",
+  "kind": "flood",
+  "values": {
+    "depth_cm": 31
+  },
+  "hops": 0,
+  "via": []
+}

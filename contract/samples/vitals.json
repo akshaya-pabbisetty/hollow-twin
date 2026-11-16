@@ -1,0 +1,14 @@
+{
+  "id": "watch-0042-000387",
+  "device": "watch-0042",
+  "block": "l8-bore-bend",
+  "time": "2026-11-18T20:00:00Z",
+  "kind": "vitals",
+  "values": {
+    "hr_bpm": 104,
+    "spo2_pct": 93,
+    "temp_c": 38.1
+  },
+  "hops": 0,
+  "via": []
+}

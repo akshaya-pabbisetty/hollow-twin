@@ -1,0 +1,19 @@
+{
+  "id": "watch-0042-000389",
+  "device": "watch-0042",
+  "block": "l8-bore-bend",
+  "time": "2026-11-18T20:00:00Z",
+  "kind": "checkin",
+  "values": {
+    "status": "ok",
+    "family": "fam-0007",
+    "to": [
+      "watch-0110"
+    ]
+  },
+  "hops": 2,
+  "via": [
+    "relay-l8-bore-bend",
+    "relay-l8-gantry-bend"
+  ]
+}

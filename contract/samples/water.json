@@ -1,0 +1,13 @@
+{
+  "id": "sensor-l7-chalk-cut-002201",
+  "device": "sensor-l7-chalk-cut",
+  "block": "l7-chalk-cut",
+  "time": "2026-11-18T20:00:00Z",
+  "kind": "water",
+  "values": {
+    "tds_ppm": 840,
+    "turbidity_ntu": 6.5
+  },
+  "hops": 0,
+  "via": []
+}

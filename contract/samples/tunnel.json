@@ -1,0 +1,16 @@
+{
+  "id": "rover-01-000044",
+  "device": "rover-01",
+  "block": "l6-flint-face",
+  "time": "2026-11-18T20:00:00Z",
+  "kind": "tunnel",
+  "values": {
+    "from_block": "l6-flint-face",
+    "to_block": "l6-rail-row",
+    "status": "closed",
+    "reason": "standing water",
+    "photo_url": "https://example.invalid/rover-01/000044.jpg"
+  },
+  "hops": 0,
+  "via": []
+}

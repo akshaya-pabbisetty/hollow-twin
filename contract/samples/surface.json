@@ -1,0 +1,15 @@
+{
+  "id": "surface-01-000012",
+  "device": "surface-01",
+  "block": "surface",
+  "time": "2026-11-18T20:00:00Z",
+  "kind": "surface",
+  "values": {
+    "co2_ppm": 430,
+    "temp_c": 17.5,
+    "radiation_usv_h": 0.31,
+    "photo_url": "https://example.invalid/surface-01/000012.jpg"
+  },
+  "hops": 0,
+  "via": []
+}

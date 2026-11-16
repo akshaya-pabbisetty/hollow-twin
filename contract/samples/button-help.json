@@ -1,0 +1,12 @@
+{
+  "id": "watch-0042-000388",
+  "device": "watch-0042",
+  "block": "l8-bore-bend",
+  "time": "2026-11-18T20:00:00Z",
+  "kind": "button",
+  "values": {
+    "button": "help"
+  },
+  "hops": 0,
+  "via": []
+}

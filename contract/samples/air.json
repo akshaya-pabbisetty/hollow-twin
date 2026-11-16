@@ -1,0 +1,14 @@
+{
+  "id": "sensor-l7-chalk-cut-002202",
+  "device": "sensor-l7-chalk-cut",
+  "block": "l7-chalk-cut",
+  "time": "2026-11-18T20:00:00Z",
+  "kind": "air",
+  "values": {
+    "co2_ppm": 2350,
+    "temp_c": 40.2,
+    "humidity_pct": 71
+  },
+  "hops": 0,
+  "via": []
+}

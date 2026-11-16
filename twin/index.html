@@ -1,0 +1,1863 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hollow Twin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Control-room palette after ISA-101: greys for normal, colour only for abnormal states. */
+  :root {
+    --app: #D3D4D0;
+    --panel: #E2E3DF;
+    --well: #ECEDE9;
+    --line: #BABCB7;
+    --line-2: #9DA09B;
+    --ink: #1F2326;
+    --dim: #565B60;
+    --faint: #85898D;
+    --alarm: #C8102E;
+    --warn: #E5A100;
+    --warn-ink: #8A5F00;
+    --sel: #33383D;
+    --scene: #1A1C1E;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--app); color: var(--ink); }
+  body { font: 13px/1.45 'IBM Plex Sans', system-ui, sans-serif; font-variant-numeric: tabular-nums; overflow: hidden; }
+  button { font: inherit; font-size: 12px; color: var(--ink); background: var(--well); border: 1px solid var(--line-2); padding: 5px 8px; cursor: pointer; border-radius: 2px; }
+  button:hover { border-color: var(--sel); }
+  button.on { background: var(--sel); color: #fff; border-color: var(--sel); }
+  button.danger.on { background: var(--alarm); border-color: var(--alarm); color: #fff; }
+
+  #app { display: grid; grid-template-columns: 260px 1fr 320px; grid-template-rows: 44px 1fr 128px; height: 100vh; }
+  header { grid-column: 1 / -1; display: flex; align-items: center; gap: 22px; padding: 0 16px; background: var(--panel); border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; }
+  .brand { font-weight: 600; font-size: 15px; }
+  .brand span { font-weight: 400; color: var(--dim); margin-left: 8px; font-size: 13px; }
+  .hstat { color: var(--dim); font-size: 12px; }
+  .hstat b { color: var(--ink); font-weight: 600; }
+  .pill { padding: 1px 8px; border-radius: 2px; font-weight: 600; font-size: 12px; }
+  .pill.ok { color: var(--ink); background: var(--well); border: 1px solid var(--line-2); }
+  .pill.bad { color: #fff; background: var(--alarm); animation: blink 1.2s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .55; } }
+  .spacer { flex: 1; }
+
+  aside { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 12px 14px; }
+  aside#right { border-right: 0; border-left: 1px solid var(--line); }
+  h3 { margin: 18px 0 6px; font-size: 12px; font-weight: 600; color: var(--dim); display: flex; justify-content: space-between; }
+  h3:first-child { margin-top: 0; }
+  .row { display: flex; gap: 4px; flex-wrap: wrap; }
+  .row button { flex: 1; }
+  .note { color: var(--dim); font-size: 12px; margin-top: 6px; }
+  .grid-btn { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .legend { display: grid; grid-template-columns: 12px 1fr; gap: 4px 8px; align-items: center; margin-top: 8px; font-size: 12px; color: var(--dim); }
+  .sw { width: 12px; height: 12px; border-radius: 50%; }
+  .sw.n { border: 1px solid var(--line-2); }
+  .sw.w { background: var(--warn); }
+  .sw.a { background: var(--alarm); }
+
+  .lvl { display: grid; grid-template-columns: 1fr 52px; gap: 2px 8px; padding: 6px; border: 1px solid transparent; cursor: pointer; border-radius: 2px; }
+  .lvl:hover { border-color: var(--line-2); }
+  .lvl.focus { border-color: var(--sel); background: var(--well); }
+  .lvl .nm { font-weight: 500; }
+  .lvl .nm i { font-style: normal; font-weight: 400; color: var(--faint); }
+  .lvl .pp { text-align: right; color: var(--dim); }
+  .lvl .meter { grid-column: 1 / -1; height: 4px; background: var(--line); position: relative; }
+  .lvl .meter span { position: absolute; inset: 0 auto 0 0; background: var(--line-2); }
+  .lvl .flags { grid-column: 1 / -1; font-size: 11px; color: var(--dim); }
+  .lvl .flags .c { color: var(--alarm); font-weight: 600; }
+  .lvl .flags .w { color: var(--warn-ink); font-weight: 600; }
+
+  #view { position: relative; overflow: hidden; background: var(--scene); }
+  #view canvas { display: block; }
+  #labels { position: absolute; inset: 0; pointer-events: none; }
+  .corner { position: absolute; color: #9a9c98; font-size: 11px; pointer-events: none; }
+  .corner.tl { bottom: 10px; left: 12px; } .corner.br { bottom: 10px; right: 12px; text-align: right; }
+
+  .lbl-level, .lbl-plant { background: rgba(226,227,223,.93); color: var(--ink); font-size: 11px; font-weight: 600; padding: 3px 7px; white-space: nowrap; line-height: 1.3; border-radius: 2px; }
+  .lbl-level small { display: block; color: var(--dim); font-weight: 400; font-size: 10px; }
+  .lbl-surface { background: rgba(226,227,223,.85); color: var(--ink); font-size: 11px; padding: 2px 7px; white-space: nowrap; border-radius: 2px; }
+  .lbl-alert { font-size: 10px; font-weight: 600; padding: 1px 5px; white-space: nowrap; border-radius: 2px; }
+  .lbl-alert.s2 { background: var(--alarm); color: #fff; }
+  .lbl-alert.s1 { background: var(--warn); color: var(--ink); }
+  .lbl-alert.lvl-tag { font-size: 11px; padding: 2px 7px; }
+  .lbl-sel { color: var(--ink); background: #fff; font-size: 11px; font-weight: 600; padding: 2px 6px; white-space: nowrap; border-radius: 2px; transform: translateY(-18px); }
+
+  .kv { display: grid; grid-template-columns: 82px 1fr; gap: 4px 8px; }
+  .kv .k { color: var(--dim); }
+  .s0 { color: var(--ink); } .s1 { color: var(--warn-ink); font-weight: 600; } .s2 { color: var(--alarm); font-weight: 600; }
+  .title { font-size: 20px; font-weight: 600; line-height: 1.1; }
+  .sub { color: var(--dim); margin: 3px 0 10px; font-size: 12px; }
+  .callout { background: var(--well); border: 1px solid var(--line); border-left: 4px solid var(--warn); padding: 8px 10px; margin: 10px 0; }
+  .callout.crit { border-left-color: var(--alarm); }
+  .callout.plain { border-left-color: var(--line-2); }
+  .big { font-size: 24px; font-weight: 600; line-height: 1.1; }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .compare div { background: var(--well); border: 1px solid var(--line); padding: 7px 8px; }
+  .compare small { display: block; color: var(--dim); font-size: 11px; margin-bottom: 2px; }
+  .alert { display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .alert:hover { background: var(--well); }
+  .alert .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .alert .dot.s2 { background: var(--alarm); } .alert .dot.s1 { background: var(--warn); }
+  .alert .w { color: var(--dim); font-size: 11px; }
+  .alert .v { font-size: 12px; }
+  svg.spark { width: 100%; height: 44px; display: block; margin-top: 4px; background: var(--well); border: 1px solid var(--line); }
+
+  footer { grid-column: 1 / -1; background: var(--well); border-top: 1px solid var(--line); padding: 8px 16px; overflow-y: auto; font-size: 12px; }
+  footer .ln { display: grid; grid-template-columns: 96px 64px 1fr; gap: 8px; padding: 1px 0; }
+  footer .ln .t { color: var(--faint); }
+  footer .ln .tag { font-weight: 600; color: var(--dim); }
+  footer .ln.crit .tag { color: var(--alarm); }
+  footer .ln.warn .tag { color: var(--warn-ink); }
+
+  .tabs { display: flex; margin: 12px 0 8px; border-bottom: 1px solid var(--line); }
+  .tabs button { border: 0; background: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 6px 12px; color: var(--dim); }
+  .tabs button.on { color: var(--ink); border-bottom-color: var(--sel); background: none; font-weight: 600; }
+  .rd { display: grid; grid-template-columns: 64px 1fr 64px; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--line); }
+  .rd .k { color: var(--dim); }
+  .rd svg { width: 64px; height: 18px; }
+  .story { margin: 0 0 12px; line-height: 1.55; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { font-size: 12px; padding: 3px 9px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--well); cursor: pointer; }
+  .chip:hover { border-color: var(--sel); }
+  .actions { display: grid; gap: 4px; }
+  .actions button { text-align: left; }
+  .actions button:disabled { opacity: .5; cursor: default; }
+  .nav { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 16px; color: var(--dim); font-size: 12px; }
+  .crumbs { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--dim); font-size: 12px; }
+  .ev { padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+  .ev .t { color: var(--faint); margin-right: 6px; }
+  .fade-in { animation: fadein .28s ease; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  #tip { position: absolute; z-index: 5; pointer-events: none; display: none; background: #fff; color: var(--ink); font-size: 12px; font-weight: 600; padding: 5px 8px; border-radius: 2px; box-shadow: 0 2px 10px rgba(0,0,0,.35); white-space: nowrap; }
+  #tip small { display: block; font-weight: 400; color: var(--dim); }
+  #find { font: inherit; font-size: 12px; padding: 4px 8px; border: 1px solid var(--line-2); background: var(--well); border-radius: 2px; width: 220px; color: var(--ink); }
+  #find:focus { outline: 2px solid var(--sel); outline-offset: -1px; }
+  select { font: inherit; font-size: 12px; width: 100%; padding: 5px 6px; border: 1px solid var(--line-2); background: var(--well); border-radius: 2px; color: var(--ink); }
+  .slider { display: block; margin-top: 8px; font-size: 12px; color: var(--dim); }
+  .slider b { color: var(--ink); float: right; }
+  .slider input { width: 100%; accent-color: var(--sel); }
+  #o-ob h3, #o-mesh h3 { margin-top: 18px; }
+  #ob-pick.on { background: var(--alarm); border-color: var(--alarm); }
+  @media (max-width: 960px) {
+    body { overflow: auto; }
+    #app { grid-template-columns: 1fr; grid-template-rows: auto 58vh auto auto 160px; height: auto; }
+    header { flex-wrap: wrap; gap: 6px 14px; padding: 8px 16px; white-space: normal; }
+    aside, aside#right { border: 0; border-top: 1px solid var(--line); }
+    #view { grid-row: 2; } aside#left { grid-row: 3; } aside#right { grid-row: 4; }
+  }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">Hollow Twin<span>Sector 7, Old Kanawha workings</span></div>
+    <div class="hstat">Clock <b id="h-clock">--</b></div>
+    <div class="hstat">Geothermal <b id="h-plant">--</b></div>
+    <div class="hstat">Supply / demand <b id="h-sd">--</b></div>
+    <div class="spacer"></div>
+    <input id="find" list="blocklist" placeholder="Find a block, e.g. Rivet Gallery" autocomplete="off" aria-label="Find a block"><datalist id="blocklist"></datalist>
+    <div class="hstat">Directorate net <span id="h-net" class="pill ok">Online</span></div>
+  </header>
+
+  <aside id="left">
+    <h3>Time</h3>
+    <div class="grid-btn" style="grid-template-columns:repeat(4,1fr)">
+      <button data-speed="0">Pause</button>
+      <button data-speed="1" class="on">1 h/s</button>
+      <button data-speed="4">4 h/s</button>
+      <button data-speed="24">24 h/s</button>
+    </div>
+    <div class="row" style="margin-top:4px"><button id="btn-reset">Reset scenario</button></div>
+
+    <h3>Power policy</h3>
+    <div class="row">
+      <button data-policy="directorate" class="on">Directorate</button>
+      <button data-policy="fair">Fair share</button>
+    </div>
+    <div class="note" id="policy-note"></div>
+    <div class="compare" style="margin-top:8px">
+      <div><small>Upper L0-L4 served</small><span class="big" id="f-upper">--</span></div>
+      <div><small>Deep L5-L8 served</small><span class="big" id="f-deep">--</span></div>
+    </div>
+    <div class="note">Equity index <b id="f-jain">--</b> (1.00 = everyone gets the same share)</div>
+
+    <h3>Network</h3>
+    <div class="row"><button id="btn-net" class="danger">Cut Directorate network</button></div>
+    <div class="note" id="net-note">Traffic routes through the central shaft. One switch at the Directorate turns it off.</div>
+
+    <h3>Outbreak</h3>
+    <select id="ob-kind" aria-label="Disease"></select>
+    <div class="note" id="ob-blurb"></div>
+    <label class="slider">How contagious (R0) <b id="ob-r0v"></b><input type="range" id="ob-r0" min="1.2" max="6" step="0.1"></label>
+    <div class="row" style="margin-top:6px"><button id="ob-pick">Pick a block to infect</button></div>
+    <div class="row" style="margin-top:4px"><button id="ob-clear">Clear outbreak</button></div>
+    <div class="note">Tip: run at 24 h/s to watch it spread. Red figures show where people are sick, drawn 4 times denser so you can see them. Quarantine and medicine are on each block's card.</div>
+
+    <h3>Layer</h3>
+    <div class="grid-btn" id="layers"></div>
+    <div class="legend"><span class="sw n"></span><span>Normal: no marker</span><span class="sw w"></span><span id="lg-lo"></span><span class="sw a"></span><span id="lg-hi"></span></div>
+    <div class="row" style="margin-top:8px"><button id="btn-overlay" class="on">Markers on</button></div>
+    <div class="note" id="lg-desc"></div>
+
+    <h3>Levels <span id="lv-all" style="cursor:pointer;color:var(--ink);text-decoration:underline">Show all</span></h3>
+    <div id="levels"></div>
+  </aside>
+
+  <main id="view">
+    <div id="labels"></div>
+    <div class="corner tl">Drag to orbit, scroll to zoom. Click a block to step inside. Esc steps back, arrows move between blocks, / to search.</div>
+    <div class="corner br" id="corner-br"></div>
+  </main>
+
+  <aside id="right"></aside>
+
+  <footer id="log"></footer>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { HorizontalTiltShiftShader } from 'three/addons/shaders/HorizontalTiltShiftShader.js';
+import { VerticalTiltShiftShader } from 'three/addons/shaders/VerticalTiltShiftShader.js';
+
+// ---------- helpers ----------
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const clamp01 = v => clamp(v, 0, 1);
+const fmtPop = k => k >= 1000 ? (k / 1000).toFixed(1) + 'M' : Math.round(k) + 'k';
+const fmtInt = v => Math.round(v).toLocaleString('en-US');
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+
+const C = { green: new THREE.Color('#3DFFB0'), amber: new THREE.Color('#FF9A1F'), red: new THREE.Color('#FF3B3B'), dark: new THREE.Color('#1A1F1D'), ink: new THREE.Color('#E8E2D0') };
+// ---------- world layout (fixed) ----------
+const SPACING = 16;
+const LEVELS = [
+  ['L0', 'Gatehouse', 60], ['L1', 'Crown', 240], ['L2', 'Arcade', 480], ['L3', 'Foundry', 760], ['L4', 'Cistern', 1050],
+  ['L5', 'Millrace', 1380], ['L6', 'Undercroft', 1720], ['L7', 'Marrow', 2110], ['L8', 'Deepwell', 2560],
+].map(([code, name, depth], i) => ({ i, code, name, depth, y: -i * SPACING, nbhds: [], edges: [] }));
+
+const PRE = ['Ash', 'Lamp', 'Sump', 'Canary', 'Shale', 'Cinder', 'Rail', 'Bore', 'Slag', 'Gantry', 'Tallow', 'Seam', 'Drift', 'Coke', 'Pylon', 'Rivet', 'Ember', 'Flint', 'Tipple', 'Winch', 'Lantern', 'Chalk', 'Pitch', 'Damp'];
+const SUF = ['Row', 'Yard', 'Court', 'Gallery', 'Cut', 'Hollow', 'Junction', 'Steps', 'Wells', 'Bend', 'Heading', 'Face'];
+
+const layoutRng = mulberry32(2087);
+const names = [];
+for (const p of PRE) for (const s of SUF) names.push(p + ' ' + s);
+for (let i = names.length - 1; i > 0; i--) { const j = Math.floor(layoutRng() * (i + 1)); [names[i], names[j]] = [names[j], names[i]]; }
+
+const NBHDS = [];
+const HUBS = [];
+const EDGES = [];
+let nameIdx = 0;
+for (const L of LEVELS) {
+  const count = L.i === 0 ? 4 : 5 + Math.ceil(L.i / 1.6);
+  const pts = []; let tries = 0;
+  while (pts.length < count && tries < 6000) {
+    tries++;
+    const x = (layoutRng() * 2 - 1) * 40, z = (layoutRng() * 2 - 1) * 23;
+    if (Math.hypot(x, z) < 10) continue;
+    if (pts.some(p => Math.hypot(p.x - x, p.z - z) < 11.5)) continue;
+    pts.push({ x, z });
+  }
+  const hub = { hub: true, level: L.i, x: 0, z: 0, name: L.name + ' lift hub' };
+  HUBS.push(hub);
+  for (const p of pts) {
+    const popBase = 110 + L.i * 75;
+    const n = {
+      id: NBHDS.length, name: names[nameIdx++], level: L.i, L, x: p.x, z: p.z,
+      pop: Math.round(popBase * (0.7 + layoutRng() * 0.6)),
+      heatBias: (layoutRng() - 0.5) * 2.4,
+      capH: 19 - L.i * 1.3 + layoutRng() * 6,
+      r: [layoutRng(), layoutRng(), layoutRng(), layoutRng()],
+    };
+    NBHDS.push(n); L.nbhds.push(n);
+  }
+  // tunnels: minimum spanning tree over hub + nbhds, plus a few loops
+  const nodes = [hub, ...L.nbhds];
+  const inTree = new Set([0]);
+  const has = (a, b) => L.edges.some(e => (e.a === a && e.b === b) || (e.a === b && e.b === a));
+  while (inTree.size < nodes.length) {
+    let best = null;
+    for (const i of inTree) for (let j = 0; j < nodes.length; j++) {
+      if (inTree.has(j)) continue;
+      const d = Math.hypot(nodes[i].x - nodes[j].x, nodes[i].z - nodes[j].z);
+      if (!best || d < best.d) best = { i, j, d };
+    }
+    inTree.add(best.j);
+    L.edges.push({ a: nodes[best.i], b: nodes[best.j], kind: nodes[best.i].hub ? 'spur' : 'tunnel', level: L.i });
+  }
+  for (const n of L.nbhds) {
+    const others = L.nbhds.filter(o => o !== n).sort((p, q) => Math.hypot(p.x - n.x, p.z - n.z) - Math.hypot(q.x - n.x, q.z - n.z));
+    const o = others[1];
+    if (o && Math.hypot(o.x - n.x, o.z - n.z) < 24 && !has(n, o)) L.edges.push({ a: n, b: o, kind: 'tunnel', level: L.i });
+  }
+  EDGES.push(...L.edges);
+}
+for (let i = 0; i < HUBS.length - 1; i++) EDGES.push({ a: HUBS[i], b: HUBS[i + 1], kind: 'shaft', level: i });
+for (const n of NBHDS) n.adj = [];
+for (const h of HUBS) h.adj = [];
+for (const e of EDGES) { e.a.adj.push(e); e.b.adj.push(e); }
+
+// ---------- three.js scene: cutaway diorama ----------
+const view = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+view.prepend(renderer.domElement);
+const labelRenderer = new CSS2DRenderer({ element: document.getElementById('labels') });
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.5, 2000);
+camera.position.set(150, 22, 232);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, -60, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.rotateSpeed = 0.7; controls.zoomSpeed = 0.9;
+controls.minDistance = 25; controls.maxDistance = 420;
+controls.minAzimuthAngle = -0.35; controls.maxAzimuthAngle = Math.PI / 2 + 0.35; // the open cutaway quadrant
+controls.maxPolarAngle = Math.PI * 0.66;
+
+function addLabel(html, cls, pos, parent = scene) {
+  const d = el('div', cls, html);
+  const o = new CSS2DObject(d);
+  o.position.copy(pos);
+  parent.add(o);
+  return o;
+}
+
+// noise + procedural textures
+function makeNoise(seed) {
+  const r = mulberry32(seed), P = new Float32Array(65536);
+  for (let i = 0; i < P.length; i++) P[i] = r();
+  const g = (a, b) => P[((a & 255) << 8) | (b & 255)];
+  const s = t => t * t * (3 - 2 * t);
+  return (x, y) => {
+    const xi = Math.floor(x), yi = Math.floor(y), u = s(x - xi), v = s(y - yi);
+    const a = g(xi, yi), b = g(xi + 1, yi), c = g(xi, yi + 1), d = g(xi + 1, yi + 1);
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+  };
+}
+const noise = makeNoise(7);
+const fbm = (x, y) => noise(x, y) * 0.5 + noise(x * 2.1 + 5, y * 2.1) * 0.25 + noise(x * 4.3, y * 4.3 + 9) * 0.125 + noise(x * 8.7, y * 8.7) * 0.0625;
+
+function canvasTex(w, h, draw, repeat = [1, 1], srgb = true) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; t.repeat.set(...repeat);
+  return t;
+}
+const hex = c => '#' + c.getHexString();
+function strataTex(base, seed, opts = {}) {
+  return canvasTex(512, 128, (g, w, h) => {
+    const col = new THREE.Color(base), r = mulberry32(seed);
+    g.fillStyle = hex(col); g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 16; i++) {
+      const y0 = r() * h, th = 2 + r() * 12, ph = r() * 9, amp = 1 + r() * 4;
+      g.fillStyle = hex(col.clone().offsetHSL((r() - .5) * .02, (r() - .5) * .08, (r() - .5) * .14));
+      g.beginPath(); g.moveTo(0, y0);
+      for (let x = 0; x <= w; x += 8) g.lineTo(x, y0 + Math.sin(x / 47 + ph) * amp);
+      for (let x = w; x >= 0; x -= 8) g.lineTo(x, y0 + th + Math.sin(x / 39 + ph) * amp);
+      g.closePath(); g.fill();
+    }
+    if (opts.coal) for (let i = 0; i < 3; i++) { g.fillStyle = '#16120f'; const y0 = 20 + r() * 80; g.fillRect(0, y0, w, 3 + r() * 6); }
+    for (let i = 0; i < (opts.pebbles || 0); i++) {
+      g.fillStyle = hex(col.clone().offsetHSL(0, -.05, (r() - .3) * .3));
+      g.beginPath(); g.ellipse(r() * w, r() * h, 1.5 + r() * 4, 1 + r() * 2.5, r() * 3, 0, 7); g.fill();
+    }
+    for (let i = 0; i < 5000; i++) { g.fillStyle = hex(col.clone().offsetHSL(0, 0, (r() - .5) * .22)); g.fillRect(r() * w, r() * h, 1 + r() * 1.5, 1 + r() * 1.5); }
+    g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1;
+    for (let i = 0; i < 10; i++) { let x = r() * w, y = r() * h; g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 6; k++) { x += (r() - .5) * 30; y += r() * 14; g.lineTo(x, y); } g.stroke(); }
+    if (opts.glow) {
+      g.strokeStyle = 'rgba(255,110,30,.9)'; g.lineWidth = 2; g.shadowColor = '#ff6a1a'; g.shadowBlur = 8;
+      for (let i = 0; i < 14; i++) { let x = r() * w, y = r() * h; g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 7; k++) { x += (r() - .5) * 40; y += (r() - .5) * 20; g.lineTo(x, y); } g.stroke(); }
+    }
+  }, [5, 1]);
+}
+function glowTex(seed) { // emissive map for hot rock: only the cracks
+  return canvasTex(512, 128, (g, w, h) => {
+    const r = mulberry32(seed); g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
+    g.strokeStyle = '#ff7a2a'; g.lineWidth = 2.5; g.shadowColor = '#ff6a1a'; g.shadowBlur = 10;
+    for (let i = 0; i < 14; i++) { let x = r() * w, y = r() * h; g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 7; k++) { x += (r() - .5) * 40; y += (r() - .5) * 20; g.lineTo(x, y); } g.stroke(); }
+  }, [5, 1]);
+}
+function floorTex(base, seed) {
+  return canvasTex(512, 512, (g, w, h) => {
+    const col = new THREE.Color(base), r = mulberry32(seed);
+    g.fillStyle = hex(col); g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 900; i++) {
+      g.fillStyle = hex(col.clone().offsetHSL(0, (r() - .5) * .06, (r() - .5) * .12)); g.globalAlpha = .5;
+      g.beginPath(); g.ellipse(r() * w, r() * h, 4 + r() * 24, 3 + r() * 14, r() * 3, 0, 7); g.fill();
+    }
+    g.globalAlpha = 1;
+    for (let i = 0; i < 9000; i++) { g.fillStyle = hex(col.clone().offsetHSL(0, 0, (r() - .5) * .25)); g.fillRect(r() * w, r() * h, 1.5, 1.5); }
+    g.strokeStyle = 'rgba(0,0,0,.18)'; g.lineWidth = 3; // cart tracks and footpaths
+    for (let i = 0; i < 6; i++) { g.beginPath(); let x = r() * w, y = 0; g.moveTo(x, y); while (y < h) { x += (r() - .5) * 30; y += 30; g.lineTo(x, y); } g.stroke(); }
+  }, [3, 2]);
+}
+function wallTexPair(base, seed, litShare) {
+  const r = mulberry32(seed), cols = 4, rows = 9, lit = [];
+  for (let i = 0; i < cols * rows; i++) lit.push(r() < litShare);
+  const draw = emissive => (g, w, h) => {
+    const col = new THREE.Color(base), rr = mulberry32(seed + 1);
+    g.fillStyle = emissive ? '#000' : hex(col); g.fillRect(0, 0, w, h);
+    if (!emissive) for (let i = 0; i < 1500; i++) { g.fillStyle = hex(col.clone().offsetHSL(0, 0, (rr() - .5) * .18)); g.fillRect(rr() * w, rr() * h, 2, 2); }
+    if (!emissive) { g.fillStyle = 'rgba(0,0,0,.25)'; for (let y = 0; y < rows; y++) g.fillRect(0, y * (h / rows) + h / rows - 2, w, 2); }
+    for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+      const on = lit[y * cols + x];
+      g.fillStyle = emissive ? (on ? '#ffd9a0' : '#000') : (on ? '#2c2a26' : '#1d1f22');
+      g.fillRect(x * (w / cols) + 4, y * (h / rows) + 4, w / cols - 8, h / rows - 9);
+    }
+  };
+  return { map: canvasTex(64, 144, draw(false)), emissive: canvasTex(64, 144, draw(true)) };
+}
+function skyTex() {
+  return canvasTex(4, 512, (g, w, h) => {
+    const grd = g.createLinearGradient(0, 0, 0, h);
+    grd.addColorStop(0, '#6f8798'); grd.addColorStop(0.32, '#b9b9a4'); grd.addColorStop(0.46, '#4a4740');
+    grd.addColorStop(0.6, '#15130f'); grd.addColorStop(1, '#070605');
+    g.fillStyle = grd; g.fillRect(0, 0, w, h);
+  });
+}
+scene.background = skyTex();
+
+// lights
+scene.add(new THREE.HemisphereLight('#d6e4f0', '#3b2c20', 0.55));
+scene.add(new THREE.AmbientLight('#ffffff', 0.12));
+const sun = new THREE.DirectionalLight('#fff0d8', 2.4);
+sun.position.set(70, 120, 60);
+sun.target.position.set(0, 16, 0);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -62, right: 62, top: 45, bottom: -45, near: 40, far: 260 });
+sun.shadow.bias = -0.0008;
+scene.add(sun, sun.target);
+
+// geometry of the cut
+const W = 100, D = 64, CAV = 10, SURF = 16;
+const caveFloor = i => LEVELS[i].y, caveTop = i => LEVELS[i].y + CAV;
+const PLANT_FLOOR = LEVELS[8].y - 18, PLANT_TOP = LEVELS[8].y - 6, BOTTOM = PLANT_FLOOR - 14;
+
+const STRATA = [ // [side color, floor color, options] from the top down
+  ['#5b3f28', '#6a5038', { pebbles: 140 }],          // topsoil above L0
+  ['#7d5b3b', '#776049', { pebbles: 60 }],           // clay
+  ['#9c7c55', '#8a7458', { pebbles: 30 }],           // sandstone
+  ['#655c53', '#6b625a', {}],                        // shale
+  ['#3b3530', '#4d4740', { coal: true }],            // coal seam (the old mines)
+  ['#86806f', '#7b7466', { pebbles: 40 }],           // limestone
+  ['#6e6966', '#6c6560', { pebbles: 80 }],           // granite
+  ['#6b4d42', '#6a5048', { pebbles: 60 }],           // red granite
+  ['#58392d', '#5c4236', { glow: false }],           // hot rock
+  ['#3c2723', '#4a3028', { glow: true }],            // basalt under L8
+  ['#2a1a16', '#2a1a16', { glow: true }],            // bedrock under the plant
+];
+const occluders = [];
+function slab(yTop, yBot, k) {
+  const [side, floor, opts] = STRATA[k];
+  const sideTex = strataTex(side, 100 + k, opts);
+  const h = yTop - yBot;
+  sideTex.repeat.set(4, h / 12);
+  const sideMat = new THREE.MeshStandardMaterial({ map: sideTex, roughness: 0.95 });
+  if (opts.glow) { sideMat.emissiveMap = glowTex(200 + k); sideMat.emissiveMap.repeat.copy(sideTex.repeat); sideMat.emissive = new THREE.Color('#ff6a1a'); sideMat.emissiveIntensity = 0.9; }
+  const topMat = new THREE.MeshStandardMaterial({ map: floorTex(floor, 300 + k), roughness: 1 });
+  const botMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(side).multiplyScalar(0.45), roughness: 1 });
+  const m = new THREE.Mesh(new THREE.BoxGeometry(W, h, D), [sideMat, sideMat, topMat, botMat, sideMat, sideMat]);
+  m.position.y = (yTop + yBot) / 2;
+  m.receiveShadow = true;
+  scene.add(m); occluders.push(m);
+  return m;
+}
+slab(SURF, caveTop(0), 0);
+for (let i = 0; i < 8; i++) slab(caveFloor(i), caveTop(i + 1), i + 1);
+slab(caveFloor(8), PLANT_TOP, 9);
+slab(PLANT_FLOOR, BOTTOM, 10);
+
+// cavern back + left walls, so the block reads as solid from the outside
+function caveWalls(yb, yt, k) {
+  const [side, , opts] = STRATA[Math.min(k, STRATA.length - 1)];
+  const tex = strataTex(new THREE.Color(side).multiplyScalar(0.62).getStyle(), 400 + k, opts);
+  tex.repeat.set(4, (yt - yb) / 12);
+  const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 1, side: THREE.DoubleSide });
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(W, yt - yb), mat);
+  back.position.set(0, (yt + yb) / 2, -D / 2); scene.add(back);
+  const left = new THREE.Mesh(new THREE.PlaneGeometry(D, yt - yb), mat);
+  left.rotation.y = Math.PI / 2; left.position.set(-W / 2, (yt + yb) / 2, 0); scene.add(left);
+}
+for (let i = 0; i < 9; i++) caveWalls(caveFloor(i), caveTop(i), i + 1);
+caveWalls(PLANT_FLOOR, PLANT_TOP, 10);
+
+// stalactites, rubble and dirt mounds
+const caveRng = mulberry32(31);
+const stalGeo = new THREE.ConeGeometry(0.5, 1, 6); stalGeo.rotateX(Math.PI); stalGeo.translate(0, -0.5, 0);
+const stal = new THREE.InstancedMesh(stalGeo, new THREE.MeshStandardMaterial({ color: '#5a514a', roughness: 1 }), 9 * 40);
+const rubble = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: '#6b5a48', roughness: 1, flatShading: true }), 9 * 34);
+const dummy = new THREE.Object3D();
+let si = 0, ri = 0;
+const rockTint = new THREE.Color();
+for (let i = 0; i < 9; i++) {
+  for (let k = 0; k < 40; k++) {
+    dummy.position.set((caveRng() - .5) * (W - 4), caveTop(i), (caveRng() - .5) * (D - 4));
+    const s = 0.4 + caveRng() * 1.1; dummy.scale.set(s, 0.8 + caveRng() * 2.6, s); dummy.rotation.set(0, caveRng() * 6, 0);
+    dummy.updateMatrix(); stal.setMatrixAt(si, dummy.matrix);
+    stal.setColorAt(si++, rockTint.set(STRATA[i][0]).multiplyScalar(0.8));
+  }
+  let placed = 0, tries = 0;
+  while (placed < 34 && tries++ < 400) {
+    const x = (caveRng() - .5) * (W - 6), z = (caveRng() - .5) * (D - 6);
+    if (LEVELS[i].nbhds.some(n => Math.hypot(n.x - x, n.z - z) < 7) || Math.hypot(x, z) < 6) continue;
+    const s = 0.3 + caveRng() * (caveRng() < 0.15 ? 2.6 : 0.9);
+    dummy.position.set(x, caveFloor(i) + s * 0.3, z); dummy.scale.set(s * (1 + caveRng()), s * 0.7, s); dummy.rotation.set(caveRng(), caveRng() * 6, caveRng());
+    dummy.updateMatrix(); rubble.setMatrixAt(ri, dummy.matrix);
+    rubble.setColorAt(ri++, rockTint.set(STRATA[i + 1][1]).offsetHSL(0, 0, (caveRng() - .5) * .1));
+    placed++;
+  }
+}
+stal.count = si; rubble.count = ri;
+scene.add(stal, rubble);
+
+// lift shaft: rails, cage and a platform on every level
+const steel = new THREE.MeshStandardMaterial({ color: '#7d8287', metalness: 0.8, roughness: 0.45 });
+const railGeo = new THREE.BoxGeometry(0.35, CAV, 0.35);
+for (let i = 0; i < 9; i++) {
+  for (const [dx, dz] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) {
+    const r = new THREE.Mesh(railGeo, steel); r.position.set(dx, caveFloor(i) + CAV / 2, dz); scene.add(r);
+  }
+  const plat = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 0.4, 24), new THREE.MeshStandardMaterial({ color: '#4a4c4e', metalness: .6, roughness: .6 }));
+  plat.position.set(0, caveFloor(i) + 0.2, 0); scene.add(plat);
+  HUBS[i].lamp = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 8), new THREE.MeshBasicMaterial({ color: '#ffb35c', toneMapped: false }));
+  HUBS[i].lamp.position.set(0, caveTop(i) - 0.6, 0); scene.add(HUBS[i].lamp);
+}
+const cage = new THREE.Mesh(new THREE.BoxGeometry(3.2, 3, 3.2), new THREE.MeshStandardMaterial({ color: '#a8803c', metalness: .7, roughness: .5, wireframe: true }));
+scene.add(cage);
+
+// cavern lights (dim as the level loses power)
+for (const L of LEVELS) {
+  L.light = new THREE.PointLight('#ffb070', 90, 0, 1.25);
+  L.light.position.set(6, caveTop(L.i) - 1.5, 10);
+  scene.add(L.light);
+  L.label = addLabel(`${L.code} ${L.name}<small id="ll-${L.i}"></small>`, 'lbl-level', new THREE.Vector3(-W / 2 - 2, caveFloor(L.i) + 5, D / 2));
+  L.label.center.set(1, 0.5);
+  L.tag = addLabel('', 'lbl-alert', new THREE.Vector3(W / 2 + 2, caveFloor(L.i) + 5, D / 2));
+  L.tag.center.set(0, 0.5); L.tag.visible = false;
+}
+
+// geothermal plant cavern
+const plantY = PLANT_FLOOR;
+const magma = new THREE.Mesh(new THREE.PlaneGeometry(W - 2, D - 2), new THREE.MeshStandardMaterial({ color: '#2a1209', emissive: '#ff5a10', emissiveIntensity: 0.6, emissiveMap: canvasTex(512, 512, (g, w, h) => {
+  const r = mulberry32(5); g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 60; i++) { const grd = g.createRadialGradient(0, 0, 0, 0, 0, 40); grd.addColorStop(0, '#ffb060'); grd.addColorStop(1, 'rgba(255,80,0,0)'); g.save(); g.translate(r() * w, r() * h); g.scale(1 + r() * 2, 0.6 + r()); g.fillStyle = grd; g.beginPath(); g.arc(0, 0, 40, 0, 7); g.fill(); g.restore(); }
+}, [2, 1.3]) }));
+magma.rotation.x = -Math.PI / 2; magma.position.y = plantY + 0.05; scene.add(magma);
+const plantLight = new THREE.PointLight('#ff6a20', 200, 0, 1.3); plantLight.position.set(0, plantY + 6, 8); scene.add(plantLight);
+const turbineMat = new THREE.MeshStandardMaterial({ color: '#8a8f94', metalness: .85, roughness: .35 });
+const plant = new THREE.Mesh(new THREE.TorusGeometry(6, 1.1, 12, 48), turbineMat);
+plant.position.set(-14, plantY + 6, 0); scene.add(plant);
+const plantInner = new THREE.Mesh(new THREE.TorusGeometry(6, 1.1, 12, 48), turbineMat);
+plantInner.position.set(14, plantY + 6, 0); scene.add(plantInner);
+for (const x of [-14, 14]) {
+  const hubM = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 4, 16), turbineMat); hubM.rotation.x = Math.PI / 2; hubM.position.set(x, plantY + 6, 0); scene.add(hubM);
+  const stand = new THREE.Mesh(new THREE.BoxGeometry(3, 6, 3), new THREE.MeshStandardMaterial({ color: '#3a3c3e', metalness: .5, roughness: .7 })); stand.position.set(x, plantY + 3, 0); scene.add(stand);
+}
+for (const x of [-30, -24, 24, 30]) { // heat pipes running up into the rock
+  const p = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, PLANT_TOP - plantY, 12), new THREE.MeshStandardMaterial({ color: '#7a4a2a', metalness: .6, roughness: .5 }));
+  p.position.set(x, (PLANT_TOP + plantY) / 2, -20); scene.add(p);
+}
+const plantLabel = addLabel('Geothermal plant', 'lbl-plant', new THREE.Vector3(-W / 2 - 2, plantY + 6, D / 2));
+plantLabel.center.set(1, 0.5);
+
+// ---------- the surface ----------
+const surfH = (x, z) => {
+  const edge = Math.min(1, (W / 2 - Math.abs(x)) / 6, (D / 2 - Math.abs(z)) / 6);
+  const gate = clamp((Math.hypot(x, z) - 8) / 6, 0, 1);
+  return (fbm(x * 0.045 + 3, z * 0.045) * 7 - 2) * Math.max(0, edge) * gate;
+};
+const tGeo = new THREE.PlaneGeometry(W, D, 140, 90); tGeo.rotateX(-Math.PI / 2);
+const tPos = tGeo.attributes.position, tCols = [];
+const cA = new THREE.Color('#3f5a26'), cB = new THREE.Color('#6d7d34'), cDirt = new THREE.Color('#6a5136'), cConc = new THREE.Color('#7b7a74'), tc = new THREE.Color();
+for (let i = 0; i < tPos.count; i++) {
+  const x = tPos.getX(i), z = tPos.getZ(i);
+  tPos.setY(i, SURF + Math.max(0, surfH(x, z)));
+  tc.copy(cA).lerp(cB, fbm(x * 0.12, z * 0.12));
+  const dirt = fbm(x * 0.07 + 40, z * 0.07 - 3);
+  if (dirt > 0.6) tc.lerp(cDirt, clamp((dirt - 0.6) * 6, 0, 0.9));
+  if (Math.hypot(x, z) < 9) tc.copy(cConc).multiplyScalar(0.8 + noise(x, z) * 0.3);
+  tc.offsetHSL(0, 0, (noise(x * 1.7, z * 1.7) - 0.5) * 0.06);
+  tCols.push(tc.r, tc.g, tc.b);
+}
+tGeo.setAttribute('color', new THREE.Float32BufferAttribute(tCols, 3));
+tGeo.computeVertexNormals();
+const terrain = new THREE.Mesh(tGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }));
+terrain.receiveShadow = true; scene.add(terrain);
+const groundAt = (x, z) => SURF + Math.max(0, surfH(x, z));
+
+// trees: conifers and broadleaf, kept off the gate, the machines and the ruins
+const MACHINES = [[28, -14, 0.5], [-33, 11, 2.2], [12, 20, 4.1]];
+const RUINS = [[-30, -18], [-20, -21], [36, 16]];
+const blocked = (x, z) => Math.hypot(x, z) < 11 || MACHINES.some(([mx, mz]) => Math.hypot(mx - x, mz - z) < 6) || RUINS.some(([rx, rz]) => Math.hypot(rx - x, rz - z) < 5);
+const treeRng = mulberry32(99);
+const NT = 320;
+const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.14, 0.24, 1.6, 6).translate(0, 0.8, 0), new THREE.MeshStandardMaterial({ color: '#4a3524', roughness: 1 }), NT);
+const coneGeo = new THREE.ConeGeometry(1, 2.8, 7).translate(0, 2.6, 0);
+const blobGeo = new THREE.IcosahedronGeometry(1.15, 1).translate(0, 2.4, 0);
+const conifer = new THREE.InstancedMesh(coneGeo, new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true }), NT);
+const broad = new THREE.InstancedMesh(blobGeo, new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true }), NT);
+let ti = 0, ci = 0, bi = 0;
+const leaf = new THREE.Color();
+for (let tries = 0; ti < NT && tries < 4000; tries++) {
+  const x = (treeRng() - .5) * (W - 3), z = (treeRng() - .5) * (D - 3);
+  if (blocked(x, z)) continue;
+  if (fbm(x * 0.06 - 7, z * 0.06 + 2) < 0.42 && treeRng() < 0.75) continue; // clearings
+  const y = groundAt(x, z), s = 0.7 + treeRng() * 0.8;
+  dummy.position.set(x, y - 0.1, z); dummy.rotation.set((treeRng() - .5) * .12, treeRng() * 6, (treeRng() - .5) * .12); dummy.scale.set(s, s * (0.9 + treeRng() * 0.5), s);
+  dummy.updateMatrix(); trunk.setMatrixAt(ti++, dummy.matrix);
+  if (treeRng() < 0.55) { conifer.setMatrixAt(ci, dummy.matrix); conifer.setColorAt(ci++, leaf.setHSL(0.3 + treeRng() * 0.05, 0.35 + treeRng() * 0.15, 0.18 + treeRng() * 0.08)); }
+  else { broad.setMatrixAt(bi, dummy.matrix); broad.setColorAt(bi++, leaf.setHSL(0.2 + treeRng() * 0.08, 0.4 + treeRng() * 0.2, 0.25 + treeRng() * 0.1)); }
+}
+trunk.count = ti; conifer.count = ci; broad.count = bi;
+for (const m of [trunk, conifer, broad]) { m.castShadow = true; m.receiveShadow = true; scene.add(m); }
+
+// leftover machines: rusted walkers, half sunk
+const rust = new THREE.MeshStandardMaterial({ color: '#7a4628', metalness: 0.55, roughness: 0.75 });
+const darkMetal = new THREE.MeshStandardMaterial({ color: '#2f2c29', metalness: 0.7, roughness: 0.6 });
+for (const [mx, mz, rot] of MACHINES) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(5, 2.2, 3), rust); body.position.y = 3.6; g.add(body);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.4, 1.8), darkMetal); head.position.set(3, 4.2, 0); g.add(head);
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 8), new THREE.MeshBasicMaterial({ color: '#ff3b2b', toneMapped: false })); eye.position.set(3.95, 4.3, 0); g.add(eye);
+  for (const [lx, lz] of [[-1.8, -1.2], [1.8, -1.2], [-1.8, 1.2], [1.8, 1.2]]) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, 3.4, 8), darkMetal); leg.position.set(lx, 1.5, lz); leg.rotation.z = lx * 0.08; g.add(leg);
+  }
+  const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 3, 8), darkMetal); gun.rotation.z = Math.PI / 2; gun.position.set(1, 5, 1.3); g.add(gun);
+  g.position.set(mx, groundAt(mx, mz) - 0.6, mz); g.rotation.set(0.06, rot, 0.1);
+  g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  scene.add(g);
+}
+// ruins: broken concrete towers
+const concrete = new THREE.MeshStandardMaterial({ color: '#8b8780', roughness: 0.95 });
+for (const [rx, rz] of RUINS) {
+  const h = 3 + Math.abs(rx % 5);
+  const t = new THREE.Mesh(new THREE.BoxGeometry(4, h, 4), concrete);
+  t.position.set(rx, groundAt(rx, rz) + h / 2 - 0.5, rz); t.rotation.set(0.05, rx, 0.09);
+  t.castShadow = t.receiveShadow = true; scene.add(t);
+  const slabR = new THREE.Mesh(new THREE.BoxGeometry(5, 0.6, 3), concrete);
+  slabR.position.set(rx + 3, groundAt(rx + 3, rz + 2) + 0.4, rz + 2); slabR.rotation.set(0.3, 0.6, 0.2);
+  slabR.castShadow = slabR.receiveShadow = true; scene.add(slabR);
+}
+// the gate: sealed bunker hatch over the lift shaft
+const gateRing = new THREE.Mesh(new THREE.CylinderGeometry(6, 6.8, 2.4, 32, 1, true), concrete);
+gateRing.position.y = SURF + 1.1; gateRing.castShadow = gateRing.receiveShadow = true; scene.add(gateRing);
+const gateTop = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 0.3, 32), concrete); gateTop.position.y = SURF + 2.3; gateTop.receiveShadow = true; scene.add(gateTop);
+const hatch = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 0.5, 32), new THREE.MeshStandardMaterial({ color: '#5b5f3a', metalness: .6, roughness: .5 }));
+hatch.position.y = SURF + 2.5; hatch.castShadow = true; scene.add(hatch);
+const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 6, 6), darkMetal); mast.position.set(4, SURF + 5, -2); mast.castShadow = true; scene.add(mast);
+addLabel('Surface &middot; status unverified', 'lbl-surface', new THREE.Vector3(0, SURF + 10, 0));
+
+// ---------- neighborhoods: clusters of habitation blocks ----------
+const WALLS = [['#8a857c', 0.7], ['#7a6f62', 0.6], ['#6f7470', 0.65], ['#86705a', 0.55]].map(([c, s], i) => wallTexPair(c, 500 + i, s));
+const roofMat = new THREE.MeshStandardMaterial({ color: '#4a4744', roughness: 0.9 });
+const pickables = [];
+const discGeo = new THREE.CircleGeometry(6, 40); discGeo.rotateX(-Math.PI / 2);
+const ringGeo = new THREE.RingGeometry(5.6, 6, 40); ringGeo.rotateX(-Math.PI / 2);
+for (const n of NBHDS) {
+  const r = mulberry32(900 + n.id);
+  const pair = WALLS[n.id % WALLS.length];
+  n.winMat = new THREE.MeshStandardMaterial({ map: pair.map, emissiveMap: pair.emissive, emissive: '#ffc27a', emissiveIntensity: 1.3, roughness: 0.85 });
+  if (n.level >= 5) n.winMat.color.setScalar(0.75); // deeper blocks are older and dirtier
+  const floorY = caveFloor(n.level);
+  const count = clamp(6 + Math.round(n.pop / 90), 6, 15);
+  let tallest = 0;
+  for (let k = 0; k < count; k++) {
+    const a = r() * Math.PI * 2, rad = k === 0 ? 0 : 1.6 + Math.sqrt(r()) * 3.8;
+    const bw = 1.4 + r() * 1.5, bd = 1.4 + r() * 1.5, bh = 1.8 + r() * (CAV - 3.2) * (0.45 + n.pop / 1500) * (1 - rad / 9);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), [n.winMat, n.winMat, roofMat, roofMat, n.winMat, n.winMat]);
+    b.position.set(n.x + Math.cos(a) * rad, floorY + bh / 2, n.z + Math.sin(a) * rad);
+    b.rotation.y = (r() - .5) * 0.5;
+    b.userData.n = n; pickables.push(b);
+    scene.add(b);
+    tallest = Math.max(tallest, bh);
+  }
+  n.h = Math.min(tallest, CAV - 1.2);
+  n.disc = new THREE.Mesh(discGeo, new THREE.MeshBasicMaterial({ color: C.green, transparent: true, opacity: 0.22, depthWrite: false, toneMapped: false }));
+  n.disc.position.set(n.x, floorY + 0.06, n.z); scene.add(n.disc);
+  n.ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: C.green, transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false }));
+  n.ring.position.set(n.x, floorY + 0.08, n.z); scene.add(n.ring);
+  n.beacon = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 8), new THREE.MeshBasicMaterial({ color: C.green, toneMapped: false }));
+  n.beacon.position.set(n.x, floorY + n.h + 0.6, n.z); scene.add(n.beacon);
+  n.puddle = new THREE.Mesh(new THREE.CircleGeometry(1, 28).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#3d3a22', roughness: 0.08, metalness: 0.4, transparent: true, opacity: 0.88 }));
+  n.puddle.position.set(n.x + 2, floorY + 0.1, n.z + 2); n.puddle.visible = false; scene.add(n.puddle);
+  const hitBox = new THREE.Mesh(new THREE.CylinderGeometry(6.2, 6.2, 0.6, 24), new THREE.MeshBasicMaterial());
+  hitBox.visible = false; hitBox.position.set(n.x, floorY + 0.3, n.z); hitBox.userData.n = n;
+  scene.add(hitBox); pickables.push(hitBox);
+  n.tag = addLabel('', 'lbl-alert', new THREE.Vector3(n.x, floorY + n.h + 1.4, n.z));
+  n.tag.visible = false;
+}
+
+// tunnels: packed-dirt track beds with rails along the cavern floor
+const trackBed = new THREE.MeshStandardMaterial({ color: '#3d3730', roughness: 1 });
+const trackBlock = new THREE.MeshStandardMaterial({ color: '#4a1410', emissive: '#e0182f', emissiveIntensity: 0.8 });
+const railMat = new THREE.MeshStandardMaterial({ color: '#8d8f90', metalness: .8, roughness: .4 });
+const trackQuar = new THREE.MeshStandardMaterial({ color: '#5a4310', emissive: '#f2b000', emissiveIntensity: 0.55 });
+for (const e of EDGES) {
+  const ya = caveFloor(e.a.level) + 0.35, yb = caveFloor(e.b.level) + 0.35;
+  e.p0 = new THREE.Vector3(e.a.x, ya, e.a.z); e.p1 = new THREE.Vector3(e.b.x, yb, e.b.z);
+  e.len = e.p0.distanceTo(e.p1);
+  if (e.kind === 'shaft') continue;
+  const g = new THREE.Group();
+  g.position.set((e.a.x + e.b.x) / 2, caveFloor(e.a.level) + 0.04, (e.a.z + e.b.z) / 2);
+  g.rotation.y = Math.atan2(e.b.x - e.a.x, e.b.z - e.a.z);
+  const bed = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.08, e.len), trackBed); g.add(bed);
+  for (const sx of [-0.33, 0.33]) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.08, e.len), railMat); r.position.set(sx, 0.08, 0); g.add(r); }
+  scene.add(g); e.line = bed;
+}
+
+// selection marker
+const selRing = new THREE.Mesh(new THREE.RingGeometry(6.5, 7.1, 64).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#E8E2D0', toneMapped: false, side: THREE.DoubleSide }));
+selRing.visible = false; scene.add(selRing);
+const selLabel = addLabel('', 'lbl-sel', new THREE.Vector3()); selLabel.visible = false;
+
+// packets
+const MAXP = 360;
+const pGeo = new THREE.BufferGeometry();
+const pPos = new Float32Array(MAXP * 3), pCol = new Float32Array(MAXP * 3);
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+pGeo.setAttribute('color', new THREE.BufferAttribute(pCol, 3));
+const pts = new THREE.Points(pGeo, new THREE.PointsMaterial({ size: 0.9, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false }));
+scene.add(pts);
+let packets = [];
+let overlay = true;
+
+// ---------- life and props ----------
+const propRng = mulberry32(4242);
+const free = (x, z, level, r) => Math.abs(x) < W / 2 - 4 && Math.abs(z) < D / 2 - 4 && Math.hypot(x, z) > 8 &&
+  !LEVELS[level].nbhds.some(n => Math.hypot(n.x - x, n.z - z) < r) && !(LEVELS[level].props || []).some(p => Math.hypot(p[0] - x, p[1] - z) < r);
+function spot(level, r) {
+  for (let k = 0; k < 400; k++) {
+    const x = (propRng() - .5) * (W - 10), z = (propRng() - .5) * (D - 12) - 3;
+    if (free(x, z, level, r)) { (LEVELS[level].props ||= []).push([x, z]); return [x, z]; }
+  }
+  return null;
+}
+
+// hanging work lamps with dusty light cones
+const beamGeo = new THREE.ConeGeometry(4.6, CAV - 0.8, 28, 1, true); beamGeo.translate(0, -(CAV - 0.8) / 2, 0);
+const bulbGeo = new THREE.SphereGeometry(0.28, 10, 8);
+for (const L of LEVELS) {
+  L.beamMat = new THREE.MeshBasicMaterial({ color: '#ffd6a0', transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+  L.bulbMat = new THREE.MeshBasicMaterial({ color: '#ffd9a8', toneMapped: false });
+  for (const x of [-33, -12, 16, 36]) {
+    const z = -4 + propRng() * 10, y = caveTop(L.i) - 0.3;
+    const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.6, 4), steel); cable.position.set(x, y + 0.1, z); scene.add(cable);
+    const bulb = new THREE.Mesh(bulbGeo, L.bulbMat); bulb.position.set(x, y - 0.3, z); scene.add(bulb);
+    const beam = new THREE.Mesh(beamGeo, L.beamMat); beam.position.set(x, y - 0.3, z); scene.add(beam);
+  }
+}
+
+// dust hanging in the lamp light
+const DUST = 9 * 150, dustPos = new Float32Array(DUST * 3), dustSeed = new Float32Array(DUST);
+for (let i = 0; i < DUST; i++) {
+  const lv = Math.floor(i / 150);
+  dustPos[i * 3] = (propRng() - .5) * (W - 4); dustPos[i * 3 + 1] = caveFloor(lv) + 0.5 + propRng() * (CAV - 1); dustPos[i * 3 + 2] = (propRng() - .5) * (D - 4);
+  dustSeed[i] = propRng() * 100;
+}
+const dustGeo = new THREE.BufferGeometry(); dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ color: '#e9d6b6', size: 0.13, transparent: true, opacity: 0.45, depthWrite: false }));
+scene.add(dust);
+
+// painted level signs on the back wall
+function signTex(L) {
+  return canvasTex(1024, 170, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = '#e8e2d2'; g.font = '900 104px "Arial Black", Impact, sans-serif'; g.textBaseline = 'top';
+    g.fillText(`${L.code}  ${L.name.toUpperCase()}`, 10, 4);
+    g.font = '700 40px "Arial Black", Impact, sans-serif'; g.fillStyle = '#d9b44a';
+    g.fillText(`${L.depth} M   LIFT →`, 14, 118);
+    const r = mulberry32(700 + L.i); g.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 2600; i++) { g.globalAlpha = 0.3 + r() * 0.7; g.fillRect(r() * w, r() * h, 1 + r() * 4, 1 + r() * 3); }
+    for (let i = 0; i < 7; i++) { g.globalAlpha = 0.5; g.fillRect(r() * w, 0, 2 + r() * 6, h); }
+  });
+}
+for (const L of LEVELS) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(20, 3.3), new THREE.MeshStandardMaterial({ map: signTex(L), transparent: true, roughness: 1, opacity: 0.85 }));
+  m.position.set(-8, caveFloor(L.i) + 6.6, -D / 2 + 0.06); scene.add(m);
+}
+
+// ventilation fans on the back wall: they stop when the level loses power
+const fanHousing = new THREE.TorusGeometry(1.9, 0.28, 8, 28);
+const bladeGeo = new THREE.BoxGeometry(0.55, 3.3, 0.07);
+for (const L of LEVELS) {
+  L.fans = [];
+  for (const x of [-36, 30]) {
+    const housing = new THREE.Mesh(fanHousing, darkMetal); housing.position.set(x, caveFloor(L.i) + 6.2, -D / 2 + 0.4); scene.add(housing);
+    const grille = new THREE.Mesh(new THREE.CircleGeometry(1.9, 24), new THREE.MeshStandardMaterial({ color: '#141414', roughness: 1 }));
+    grille.position.set(x, caveFloor(L.i) + 6.2, -D / 2 + 0.2); scene.add(grille);
+    const blades = new THREE.Group(); blades.position.set(x, caveFloor(L.i) + 6.2, -D / 2 + 0.45);
+    for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(bladeGeo, steel); b.rotation.z = k * Math.PI / 4; blades.add(b); }
+    scene.add(blades); L.fans.push(blades);
+  }
+}
+
+// hydroponic farms under grow lights (L2 to L4)
+const soilMat = new THREE.MeshStandardMaterial({ color: '#3a2a1d', roughness: 1 });
+const postMat = new THREE.MeshStandardMaterial({ color: '#55585a', metalness: .6, roughness: .5 });
+for (const lv of [2, 3, 4]) {
+  const L = LEVELS[lv];
+  L.growMat = new THREE.MeshBasicMaterial({ color: '#d78cff', toneMapped: false });
+  L.plantMat = new THREE.MeshStandardMaterial({ color: '#5c8a34', roughness: .9, emissive: '#4a1f6e', emissiveIntensity: 0.35 });
+  for (let f = 0; f < 2; f++) {
+    const s = spot(lv, 10); if (!s) continue;
+    const g = new THREE.Group(); g.position.set(s[0], caveFloor(lv), s[1]); g.rotation.y = (propRng() - .5) * 0.3;
+    const base = new THREE.Mesh(new THREE.BoxGeometry(9, 0.3, 5.6), soilMat); base.position.y = 0.15; g.add(base);
+    for (let r = 0; r < 5; r++) {
+      const row = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.45 + propRng() * 0.2, 0.5), L.plantMat); row.position.set(0, 0.5, -2.1 + r * 1.05); g.add(row);
+    }
+    for (const bz of [-1.3, 1.3]) { const bar = new THREE.Mesh(new THREE.BoxGeometry(8.6, 0.12, 0.3), L.growMat); bar.position.set(0, 2.6, bz); g.add(bar); }
+    for (const [px, pz] of [[-4.2, -1.3], [4.2, -1.3], [-4.2, 1.3], [4.2, 1.3]]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.6, 5), postMat); p.position.set(px, 1.3, pz); g.add(p); }
+    scene.add(g);
+  }
+}
+
+// water tanks: a big bank on L4 Cistern, a small tank on the other levels
+const tankMat = new THREE.MeshStandardMaterial({ color: '#7f8a8e', metalness: .55, roughness: .55 });
+const bandMat = new THREE.MeshStandardMaterial({ color: '#6b3d24', metalness: .4, roughness: .8 });
+function tank(x, y, z, r, h) {
+  const t = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 20), tankMat); t.position.set(x, y + h / 2, z); scene.add(t);
+  for (const k of [0.25, 0.75]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.02, r * 1.02, 0.18, 20), bandMat); b.position.set(x, y + h * k, z); scene.add(b); }
+}
+for (const x of [-26, -20.5, 20.5, 26]) tank(x, caveFloor(4), -27, 2.4, 6.5);
+for (const L of LEVELS) if (L.i !== 4) { const s = spot(L.i, 6); if (s) tank(s[0], caveFloor(L.i), s[1], 1.1, 2.8); }
+
+// laundry strung between blocks
+const clothCols = ['#c9c2b0', '#8a4a3a', '#5d6f86', '#b9a26a', '#6f7d5c', '#e0d9c8'];
+const clothGeo = new THREE.PlaneGeometry(0.45, 0.6);
+for (const n of NBHDS) {
+  if (n.id % 2) continue;
+  const a = (n.id * 1.7) % (Math.PI * 2), y = caveFloor(n.level) + 2.6;
+  const p0 = new THREE.Vector3(n.x + Math.cos(a) * 1.5, y, n.z + Math.sin(a) * 1.5), p1 = new THREE.Vector3(n.x + Math.cos(a) * 5.2, y + 0.3, n.z + Math.sin(a) * 5.2);
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([p0, p1]), new THREE.LineBasicMaterial({ color: '#2a2a2a' }));
+  scene.add(line);
+  for (let k = 1; k < 6; k++) {
+    const c = new THREE.Mesh(clothGeo, new THREE.MeshStandardMaterial({ color: clothCols[(n.id + k) % clothCols.length], side: THREE.DoubleSide, roughness: 1 }));
+    c.position.lerpVectors(p0, p1, k / 6); c.position.y -= 0.32; c.lookAt(c.position.x + (p1.z - p0.z), c.position.y, c.position.z - (p1.x - p0.x));
+    scene.add(c);
+  }
+}
+
+// people and mine carts moving along the tunnels
+const walkEdges = EDGES.filter(e => e.kind !== 'shaft');
+const tunnelEdges = EDGES.filter(e => e.kind === 'tunnel');
+const NP = 1400, NC = 40;
+const bodyGeo = new THREE.CapsuleGeometry(0.13, 0.34, 2, 6); bodyGeo.translate(0, 0.3, 0);
+const headGeo = new THREE.SphereGeometry(0.12, 8, 6); headGeo.translate(0, 0.72, 0);
+const bodies = new THREE.InstancedMesh(bodyGeo, new THREE.MeshStandardMaterial({ roughness: .85 }), NP);
+const heads = new THREE.InstancedMesh(headGeo, new THREE.MeshStandardMaterial({ roughness: .7 }), NP);
+const carts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.7, 0.55, 1.15).translate(0, 0.42, 0), new THREE.MeshStandardMaterial({ roughness: .7, metalness: .4 }), NC);
+const CLOTH = ['#5b6a7a', '#7a5b4a', '#4f5d4a', '#8a7f6a', '#6b4f5f', '#a0623a', '#3f4a55', '#9a9a8e', '#b08a3a', '#5a3f35', '#c4b9a3'];
+const SKIN = ['#e0b896', '#c69472', '#a8714f', '#7d4f35', '#5c3a28', '#f0cfb0'];
+const movers = [];
+const pc = new THREE.Color();
+for (let i = 0; i < NP; i++) {
+  const walk = propRng() < 0.58;
+  if (walk) movers.push({ i, mesh: 'p', walk, e: walkEdges[Math.floor(propRng() * walkEdges.length)], t: propRng(), dir: propRng() < .5 ? 1 : -1, v: 1 + propRng() * 0.9, off: (propRng() - .5) * 1.2, ph: propRng() * 6 });
+  else {
+    const n = NBHDS[Math.floor(propRng() * NBHDS.length)], a = propRng() * Math.PI * 2, rad = 6 + propRng() * 1.6;
+    movers.push({ i, mesh: 'p', walk, n, x: n.x + Math.cos(a) * rad, z: n.z + Math.sin(a) * rad, ph: propRng() * 6, face: propRng() * 6.3 });
+  }
+  const mv = movers[movers.length - 1]; mv.u = propRng(); mv.col = new THREE.Color(CLOTH[Math.floor(propRng() * CLOTH.length)]);
+  bodies.setColorAt(i, mv.col);
+  heads.setColorAt(i, pc.set(SKIN[Math.floor(propRng() * SKIN.length)]));
+}
+for (let i = 0; i < NC; i++) {
+  movers.push({ i, mesh: 'c', walk: true, e: tunnelEdges[Math.floor(propRng() * tunnelEdges.length)], t: propRng(), dir: propRng() < .5 ? 1 : -1, v: 2.4 + propRng(), off: 0, ph: 0 });
+  carts.setColorAt(i, pc.set(['#6e4a30', '#5a5f63', '#7a5a2e'][i % 3]));
+}
+scene.add(bodies, heads, carts);
+
+function advance(p, dt) {
+  p.t += p.dir * p.v * dt / p.e.len;
+  if (p.t > 1 || p.t < 0) {
+    const node = p.t > 1 ? p.e.b : p.e.a;
+    let opts = node.adj.filter(x => x.kind !== 'shaft' && !x.blocked && !x.a.quar && !x.b.quar && x !== p.e && (p.mesh === 'p' || x.kind === 'tunnel'));
+    if (!opts.length) opts = [p.e];
+    const ne = opts[Math.floor(Math.random() * opts.length)];
+    p.e = ne;
+    if (ne.a === node) { p.t = 0; p.dir = 1; } else { p.t = 1; p.dir = -1; }
+  }
+}
+const SICK = new THREE.Color('#d8392b');
+const homeOf = p => { if (!p.walk) return p.n; const a = p.t < 0.5 ? p.e.a : p.e.b, b = a === p.e.a ? p.e.b : p.e.a; return a.hub ? b : a; };
+function updateMovers(dt, now) {
+  let recolor = false;
+  for (const p of movers) {
+    if (p.mesh === 'p') {
+      const h = homeOf(p), sick = !!(sim.ob && h && h.ob && p.u < (h.ob.I + h.ob.E * 0.4) * 4);
+      if (sick !== p.sick) { p.sick = sick; bodies.setColorAt(p.i, sick ? SICK : p.col); recolor = true; }
+    }
+    let x, y, z, ry;
+    if (p.walk) {
+      const halt = p.mesh === 'c' && (p.e.blocked || p.e.a.blackout || p.e.b.blackout);
+      if (!halt) advance(p, dt);
+      const e = p.e, dx = e.p1.x - e.p0.x, dz = e.p1.z - e.p0.z;
+      x = e.p0.x + dx * p.t - dz / e.len * p.off; z = e.p0.z + dz * p.t + dx / e.len * p.off;
+      y = e.p0.y - 0.35 + (p.mesh === 'p' ? Math.abs(Math.sin(now * 0.009 * p.v + p.ph)) * 0.05 : 0);
+      ry = Math.atan2(dx * p.dir, dz * p.dir);
+    } else {
+      x = p.x; z = p.z; y = caveFloor(p.n.level); ry = p.face + Math.sin(now * 0.0005 + p.ph) * 0.7;
+    }
+    dummy.position.set(x, y, z); dummy.rotation.set(0, ry, 0); dummy.scale.setScalar(p.mesh === 'p' ? 1.3 : 1); dummy.updateMatrix();
+    if (p.mesh === 'p') { bodies.setMatrixAt(p.i, dummy.matrix); heads.setMatrixAt(p.i, dummy.matrix); }
+    else carts.setMatrixAt(p.i, dummy.matrix);
+  }
+  bodies.instanceMatrix.needsUpdate = heads.instanceMatrix.needsUpdate = carts.instanceMatrix.needsUpdate = true;
+  if (recolor) bodies.instanceColor.needsUpdate = true;
+  // dust drift
+  for (let i = 0; i < DUST; i++) {
+    const s = dustSeed[i];
+    dustPos[i * 3] += Math.sin(now * 0.0002 + s) * dt * 0.25;
+    dustPos[i * 3 + 1] += Math.cos(now * 0.00015 + s * 1.3) * dt * 0.12;
+  }
+  dustGeo.attributes.position.needsUpdate = true;
+}
+
+// ---------- post: a miniature-model look ----------
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const gtao = new GTAOPass(scene, camera, 800, 600);
+gtao.updateGtaoMaterial({ radius: 2.4, distanceExponent: 1.2, thickness: 2, scale: 1.3, samples: 16 });
+gtao.blendIntensity = 0.95;
+composer.addPass(gtao);
+composer.addPass(new OutputPass());
+const tiltH = new ShaderPass(HorizontalTiltShiftShader), tiltV = new ShaderPass(VerticalTiltShiftShader);
+tiltH.uniforms.r.value = tiltV.uniforms.r.value = 0.5;
+composer.addPass(tiltH); composer.addPass(tiltV);
+const grade = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, time: { value: 0 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float time; varying vec2 vUv;
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+    void main(){
+      vec3 c = texture2D(tDiffuse, vUv).rgb;
+      float l = dot(c, vec3(0.299, 0.587, 0.114));
+      c = mix(vec3(l), c, 0.9);                      // pull saturation back a little
+      c *= vec3(1.03, 1.0, 0.94);                     // warm, like an old print
+      c += vec3(-0.010, 0.002, 0.016) * (1.0 - l);    // cooler shadows
+      c = (c - 0.5) * 1.05 + 0.5;
+      vec2 d = vUv - 0.5; c *= 1.0 - dot(d, d) * 0.35; // vignette
+      c += (hash(vUv * vec2(1733.0, 977.0) + fract(time)) - 0.5) * 0.04; // grain
+      gl_FragColor = vec4(c, 1.0);
+    }`,
+});
+composer.addPass(grade);
+
+// ---------- simulation ----------
+const START = Date.UTC(2124, 2, 14, 0, 0);
+const sim = {};
+let simRng;
+
+const LAYERS = {
+  power: { name: 'Power', lo: 'Warning: under 24 h of battery, or brownout', hi: 'Alarm: dark, or under 8 h of battery', desc: 'Power reaching each block, and how long its battery lasts at the current drain.' },
+  air: { name: 'Air', lo: 'Warning: CO2 over 2,000 ppm', hi: 'Alarm: CO2 over 4,000 ppm', desc: 'CO2 from block sensors. Scrubbers stop when the power does.' },
+  heat: { name: 'Heat', lo: 'Warning: over 39°C', hi: 'Alarm: over 43°C', desc: 'Air temperature. Deep rock is hotter and the fans need power.' },
+  water: { name: 'Water', lo: 'Warning: contamination index over 25', hi: 'Alarm: over 50, do not drink', desc: 'Tap-line sensors after each water recycler.' },
+  flood: { name: 'Flood', lo: 'Warning: over 25 cm', hi: 'Alarm: over 45 cm, tunnel closed', desc: 'Sewage and water level in the tunnels.' },
+  lung: { name: 'Lung', lo: 'Warning: over 18 cases per 1,000', hi: 'Alarm: over 28 per 1,000', desc: 'Lung sickness counted by residents, not the Directorate.' },
+  outbreak: { name: 'Outbreak', lo: 'Warning: over 3 sick per 1,000', hi: 'Alarm: over 30 sick per 1,000', desc: 'People sick right now from the outbreak you started. Pick a disease below and click a block to start one.' },
+};
+let layer = 'power';
+let selected = null;
+let focus = null;
+let speed = 1;
+
+const SCRIPT = [
+  { t: 4, run() { sim.plant = 0.78; log('crit', 'Geothermal unit 3 tripped. Plant output down to 78%.'); } },
+  { t: 10, run() { const n = pickBig(7); n.waterRate = 7; n.waterUntil = sim.t + 9; } },
+  { t: 16, run() { const n = pickBig(6); n.floodRate = 7; n.floodUntil = sim.t + 10; } },
+  { t: 24, run() { if (!sim.netCut) setNet(true, true); } },
+  { t: 36, run() { sim.plant = 0.92; log('ok', 'Unit 3 is partly back. Plant at 92%.'); } },
+  { t: 44, run() { sim.aging += 1.2; log('warn', 'Deep rock is 1.2°C warmer this cycle. The plant is aging.'); } },
+];
+function pickBig(level) { return LEVELS[level].nbhds.slice().sort((a, b) => b.pop - a.pop)[0]; }
+
+function initSim() {
+  simRng = mulberry32(14);
+  Object.assign(sim, { t: 0, acc: 0, plant: 1, aging: 0, netCut: false, policy: sim.policy || 'directorate', fired: new Set(), logs: [], ob: null });
+  for (const n of NBHDS) {
+    const lv = n.level;
+    n.temp = 23 + lv * 2.1 + n.heatBias;
+    n.demand = demandOf(n);
+    n.cap = n.demand * n.capH;
+    n.B = n.cap * (0.55 + n.r[0] * 0.35);
+    n.alloc = n.demand; n.served = 1; n.blackout = false; n.drain = 0; n.hoursLeft = Infinity;
+    n.co2 = 650 + lv * 120 + n.r[1] * 120;
+    n.water = n.r[2] * 6; n.waterRate = 0; n.waterUntil = 0;
+    n.flood = n.r[3] * 6; n.floodRate = 0; n.floodUntil = 0;
+    n.lungObs = 2 + lv * 2.4 + n.r[1] * 4; n.lungOff = n.lungObs * officialFactor(lv);
+    n.checkin = 1; n.meshBatt = 40; n.isolated = false;
+    n.prev = {}; n.fWarned = false; n.hist = []; n.prioUntil = 0; n.crewAt = 0; n.ob = null; n.quar = false; n.medUntil = 0;
+  }
+  sim.baseSupply = NBHDS.reduce((s, n) => s + n.demand, 0) * 0.99;
+  packets = [];
+  document.getElementById('log').innerHTML = '';
+  log('info', `Twin running. ${NBHDS.length} blocks across 9 levels, about ${fmtPop(NBHDS.reduce((s, n) => s + n.pop, 0))} people. Sensor data is simulated.`);
+  setNet(false, false);
+  computeDerived();
+}
+function officialFactor(lv) { return lv >= 5 ? 0.14 : lv >= 3 ? 0.5 : 0.9; }
+function demandOf(n) { return n.pop * (1 + 0.03 * Math.max(0, n.temp - 30)); }
+
+function allocate(S) {
+  for (const n of NBHDS) { n.demand = demandOf(n); n.req = n.demand + Math.min(n.cap - n.B, 0.15 * n.demand); n.alloc = 0; }
+  if (sim.policy === 'directorate') {
+    let rem = S;
+    const order = NBHDS.slice().sort((a, b) => a.level - b.level || b.pop - a.pop);
+    order.sort((a, b) => (b.prioUntil > sim.t) - (a.prioUntil > sim.t));
+    for (const n of order) { const a = Math.min(n.req, rem); n.alloc = a; rem -= a; }
+    return;
+  }
+  // fair share: life-support floor for everyone, then equal % of the rest, emergencies weighted up, then recharge
+  const FLOOR = 0.45;
+  const F = NBHDS.reduce((s, n) => s + FLOOR * n.demand, 0);
+  if (S <= F) { for (const n of NBHDS) n.alloc = FLOOR * n.demand * S / F; return; }
+  let rem = S - F;
+  for (const n of NBHDS) n.alloc = FLOOR * n.demand;
+  let open = NBHDS.slice();
+  for (let pass = 0; pass < 4 && rem > 1e-6 && open.length; pass++) {
+    const w = n => (1 + (n.temp > 40 ? 0.35 : 0) + (n.co2 > 2000 ? 0.35 : 0) + (n.flood > 25 ? 0.25 : 0) + (n.prioUntil > sim.t ? 1.5 : 0)) * n.demand;
+    const W = open.reduce((s, n) => s + w(n), 0);
+    const share = rem;
+    const next = [];
+    for (const n of open) {
+      const want = n.demand - n.alloc;
+      const give = Math.min(want, share * w(n) / W);
+      n.alloc += give; rem -= give;
+      if (n.demand - n.alloc > 1e-6) next.push(n);
+    }
+    open = next;
+  }
+  if (rem > 0) {
+    const R = NBHDS.reduce((s, n) => s + (n.req - n.demand), 0);
+    if (R > 0) for (const n of NBHDS) n.alloc += Math.min(n.req - n.demand, rem * (n.req - n.demand) / R);
+  }
+}
+
+function step() {
+  sim.t += 1;
+  for (const ev of SCRIPT) if (ev.t === sim.t && !sim.fired.has(ev.t)) { sim.fired.add(ev.t); ev.run(); }
+  if (sim.t > 48 && sim.t % 9 === 0) randomIncident();
+  sim.aging += 0.008;
+
+  const S = sim.baseSupply * sim.plant * (1 + 0.035 * Math.sin(sim.t / 4.5));
+  sim.S = S;
+  allocate(S);
+
+  for (const n of NBHDS) {
+    const lv = n.level;
+    n.B = clamp(n.B + n.alloc - n.demand, 0, n.cap);
+    const short = n.demand - n.alloc;
+    n.drain = 0.65 * n.drain + 0.35 * short;
+    n.served = n.B > 0 ? 1 : clamp(n.alloc / n.demand, 0, 1);
+    n.blackout = n.served < 0.55;
+    n.willDark = n.alloc / n.demand < 0.55;
+    n.hoursLeft = n.willDark && n.drain > 0.02 * n.demand ? n.B / n.drain : Infinity;
+
+    const eff = n.served;
+    const co2Base = 650 + lv * 120;
+    if (eff >= 0.7) n.co2 += (co2Base - n.co2) * 0.35;
+    else n.co2 = Math.min(9000, n.co2 + 460 * (1 - eff) - (n.co2 - co2Base) * 0.04 * eff);
+    const tBase = 23 + lv * 2.1 + n.heatBias + sim.aging;
+    if (eff >= 0.7) n.temp += (tBase - n.temp) * 0.3; else n.temp = Math.min(tBase + 7, n.temp + 0.6 * (1 - eff));
+
+    if (n.waterRate && sim.t >= n.waterUntil) n.waterRate = 0;
+    n.water = clamp(n.water + n.waterRate + (n.blackout ? 0.9 : 0) - (n.waterRate ? 0 : n.water * 0.08), 0, 100);
+    if (n.floodRate && sim.t >= n.floodUntil) n.floodRate = 0;
+    n.flood = clamp(n.flood + n.floodRate + (n.blackout ? 0.9 : -2.2), 0, 140);
+
+    n.lungObs += Math.max(0, n.co2 - 900) / 1000 * 0.06 + (lv >= 5 ? 0.012 : 0.002);
+    if (!(sim.netCut && lv >= 5)) n.lungOff = n.lungObs * officialFactor(lv);
+
+    if (sim.netCut) {
+      if (n.blackout) n.meshBatt = Math.max(0, n.meshBatt - 1);
+      n.checkin += (n.meshBatt > 0 ? 0.2 : 0.02) * (1 - n.checkin);
+    } else n.checkin = 1;
+
+    if (n.crewAt && sim.t >= n.crewAt) {
+      n.crewAt = 0; n.waterRate = 0; n.floodRate = 0; n.water *= 0.4; n.flood *= 0.4;
+      log('ok', `Repair crew finished at ${n.name}. Recycler patched and the pumps are clear.`, n);
+    }
+    n.hist.push({ s: n.served, b: n.B / n.demand, co2: n.co2, temp: n.temp, water: n.water, flood: n.flood, lung: n.lungObs, ob: n.ob ? n.ob.I * 1000 : 0 }); if (n.hist.length > 48) n.hist.shift();
+  }
+  // floods close tunnels; find isolated blocks
+  for (const e of EDGES) if (e.kind !== 'shaft') e.blocked = e.a.flood > 45 || e.b.flood > 45;
+  for (const L of LEVELS) {
+    const seen = new Set([HUBS[L.i]]); const q = [HUBS[L.i]];
+    while (q.length) { const v = q.shift(); for (const e of v.adj) { if (e.blocked || e.kind === 'shaft') continue; const o = e.a === v ? e.b : e.a; if (!seen.has(o)) { seen.add(o); q.push(o); } } }
+    for (const n of L.nbhds) n.isolatedNow = !seen.has(n);
+  }
+  stepOutbreak();
+  detectEvents();
+  computeDerived();
+}
+
+function randomIncident() {
+  const deep = NBHDS.filter(n => n.level >= 4);
+  const n = deep[Math.floor(simRng() * deep.length)];
+  if (simRng() < 0.5) { n.waterRate = 5 + simRng() * 4; n.waterUntil = sim.t + 8; }
+  else { n.floodRate = 5 + simRng() * 3; n.floodUntil = sim.t + 9; }
+}
+
+function where(n) { return `${n.name} (${LEVELS[n.level].name})`; }
+const say = (opts, n) => opts[(n.id + sim.t) % opts.length];
+function detectEvents() {
+  const wentDark = [], cameBack = [];
+  for (const n of NBHDS) {
+    const p = n.prev, Ln = LEVELS[n.level].name, ppl = fmtPop(n.pop);
+    if (n.blackout && !p.blackout) wentDark.push(n);
+    if (!n.blackout && p.blackout) cameBack.push(n);
+    if (!n.blackout && n.hoursLeft < 12 && !n.fWarned) {
+      n.fWarned = true;
+      const h = Math.max(1, Math.round(n.hoursLeft));
+      log('warn', say([
+        `${n.name} has about ${h} h of battery left at this drain. Residents warned.`,
+        `${Ln}: ${n.name} goes dark in roughly ${h} h unless supply improves. ${ppl} people told.`,
+        `Early warning sent to ${n.name}. Expect a blackout in about ${h} h.`], n), n);
+    }
+    if (n.hoursLeft > 24 && !n.blackout) n.fWarned = false;
+    if (n.water > 25 && !(p.water > 25)) {
+      const clean = LEVELS[n.level].nbhds.filter(o => o !== n && o.water < 10).sort((a, b) => Math.hypot(a.x - n.x, a.z - n.z) - Math.hypot(b.x - n.x, b.z - n.z))[0];
+      const tail = clean ? ` Clean water at ${clean.name}.` : '';
+      log('crit', say([
+        `Tap sensors at ${n.name} picked up contamination. Do-not-drink went out before it reached unsafe levels.${tail}`,
+        `Bad water coming through at ${n.name}. Residents told not to drink it.${tail}`], n), n);
+    }
+    if (n.co2 > 4000 && !(p.co2 > 4000)) log('crit', say([`Air at ${n.name} passed 4,000 ppm. Moving people up a level.`, `CO2 is unsafe at ${n.name}. Sending residents toward the lift.`], n), n);
+    if (n.flood > 45 && !(p.flood > 45)) log('crit', say([`Water over 45 cm at ${n.name}. Tunnels into the block are closed.`, `${n.name} is flooding. Tunnel closed and carts stopped.`], n), n);
+    if (n.isolatedNow && !n.isolated) log('warn', say([`${n.name} is cut off by the flooding. Supplies go around through the relays.`, `No dry route to ${n.name}. Rerouting food and water.`], n), n);
+    n.isolated = n.isolatedNow;
+    n.prev = { blackout: n.blackout, water: n.water, co2: n.co2, flood: n.flood };
+  }
+  const list = ns => ns.length <= 3 ? ns.map(n => n.name).join(', ').replace(/, ([^,]*)$/, ' and $1') : `${ns.slice(0, 2).map(n => n.name).join(', ')} and ${ns.length - 2} more`;
+  if (wentDark.length === 1) {
+    const n = wentDark[0], Ln = LEVELS[n.level].name, ppl = fmtPop(n.pop);
+    log('crit', say([`${n.name} (${Ln}) went dark. Fans and scrubbers are off for about ${ppl} people.`, `Lost power at ${n.name}, ${Ln}. ${ppl} people without air handling.`, `${n.name} is dark. The battery ran out before supply came back.`], n), n);
+  } else if (wentDark.length) {
+    const ppl = fmtPop(wentDark.reduce((s, n) => s + n.pop, 0));
+    log('crit', `${wentDark.length} blocks went dark this hour: ${list(wentDark)}. About ${ppl} people without fans or scrubbers.`, wentDark);
+  }
+  if (cameBack.length === 1) { const n = cameBack[0]; log('ok', say([`Lights back on at ${n.name}.`, `${n.name} is back on the grid.`, `Power restored to ${where(n)}.`], n), n); }
+  else if (cameBack.length) log('ok', `Power back at ${cameBack.length} blocks: ${list(cameBack)}.`, cameBack);
+}
+
+function metric(n, key) {
+  switch (key) {
+    case 'power': {
+      if (n.blackout) return { t: 1, s: 2, label: 'Dark' };
+      const h = n.hoursLeft; let s = 0;
+      if (h < Infinity) { if (h < 8) s = 2; else if (h < 24) s = 1; }
+      if (n.served < 0.7) s = Math.max(s, 1);
+      const pct = Math.round(n.served * 100);
+      return { t: s / 2, s, label: h < 48 ? `${Math.max(1, Math.round(h))} h left` : n.served < 1 ? `Brownout, ${pct}%` : `${pct}%` };
+    }
+    case 'air': { const v = n.co2; return { t: 0, s: v > 4000 ? 2 : v > 2000 ? 1 : 0, label: v >= 8000 ? 'Over 8,000 ppm' : `${fmtInt(Math.round(v / 50) * 50)} ppm` }; }
+    case 'heat': { const v = n.temp; return { t: 0, s: v > 43 ? 2 : v > 39 ? 1 : 0, label: `${Math.round(v)}°C` }; }
+    case 'water': { const v = n.water; return { t: 0, s: v > 50 ? 2 : v > 25 ? 1 : 0, label: v < 8 ? 'Clean' : `Index ${Math.round(v)}` }; }
+    case 'flood': { const v = n.flood; return { t: 0, s: v > 45 ? 2 : v > 25 ? 1 : 0, label: v < 3 ? 'Dry' : `${Math.round(v)} cm` }; }
+    case 'lung': { const v = n.lungObs; return { t: 0, s: v > 28 ? 2 : v > 18 ? 1 : 0, label: `${Math.round(v)} per 1k` }; }
+    case 'outbreak': { if (!n.ob) return { t: 0, s: 0, label: 'None' }; const v = n.ob.I * 1000; return { t: 0, s: v > 30 ? 2 : v > 3 ? 1 : 0, label: v < 0.5 ? (n.ob.R + n.ob.D > 0.001 ? 'Over' : 'None') : `${Math.round(v)} sick per 1k` }; }
+  }
+}
+
+function computeDerived() {
+  // equity
+  let up = [0, 0], dp = [0, 0], sp = 0, sx = 0, sx2 = 0;
+  for (const n of NBHDS) {
+    const x = clamp(n.alloc / n.demand, 0, 1);
+    (n.level >= 5 ? dp : up)[0] += x * n.pop; (n.level >= 5 ? dp : up)[1] += n.pop;
+    sp += n.pop; sx += n.pop * x; sx2 += n.pop * x * x;
+  }
+  sim.upper = up[0] / up[1]; sim.deep = dp[0] / dp[1]; sim.jain = sx2 > 0 ? (sx * sx) / (sp * sx2) : 1;
+  sim.alerts = [];
+  for (const n of NBHDS) for (const k of Object.keys(LAYERS)) { const m = metric(n, k); if (m.s > 0) sim.alerts.push({ n, k, ...m }); }
+  sim.alerts.sort((a, b) => b.s - a.s || b.n.level - a.n.level || b.t - a.t);
+}
+
+// ---------- outbreaks: SEIR per block, spread along the paths people use ----------
+const DISEASES = {
+  cough: { name: 'Deep cough', route: 'air', r0: 3.2, incub: 30, inf: 72, cfr: 0.015, blurb: 'Airborne. Spreads faster where the air is bad and the fans are off.' },
+  fever: { name: 'Rift fever', route: 'contact', r0: 4.2, incub: 16, inf: 48, cfr: 0.006, blurb: 'Spread by contact. Moves fast through crowded tunnels and the lift.' },
+  cholera: { name: 'Recycler cholera', route: 'water', r0: 2.6, incub: 24, inf: 60, cfr: 0.03, blurb: 'Waterborne. Travels along the shared water line on a level. Repair crews stop it.' },
+};
+// how strongly each kind of link carries each kind of disease (per hour, relative to contact inside the block)
+const LINKW = {
+  air: { tunnel: 0.1, lobby: 0.04, lift: 0.012, line: 0 },
+  contact: { tunnel: 0.14, lobby: 0.06, lift: 0.02, line: 0 },
+  water: { tunnel: 0.02, lobby: 0.004, lift: 0.002, line: 0.06 },
+};
+for (const n of NBHDS) n.links = [];
+const link = (a, b, kind, e = null) => { a.links.push({ o: b, kind, e }); b.links.push({ o: a, kind, e }); };
+for (const e of EDGES) if (e.kind === 'tunnel') link(e.a, e.b, 'tunnel', e);
+const lobby = HUBS.map(h => h.adj.filter(e => e.kind === 'spur').map(e => (e.a === h ? e.b : e.a)));
+lobby.forEach((ns, i) => {
+  for (let a = 0; a < ns.length; a++) for (let b = a + 1; b < ns.length; b++) link(ns[a], ns[b], 'lobby');
+  if (i < lobby.length - 1) for (const a of ns) for (const b of lobby[i + 1]) link(a, b, 'lift');
+});
+for (const L of LEVELS) for (let a = 0; a < L.nbhds.length; a++) for (let b = a + 1; b < L.nbhds.length; b++) link(L.nbhds[a], L.nbhds[b], 'line');
+
+const people = n => n.pop * 1000;
+const listNames = ns => ns.length <= 3 ? ns.map(n => n.name).join(', ').replace(/, ([^,]*)$/, ' and $1') : `${ns.slice(0, 2).map(n => n.name).join(', ')} and ${ns.length - 2} more`;
+let obPick = false;
+
+function startOutbreak(n) {
+  const kind = $('ob-kind').value, D = DISEASES[kind], r0 = +$('ob-r0').value;
+  if (!sim.ob || sim.ob.done || sim.ob.kind !== kind) {
+    sim.ob = { kind, d: D, r0, start: sim.t, hist: [], peak: 0, peakT: 0, falling: false, done: false, levels: new Set() };
+    for (const m of NBHDS) m.ob = { S: 1, E: 0, I: 0, R: 0, D: 0, reached: false };
+  }
+  const seed = 250 / people(n);
+  n.ob.I += seed; n.ob.E += 2 * seed; n.ob.S = Math.max(0, n.ob.S - 3 * seed);
+  if (D.route === 'water') { n.waterRate = 4; n.waterUntil = sim.t + 8; }
+  n.ob.reached = true; sim.ob.levels.add(n.level);
+  log('crit', `${D.name} outbreak started at ${where(n)}. About 250 people sick and 500 more exposed.`, n);
+  setLayer('outbreak');
+  paint(); renderPanels();
+}
+function clearOutbreak() {
+  if (!sim.ob) return;
+  log('info', `Outbreak cleared from the model.`);
+  sim.ob = null;
+  for (const n of NBHDS) { n.ob = null; n.quar = false; n.medUntil = 0; }
+  paint(); renderPanels();
+}
+
+function stepOutbreak() {
+  const ob = sim.ob; if (!ob || ob.done) return;
+  const D = ob.d, W = LINKW[D.route];
+  const beta = ob.r0 / D.inf, sigma = 1 / D.incub, gamma0 = 1 / D.inf;
+  for (const n of NBHDS) n.ob.Iprev = n.ob.I;
+  for (const n of NBHDS) {
+    let mult = 1;
+    if (D.route === 'air') mult = 1 + Math.max(0, (n.co2 - 900) / 1500) + (n.served < 0.7 ? 0.4 : 0);
+    if (D.route === 'contact') mult = 1 + n.level * 0.06;
+    if (D.route === 'water') mult = 1 + n.water / 25;
+    if (n.quar) mult *= 0.6;
+    let press = n.ob.Iprev;
+    for (const l of n.links) {
+      let w = W[l.kind]; if (!w) continue;
+      if (l.e && l.e.blocked) w = 0;
+      if (n.quar || l.o.quar) w *= 0.08;
+      if (l.kind === 'line') w *= 1 + l.o.water / 25;
+      press += w * l.o.ob.Iprev;
+    }
+    n.ob.lam = Math.min(1, beta * mult * press);
+  }
+  let sick = 0, rec = 0, dead = 0, active = 0, official = 0;
+  for (const n of NBHDS) {
+    const o = n.ob, med = n.medUntil > sim.t;
+    const gamma = gamma0 * (med ? 1.4 : 1);
+    const cfr = D.cfr * (profile(n).clinic ? 0.7 : 1) * (med ? 0.4 : 1) * (n.blackout ? 1.6 : 1);
+    const newE = o.S * o.lam, newI = o.E * sigma, out = o.I * gamma;
+    o.S -= newE; o.E += newE - newI; o.I += newI - out; o.D += out * cfr; o.R += out * (1 - cfr);
+    const p = people(n);
+    sick += o.I * p; rec += o.R * p; dead += o.D * p; active += (o.E + o.I) * p;
+    official += o.I * p * officialFactor(n.level);
+  }
+  Object.assign(ob, { sick, rec, dead, official });
+  ob.hist.push({ t: sim.t, sick, rec, dead });
+
+  const newly = NBHDS.filter(n => !n.ob.reached && (n.ob.E + n.ob.I) * people(n) >= 50);
+  for (const n of newly) n.ob.reached = true;
+  const newLevels = new Set();
+  for (const lv of new Set(newly.map(n => n.level))) {
+    if (ob.levels.has(lv)) continue;
+    ob.levels.add(lv); newLevels.add(lv);
+    const here = newly.filter(n => n.level === lv);
+    log('warn', `${D.name} reached ${LEVELS[lv].code} ${LEVELS[lv].name}. First cases at ${listNames(here)}.`, here);
+  }
+  const rest = newly.filter(n => !newLevels.has(n.level));
+  if (rest.length) log('warn', rest.length === 1 ? `First cases at ${where(rest[0])}.` : `${D.name} reached ${rest.length} more blocks: ${listNames(rest)}.`, rest);
+  if (sick > ob.peak) { ob.peak = sick; ob.peakT = sim.t; }
+  else if (!ob.falling && ob.peak > 2000 && sick < ob.peak * 0.9) {
+    ob.falling = true;
+    log('ok', `Cases are falling. The peak was about ${approx(ob.peak)} sick on ${clockStr(ob.peakT)}.`);
+  }
+  if (sim.t - ob.start > 48 && active < 5) {
+    ob.done = true;
+    log('ok', `The ${D.name.toLowerCase()} outbreak is over. About ${approx(rec)} recovered and ${approx(dead)} died.`);
+  }
+}
+
+function obChart() {
+  const h = sim.ob.hist; if (h.length < 2) return '<div class="note">The curve appears after the first hour.</div>';
+  const maxY = Math.max(1, ...h.map(p => Math.max(p.sick, p.rec, p.dead)));
+  const span = Math.max(h[h.length - 1].t - h[0].t, 24);
+  const X = p => ((p.t - h[0].t) / span) * 100, Y = v => 58 - (v / maxY) * 54;
+  const line = (f, attrs) => `<polyline points="${h.map(p => `${X(p).toFixed(2)},${Y(f(p)).toFixed(2)}`).join(' ')}" fill="none" vector-effect="non-scaling-stroke" ${attrs}/>`;
+  return `<svg class="spark" style="height:70px" viewBox="0 0 100 60" preserveAspectRatio="none">
+    ${line(p => p.rec, 'stroke="#85898D" stroke-width="1.2" stroke-dasharray="3 2"')}
+    ${line(p => p.sick, 'stroke="#1F2326" stroke-width="1.8"')}
+    ${line(p => p.dead, 'stroke="#C8102E" stroke-width="1.4"')}</svg>
+    <div class="note">Solid: sick now. Dashed: recovered. Red: deaths. Day ${Math.floor((sim.t - sim.ob.start) / 24) + 1}.</div>`;
+}
+function obOverview() {
+  const ob = sim.ob; if (!ob) return '';
+  const reached = NBHDS.filter(n => n.ob.reached).length;
+  return `<h3>${ob.done ? 'Outbreak over' : 'Outbreak'}: ${ob.d.name}</h3>
+    ${obChart()}
+    <div class="kv" style="margin-top:8px">
+      <div class="k">Sick now</div><div class="${ob.sick > 1000 ? 's2' : ''}">${approx(ob.sick || 0)}</div>
+      <div class="k">Recovered</div><div>${approx(ob.rec || 0)}</div>
+      <div class="k">Deaths</div><div class="${ob.dead > 10 ? 's2' : ''}">${approx(ob.dead || 0)}</div>
+      <div class="k">Blocks hit</div><div>${reached} of ${NBHDS.length}, on ${ob.levels.size} level${ob.levels.size > 1 ? 's' : ''}</div>
+      <div class="k">Directorate says</div><div>${approx(ob.official || 0)} sick</div>
+      <div class="k">Quarantined</div><div>${NBHDS.filter(n => n.quar).length} blocks</div>
+    </div>`;
+}
+
+// ---------- visuals ----------
+const COL_ALARM = new THREE.Color('#E0182F'), COL_WARN = new THREE.Color('#F2B000');
+function paint() {
+  for (const n of NBHDS) {
+    const m = metric(n, layer);
+    const show = overlay && m.s > 0;
+    const col = m.s === 2 ? COL_ALARM : COL_WARN;
+    n.disc.visible = n.ring.visible = n.beacon.visible = show;
+    if (show) { n.disc.material.color.copy(col); n.ring.material.color.copy(col); n.beacon.material.color.copy(col); }
+    n.winMat.emissiveIntensity = n.blackout ? 0.02 : (n === selected ? 1.8 : 1.3) * Math.max(0.35, n.served);
+    n.puddle.visible = n.flood > 6;
+    n.puddle.scale.setScalar(1 + n.flood / 9);
+    const showTag = show && focus === n.level;
+    n.tag.visible = showTag;
+    if (showTag) { n.tag.element.className = 'lbl-alert s' + m.s; n.tag.element.textContent = m.label; }
+  }
+  for (const e of EDGES) if (e.line) e.line.material = e.blocked ? trackBlock : (e.a.quar || e.b.quar) ? trackQuar : trackBed;
+  for (const L of LEVELS) {
+    const lit = L.nbhds.reduce((s, n) => s + (n.blackout ? 0 : n.served) * n.pop, 0) / L.nbhds.reduce((s, n) => s + n.pop, 0);
+    L.lit = lit;
+    L.light.intensity = 12 + 80 * lit;
+    L.beamMat.opacity = 0.055 * lit;
+    L.bulbMat.color.set(lit > 0.3 ? '#ffd9a8' : '#3a3026');
+    if (L.growMat) { L.growMat.color.set(lit > 0.5 ? '#d78cff' : '#3b2a44'); L.plantMat.emissiveIntensity = lit > 0.5 ? 0.35 : 0; }
+    L.label.element.style.opacity = selected ? 0 : focus === null || focus === L.i ? 1 : 0.3;
+    const ms = L.nbhds.map(n => metric(n, layer)), crit = ms.filter(m => m.s === 2).length, warn = ms.filter(m => m.s === 1).length;
+    const dark = layer === 'power' ? L.nbhds.filter(n => n.blackout).length : 0;
+    L.tag.visible = overlay && focus === null && (crit + warn) > 0;
+    if (L.tag.visible) {
+      L.tag.element.className = 'lbl-alert lvl-tag s' + (crit ? 2 : 1);
+      L.tag.element.textContent = dark ? `${dark} of ${L.nbhds.length} blocks dark` : crit ? `${crit} in alarm` : `${warn} warning${warn > 1 ? 's' : ''}`;
+    }
+  }
+  plantLabel.element.innerHTML = `Geothermal plant, ${Math.round(sim.plant * 100)}% output`;
+  plantLight.intensity = 200 * sim.plant;
+  magma.material.emissiveIntensity = 0.4 * sim.plant;
+}
+
+// ---------- UI ----------
+const right = document.getElementById('right');
+const logEl = document.getElementById('log');
+const TAGS = { crit: 'Alarm', warn: 'Warning', ok: 'Cleared', info: 'Note' };
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function clockStr(t) { const d = new Date(START + t * 3600e3); return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}, ${String(d.getUTCHours()).padStart(2, '0')}:00`; }
+const approx = v => v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e4 ? Math.round(v / 1000) + 'k' : fmtInt(Math.round(v / 10) * 10);
+function log(kind, msg, who) {
+  sim.logs.push({ t: sim.t, kind, msg, ids: who ? [].concat(who).map(n => n.id) : [] });
+  if (sim.logs.length > 600) sim.logs.shift();
+  const ln = el('div', 'ln ' + kind, `<span class="t">${clockStr(sim.t)}</span><span class="tag">${TAGS[kind]}</span><span class="msg">${msg}</span>`);
+  logEl.prepend(ln);
+  while (logEl.children.length > 60) logEl.lastChild.remove();
+}
+
+const layersEl = document.getElementById('layers');
+for (const [k, v] of Object.entries(LAYERS)) {
+  const b = el('button', k === layer ? 'on' : '', v.name); b.dataset.layer = k;
+  b.onclick = () => setLayer(k); layersEl.append(b);
+}
+function setLayer(k) {
+  layer = k;
+  for (const b of layersEl.children) b.classList.toggle('on', b.dataset.layer === k);
+  document.getElementById('lg-lo').textContent = LAYERS[k].lo;
+  document.getElementById('lg-hi').textContent = LAYERS[k].hi;
+  document.getElementById('lg-desc').textContent = LAYERS[k].desc;
+  paint(); renderPanels();
+}
+
+const obKind = document.getElementById('ob-kind'), obR0 = document.getElementById('ob-r0');
+obKind.innerHTML = Object.entries(DISEASES).map(([k, d]) => `<option value="${k}">${d.name}</option>`).join('');
+function syncDisease(resetR0) {
+  const d = DISEASES[obKind.value];
+  if (resetR0) obR0.value = d.r0;
+  document.getElementById('ob-blurb').textContent = d.blurb;
+  document.getElementById('ob-r0v').textContent = (+obR0.value).toFixed(1);
+  if (sim.ob && sim.ob.kind === obKind.value) sim.ob.r0 = +obR0.value;
+}
+obKind.onchange = () => syncDisease(true);
+obR0.oninput = () => syncDisease(false);
+syncDisease(true);
+function setPick(on) {
+  obPick = on;
+  const b = document.getElementById('ob-pick');
+  b.classList.toggle('on', on);
+  b.textContent = on ? 'Click a block in the view (Esc to cancel)' : 'Pick a block to infect';
+}
+document.getElementById('ob-pick').onclick = () => setPick(!obPick);
+document.getElementById('ob-clear').onclick = () => clearOutbreak();
+document.querySelectorAll('[data-speed]').forEach(b => b.onclick = () => {
+  speed = +b.dataset.speed;
+  document.querySelectorAll('[data-speed]').forEach(x => x.classList.toggle('on', x === b));
+});
+document.querySelectorAll('[data-policy]').forEach(b => b.onclick = () => setPolicy(b.dataset.policy, true));
+function setPolicy(p, announce) {
+  sim.policy = p;
+  document.querySelectorAll('[data-policy]').forEach(x => x.classList.toggle('on', x.dataset.policy === p));
+  document.getElementById('policy-note').textContent = p === 'directorate'
+    ? 'Top levels are served first. When supply runs short, the deep levels go dark.'
+    : 'Everyone gets life support first (45%). The rest is split evenly, with heat, air and flood emergencies weighted up.';
+  if (announce) log('info', p === 'directorate' ? 'Policy set to Directorate priority. Upper levels are served first.' : 'Policy set to fair share. Every block keeps life support and the shortfall is split.');
+}
+document.getElementById('btn-overlay').onclick = e => { overlay = !overlay; e.currentTarget.classList.toggle('on', overlay); e.currentTarget.textContent = overlay ? 'Markers on' : 'Markers off'; paint(); };
+document.getElementById('btn-net').onclick = () => setNet(!sim.netCut, true);
+function setNet(cut, announce) {
+  sim.netCut = cut;
+  const b = document.getElementById('btn-net');
+  b.classList.toggle('on', cut);
+  b.textContent = cut ? 'Restore Directorate network' : 'Cut Directorate network';
+  const pill = document.getElementById('h-net');
+  pill.textContent = cut ? 'Down' : 'Online'; pill.className = 'pill ' + (cut ? 'bad' : 'ok');
+  document.getElementById('net-note').textContent = cut
+    ? 'Central network is down. Block-to-block radio relays carry alerts, sensor readings and family check-ins along the tunnels.'
+    : 'Traffic routes through the central shaft. One switch at the Directorate turns it off.';
+  if (cut) for (const n of NBHDS) { n.checkin = n.level >= 5 ? 0.05 : 0.4; n.meshBatt = 40; }
+  if (announce) log(cut ? 'crit' : 'ok', cut ? 'Directorate network shut down. Block relays are carrying alerts and check-ins.' : 'Directorate network is back.');
+  packets = [];
+}
+document.getElementById('btn-reset').onclick = () => { selected = null; initSim(); setPolicy(sim.policy, false); paint(); renderPanels(); };
+
+const levelsEl = document.getElementById('levels');
+for (const L of LEVELS) {
+  const r = el('div', 'lvl', `<div class="nm">${L.code} ${L.name} <i>-${L.depth}m</i></div><div class="pp"></div><div class="meter"><span></span></div><div class="flags"></div>`);
+  r.onclick = () => setFocus(focus === L.i ? null : L.i);
+  levelsEl.append(r); L.row = r;
+}
+document.getElementById('lv-all').onclick = () => setFocus(null);
+
+// ---------- camera moves ----------
+let tween = null;
+const ease = x => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+function flyTo(tgt, pos, dur = 1.3) { tween = { t: 0, dur, p0: camera.position.clone(), p1: pos, c0: controls.target.clone(), c1: tgt }; }
+controls.addEventListener('start', () => { tween = null; });
+
+function levelView(i) {
+  const tgt = i === null ? new THREE.Vector3(0, -60, 0) : new THREE.Vector3(0, caveFloor(i) + 4, 0);
+  const pos = i === null ? new THREE.Vector3(150, 22, 232) : tgt.clone().add(new THREE.Vector3(30, 4, 62));
+  return [tgt, pos];
+}
+function blockView(n) {
+  const tgt = new THREE.Vector3(n.x, caveFloor(n.level) + 2.4, n.z);
+  let az = Math.atan2(camera.position.x - controls.target.x, camera.position.z - controls.target.z);
+  az = clamp(az, 0.2, 1.05); // always look in from the open side of the cut
+  return [tgt, tgt.clone().add(new THREE.Vector3(Math.sin(az) * 21, 5.2, Math.cos(az) * 21))];
+}
+
+function setFocus(i, fly = true) {
+  focus = i;
+  for (const L of LEVELS) L.row.classList.toggle('focus', L.i === i);
+  if (selected) { selected = null; renderPanels(); }
+  if (fly) flyTo(...levelView(i));
+  paint();
+}
+
+function select(n, fly = true) {
+  selected = n;
+  if (n) {
+    focus = n.level;
+    for (const L of LEVELS) L.row.classList.toggle('focus', L.i === n.level);
+    if (fly) flyTo(...blockView(n));
+  } else if (fly) flyTo(...levelView(focus));
+  paint(); renderPanels();
+}
+
+// ---------- block profiles (in-world detail, generated once per block) ----------
+const FIRST = ['Mara', 'Ilse', 'Tobiah', 'Rena', 'Obi', 'Priya', 'Dez', 'Halvard', 'Yusra', 'Ciaran', 'Noor', 'Bettina', 'Amadou', 'Lin', 'Esperanza', 'Kofi', 'Margit', 'Ravi', 'Soledad', 'Teodor', 'Ines', 'Jun', 'Farida', 'Wendell'];
+const LAST = ['Vance', 'Okafor', 'Lindqvist', 'Reyes', 'Abernathy', 'Sato', 'Kowalczyk', 'Mbeki', 'Dunmore', 'Haddad', 'Petrosyan', 'Quill', 'Achterberg', 'Nakamura', 'Ferreira', 'Blackwood', 'Osei', 'Varga', 'Castellanos', 'Ibsen'];
+const ORIGIN = {
+  Rivet: 'the old rivet shop where the first lift cages were built', Lamp: 'the lamp room where miners once signed out their headlamps',
+  Sump: 'a drainage sump that was pumped dry and roofed over', Canary: 'the cages where canaries were kept to test the air',
+  Shale: 'a shale face that was never worth mining', Cinder: 'the ash dump from the first boilers', Rail: 'the junction where the ore trains turned',
+  Bore: 'a survey borehole that broke into an air pocket', Slag: 'a slag heap flattened into terraces', Gantry: 'a steel gantry that still runs over the main street',
+  Tallow: 'a candle store from the hand-mining days', Seam: 'a worked-out coal seam', Drift: 'a drift tunnel driven sideways into the hill',
+  Coke: 'the coking ovens, still warm under the floor', Pylon: 'the base of a cable pylon', Winch: 'the winding house of the old shaft',
+  Lantern: 'a lantern repair shop', Chalk: 'a chalk vein the children still draw with', Pitch: 'the pitch boilers that sealed the tunnels',
+  Damp: 'a wet section nobody else wanted', Ember: 'an old seam fire that burned out in the 2060s', Flint: 'a flint floor older than the mines',
+  Tipple: 'the tipple where ore carts were emptied', Ash: 'the ash pits under the old powerhouse',
+};
+const FAMOUS = ['a night market at every shift change', 'the best mushroom beds on the level', 'a choir that sings in the lift shaft', 'a water still built after the 2112 outbreak',
+  'a relay mast the kids built from scrap', 'a chapel in an old powder magazine', 'the cheapest haircuts in the sector', 'a lending library of paper books',
+  'a wrestling ring in the old pump room', 'tea grown under borrowed grow lights', 'a school that runs in three shifts', 'the loudest cart crews in the Hollow'];
+function profile(n) {
+  if (n.prof) return n.prof;
+  const r = mulberry32(5000 + n.id), pick = a => a[Math.floor(r() * a.length)];
+  n.prof = {
+    origin: ORIGIN[n.name.split(' ')[0]] || 'an old working', settled: 2087 + n.level * 2 + Math.floor(r() * 3),
+    steward: `${pick(FIRST)} ${pick(LAST)}`, famous: pick(FAMOUS), households: Math.round(n.pop * 1000 / 3.6 / 100) * 100,
+    clinic: r() < 0.28, recycler: `WR-${n.level}${10 + Math.floor(r() * 90)}`, relay: `RX-${String(n.id).padStart(3, '0')}`,
+  };
+  return n.prof;
+}
+function nearest(n, test) { // breadth-first over tunnels and the lift
+  const seen = new Map([[n, 0]]), q = [n];
+  while (q.length) {
+    const v = q.shift();
+    if (v !== n && !v.hub && test(v)) return [v, seen.get(v)];
+    for (const e of v.adj) { const o = e.a === v ? e.b : e.a; if (!seen.has(o)) { seen.set(o, seen.get(v) + 1); q.push(o); } }
+  }
+  return [null, 0];
+}
+
+// ---------- right panel: built once, values patched in place ----------
+let rightMode = null, tab = 'now', alertKeys = '';
+const $ = id => document.getElementById(id);
+
+function buildOverview() {
+  rightMode = 'overview'; alertKeys = '';
+  right.innerHTML = `<div class="fade-in">
+    <h3>Sector now</h3>
+    <div class="compare">
+      <div><small>Blocks dark</small><span class="big" id="o-dark"></span> <span id="o-darkp"></span></div>
+      <div><small>Dark within 12 h</small><span class="big" id="o-soon"></span> <span id="o-soonp"></span></div>
+    </div>
+    <h3>Lung sickness cases</h3>
+    <div class="compare">
+      <div><small>Directorate says</small><span class="big" id="o-off"></span></div>
+      <div><small>Residents count</small><span class="big s2" id="o-obs"></span></div>
+    </div>
+    <div class="note" id="o-gap"></div>
+    <div id="o-ob"></div>
+    <div id="o-mesh"></div>
+    <h3>Alerts <span id="o-n"></span></h3>
+    <div id="alerts"></div>
+    <div class="note" style="margin-top:12px">Click any block in the view, or search for one by name, to step inside it.</div>
+  </div>`;
+}
+function updateOverview() {
+  if (rightMode !== 'overview') buildOverview();
+  const pop = NBHDS.reduce((s, n) => s + n.pop, 0);
+  const obs = NBHDS.reduce((s, n) => s + n.lungObs * n.pop, 0), off = NBHDS.reduce((s, n) => s + n.lungOff * n.pop, 0);
+  const checkin = NBHDS.reduce((s, n) => s + n.checkin * n.pop, 0) / pop;
+  const dark = NBHDS.filter(n => n.blackout), soon = NBHDS.filter(n => !n.blackout && n.hoursLeft < 12);
+  $('o-dark').textContent = dark.length; $('o-dark').className = 'big ' + (dark.length ? 's2' : '');
+  $('o-darkp').textContent = dark.length ? fmtPop(dark.reduce((s, n) => s + n.pop, 0)) + ' people' : '';
+  $('o-soon').textContent = soon.length; $('o-soon').className = 'big ' + (soon.length ? 's1' : '');
+  $('o-soonp').textContent = soon.length ? fmtPop(soon.reduce((s, n) => s + n.pop, 0)) + ' people' : '';
+  $('o-off').textContent = approx(off); $('o-obs').textContent = approx(obs);
+  $('o-gap').textContent = `The official number is about ${Math.round(obs / off)} times lower. The gap is widest below L5.`;
+  $('o-mesh').innerHTML = sim.netCut ? `<h3>Block relays</h3><div class="kv"><div class="k">Relays up</div><div>${NBHDS.filter(n => n.meshBatt > 0).length} of ${NBHDS.length}</div><div class="k">Check-ins</div><div class="${checkin < 0.7 ? 's1' : ''}">${Math.round(checkin * 100)}% of families heard from</div></div>` : '';
+  $('o-ob').innerHTML = obOverview();
+  $('o-n').textContent = sim.alerts.length;
+  const top = sim.alerts.slice(0, 60), keys = top.map(a => a.n.id + a.k).join('|'), list = $('alerts');
+  if (keys !== alertKeys) {
+    alertKeys = keys; list.innerHTML = top.length ? '' : '<div class="note">Nothing abnormal.</div>';
+    for (const a of top) {
+      const r = el('div', 'alert', `<span class="dot"></span><div><div>${a.n.name}</div><div class="w">${LEVELS[a.n.level].code} ${LAYERS[a.k].name}</div></div><span class="v"></span>`);
+      r.onclick = () => { setLayer(a.k); select(a.n); };
+      r.onmouseenter = () => showHover(a.n); r.onmouseleave = () => showHover(null);
+      list.append(r);
+    }
+  }
+  top.forEach((a, i) => { const r = list.children[i]; if (!r) return; r.querySelector('.dot').className = 'dot s' + a.s; const v = r.querySelector('.v'); v.className = 'v s' + a.s; v.textContent = a.label; });
+}
+
+const HISTKEY = { outbreak: p => p.ob, power: p => p.s * 100, air: p => p.co2, heat: p => p.temp, water: p => p.water, flood: p => p.flood, lung: p => p.lung };
+function miniSpark(n, k) {
+  const vals = n.hist.map(HISTKEY[k]); if (vals.length < 2) return '';
+  const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
+  const pts = vals.map((v, i) => `${(i / Math.max(47, vals.length - 1)) * 64},${16 - ((v - lo) / span) * 14}`).join(' ');
+  return `<polyline points="${pts}" fill="none" stroke="#33383D" stroke-width="1.2" vector-effect="non-scaling-stroke"/>`;
+}
+
+function buildCard(n) {
+  rightMode = n.id;
+  const L = LEVELS[n.level], P = profile(n), sib = L.nbhds, idx = sib.indexOf(n);
+  const [clinic, hops] = P.clinic ? [n, 0] : nearest(n, v => profile(v).clinic);
+  const nbrs = [...new Set(n.adj.map(e => e.a === n ? e.b : e.a))];
+  right.innerHTML = `<div class="fade-in">
+    <div class="crumbs"><button id="c-back">Back</button><span>${L.code} ${L.name}, ${L.depth} m down</span></div>
+    <div class="title">${n.name}</div>
+    <div class="sub">About ${fmtInt(P.households)} households, ${fmtPop(n.pop)} people</div>
+    <div id="c-status"></div>
+    <div class="tabs">
+      <button data-tab="now">Now</button><button data-tab="about">About</button><button data-tab="history">History</button>
+    </div>
+    <div data-pane="now">
+      ${Object.keys(LAYERS).map(k => `<div class="rd" data-k="${k}"><span class="k">${LAYERS[k].name}</span><span class="v"></span><svg viewBox="0 0 64 18" preserveAspectRatio="none"></svg></div>`).join('')}
+      <div class="kv" style="margin-top:10px">
+        <div class="k">Supply</div><div id="c-supply"></div>
+        <div class="k">Battery</div><div id="c-batt"></div>
+        <div class="k">Access</div><div id="c-access"></div>
+        <div class="k">Check-ins</div><div id="c-check"></div>
+        <div class="k">Lung, official</div><div id="c-lung"></div>
+        <div class="k">Outbreak</div><div id="c-ob"></div>
+      </div>
+      <h3>Act</h3>
+      <div class="actions">
+        <button id="a-warn">Send a warning to every household</button>
+        <button id="a-prio">Put this block first for power</button>
+        <button id="a-crew">Send a repair crew</button>
+        <button id="a-quar">Quarantine this block</button>
+        <button id="a-med">Send medicine</button>
+        <button id="a-ob">Start an outbreak here</button>
+      </div>
+      <div class="note" id="a-note"></div>
+    </div>
+    <div data-pane="about">
+      <p class="story">${n.name} grew up around ${P.origin}. The first families moved in around ${P.settled}. Today it is known for ${P.famous}.</p>
+      <div class="kv">
+        <div class="k">Steward</div><div>${P.steward}</div>
+        <div class="k">Clinic</div><div>${P.clinic ? 'In the block' : clinic ? `${clinic.name}, ${hops} stop${hops > 1 ? 's' : ''} away${clinic.level !== n.level ? ' (' + LEVELS[clinic.level].name + ')' : ''}` : 'None within reach'}</div>
+        <div class="k">Water</div><div>Recycler ${P.recycler}</div>
+        <div class="k">Relay</div><div>${P.relay}</div>
+      </div>
+      <h3>Tunnels lead to</h3>
+      <div class="chips">${nbrs.map(o => o.hub ? `<span class="chip" data-hub="1">Lift to other levels</span>` : `<span class="chip" data-id="${o.id}">${o.name}</span>`).join('')}</div>
+    </div>
+    <div data-pane="history"><div id="c-hist"></div></div>
+    <div class="nav"><button id="c-prev">Previous</button><span>${idx + 1} of ${sib.length} in ${L.name}</span><button id="c-next">Next</button></div>
+  </div>`;
+  $('c-back').onclick = () => select(null);
+  $('c-prev').onclick = () => select(sib[(idx - 1 + sib.length) % sib.length]);
+  $('c-next').onclick = () => select(sib[(idx + 1) % sib.length]);
+  right.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { tab = b.dataset.tab; showTab(); });
+  right.querySelectorAll('.chip').forEach(c => {
+    const o = c.dataset.id ? NBHDS[+c.dataset.id] : null;
+    c.onclick = () => o ? select(o) : (selected = null, setFocus(n.level === 8 ? 7 : n.level + 1));
+    if (o) { c.onmouseenter = () => showHover(o); c.onmouseleave = () => showHover(null); }
+  });
+  $('a-warn').onclick = () => { log('info', `Warning sent to ${fmtInt(P.households)} households in ${n.name}.`, n); n.checkin = Math.min(1, n.checkin + 0.15); updateCard(); };
+  $('a-prio').onclick = () => {
+    if (n.prioUntil > sim.t) { n.prioUntil = 0; log('info', `Priority lifted for ${n.name}.`, n); }
+    else { n.prioUntil = sim.t + 12; log('info', `${n.name} goes to the front of the power queue for 12 h.`, n); }
+    updateCard();
+  };
+  $('a-quar').onclick = () => { n.quar = !n.quar; log(n.quar ? 'warn' : 'info', n.quar ? `${n.name} is under quarantine. Tunnels into the block are closed to foot traffic.` : `Quarantine lifted at ${n.name}.`, n); paint(); updateCard(); };
+  $('a-med').onclick = () => { n.medUntil = sim.t + 48; log('info', `Medicine sent to ${n.name}. Enough for about 48 h of treatment.`, n); updateCard(); };
+  $('a-ob').onclick = () => { startOutbreak(n); updateCard(); };
+  $('a-crew').onclick = () => { n.crewAt = sim.t + 3; log('info', `Repair crew sent to ${n.name}. They should be there in about 3 h.`, n); updateCard(); };
+  showTab();
+}
+function showTab() {
+  right.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  right.querySelectorAll('[data-pane]').forEach(p => p.style.display = p.dataset.pane === tab ? '' : 'none');
+}
+function updateCard() {
+  const n = selected; if (rightMode !== n.id) buildCard(n);
+  const airH = Math.max(1, Math.round((4000 - n.co2) / 460));
+  let st = '';
+  if (n.blackout) st = `<div class="callout crit">Dark now. ${n.co2 < 4000 ? `Without scrubbers the air turns unsafe in about ${airH} h.` : 'The air is already unsafe. Move people to the nearest lit block.'}</div>`;
+  else if (n.hoursLeft < 48) st = `<div class="callout ${n.hoursLeft < 8 ? 'crit' : ''}">At this drain the battery lasts about <b>${Math.max(1, Math.round(n.hoursLeft))} h</b>. Without scrubbers the air turns unsafe about ${airH} h after that.</div>`;
+  else if (n.alloc < n.demand * 0.98) { const ratio = Math.round(n.alloc / n.demand * 100); st = `<div class="callout plain">Getting ${ratio}% of the power it needs. ${n.B > 0 ? `The battery covers the gap for about ${Math.max(1, Math.round(n.B / Math.max(n.drain, 1e-6)))} h, then` : 'For now'} it runs on reduced power. Life support stays on.</div>`; }
+  else st = `<div class="callout plain">Running normally.</div>`;
+  if ($('c-status').innerHTML !== st) $('c-status').innerHTML = st;
+  right.querySelectorAll('.rd').forEach(r => {
+    const k = r.dataset.k, m = metric(n, k), v = r.querySelector('.v');
+    v.textContent = m.label; v.className = 'v s' + m.s;
+    r.querySelector('svg').innerHTML = miniSpark(n, k);
+  });
+  $('c-supply').textContent = `${Math.round(clamp(n.alloc / n.demand, 0, 1) * 100)}% of demand`;
+  $('c-batt').textContent = `${Math.round(n.B / n.demand)} h at full load`;
+  $('c-access').textContent = n.isolated ? 'Cut off by flood' : 'Tunnels open'; $('c-access').className = n.isolated ? 's2' : '';
+  $('c-check').textContent = sim.netCut ? `${Math.round(n.checkin * 100)}% of families heard from` : 'Network up';
+  $('c-lung').innerHTML = `${Math.round(n.lungOff)} per 1k <span class="note">(residents count ${Math.round(n.lungObs)})</span>`;
+  const prio = n.prioUntil > sim.t, fault = n.water > 25 || n.flood > 25;
+  $('a-prio').textContent = prio ? `First for power, ${n.prioUntil - sim.t} h left. Click to lift.` : 'Put this block first for power';
+  $('a-prio').classList.toggle('on', prio);
+  $('a-crew').disabled = !fault || !!n.crewAt;
+  $('a-crew').textContent = n.crewAt ? `Repair crew arriving in about ${Math.max(1, n.crewAt - sim.t)} h` : fault ? 'Send a repair crew' : 'Send a repair crew (no fault right now)';
+  if (n.ob) { const p = people(n); $('c-ob').innerHTML = `${fmtInt(Math.round(n.ob.I * p))} sick, ${fmtInt(Math.round(n.ob.R * p))} recovered, <span class="${n.ob.D * p >= 1 ? 's2' : ''}">${fmtInt(Math.round(n.ob.D * p))} died</span>${n.quar ? ', quarantined' : ''}`; }
+  else $('c-ob').textContent = 'None';
+  $('a-quar').disabled = !sim.ob; $('a-quar').textContent = n.quar ? 'Lift the quarantine' : 'Quarantine this block'; $('a-quar').classList.toggle('on', !!n.quar);
+  const med = n.medUntil > sim.t; $('a-med').disabled = !sim.ob || med; $('a-med').textContent = med ? `Medicine on hand, ${n.medUntil - sim.t} h left` : 'Send medicine';
+  $('a-ob').textContent = sim.ob && !sim.ob.done ? `Seed ${sim.ob.d.name.toLowerCase()} here too` : `Start ${DISEASES[obKind.value].name.toLowerCase()} here`;
+  const evs = sim.logs.filter(l => l.ids.includes(n.id)).slice(-10).reverse();
+  $('c-hist').innerHTML = evs.length ? evs.map(l => `<div class="ev"><span class="t">${clockStr(l.t)}</span><span class="${l.kind === 'crit' ? 's2' : l.kind === 'warn' ? 's1' : ''}">${l.msg}</span></div>`).join('') : '<div class="note">Nothing logged for this block yet.</div>';
+}
+
+// ---------- header, levels and the right panel ----------
+function renderPanels() {
+  $('h-clock').textContent = `${clockStr(sim.t)} (hour ${sim.t})`;
+  $('h-plant').textContent = Math.round(sim.plant * 100) + '%';
+  const D = NBHDS.reduce((s, n) => s + n.demand, 0);
+  $('h-sd').textContent = Math.round((sim.S || sim.baseSupply) / D * 100) + '%';
+  $('f-upper').textContent = Math.round(sim.upper * 100) + '%';
+  $('f-deep').textContent = Math.round(sim.deep * 100) + '%';
+  $('f-deep').className = 'big ' + (sim.deep < 0.6 ? 's2' : sim.deep < 0.85 ? 's1' : '');
+  $('f-jain').textContent = sim.jain.toFixed(2);
+  $('corner-br').textContent = `${NBHDS.length} blocks, ${EDGES.length} tunnels. Showing ${LAYERS[layer].name.toLowerCase()}.`;
+  for (const L of LEVELS) {
+    const pop = L.nbhds.reduce((s, n) => s + n.pop, 0);
+    const alloc = L.nbhds.reduce((s, n) => s + clamp(n.alloc / n.demand, 0, 1) * n.pop, 0) / pop;
+    const crit = sim.alerts.filter(a => a.n.level === L.i && a.s === 2).length;
+    const warn = sim.alerts.filter(a => a.n.level === L.i && a.s === 1).length;
+    const bo = L.nbhds.filter(n => n.blackout).length;
+    L.row.querySelector('.pp').textContent = fmtPop(pop);
+    const bar = L.row.querySelector('.meter span');
+    bar.style.width = Math.round(alloc * 100) + '%';
+    bar.style.background = alloc < 0.6 ? 'var(--alarm)' : alloc < 0.9 ? 'var(--warn)' : 'var(--line-2)';
+    L.row.querySelector('.flags').innerHTML = `Supply ${Math.round(alloc * 100)}%` + (bo ? `, <span class="c">${bo} dark</span>` : '') + (crit ? `, <span class="c">${crit} alarm${crit > 1 ? 's' : ''}</span>` : '') + (warn ? `, <span class="w">${warn} warning${warn > 1 ? 's' : ''}</span>` : '');
+    const avgT = L.nbhds.reduce((s, n) => s + n.temp, 0) / L.nbhds.length;
+    const sm = $('ll-' + L.i);
+    if (sm) sm.textContent = `${L.depth} m down, ${fmtPop(pop)} people, ${Math.round(avgT)}°C`;
+  }
+  if (selected) updateCard(); else updateOverview();
+}
+
+// ---------- search ----------
+const findEl = $('find'), listEl = $('blocklist');
+listEl.innerHTML = NBHDS.map(n => `<option value="${n.name}">${LEVELS[n.level].code} ${LEVELS[n.level].name}</option>`).join('');
+function findBlock() {
+  const q = findEl.value.trim().toLowerCase(); if (!q) return;
+  const n = NBHDS.find(n => n.name.toLowerCase() === q) || NBHDS.find(n => n.name.toLowerCase().startsWith(q)) || NBHDS.find(n => n.name.toLowerCase().includes(q));
+  if (n) { select(n); findEl.value = ''; findEl.blur(); }
+}
+findEl.addEventListener('change', findBlock);
+findEl.addEventListener('keydown', e => { if (e.key === 'Enter') findBlock(); });
+
+// ---------- picking and hover ----------
+const ray = new THREE.Raycaster(); const ptr = new THREE.Vector2(); let downAt = null, lastMove = null, hovered = null;
+const tip = el('div', '', ''); tip.id = 'tip'; view.append(tip);
+const hoverRing = new THREE.Mesh(new THREE.RingGeometry(6.3, 6.75, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.75, toneMapped: false, depthWrite: false }));
+hoverRing.visible = false; scene.add(hoverRing);
+function hit(ev) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ptr.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ptr, camera);
+  const first = ray.intersectObjects([...pickables, ...occluders], false)[0];
+  return first?.object.userData.n || null;
+}
+function showHover(n, ev) {
+  hovered = n;
+  hoverRing.visible = !!n && n !== selected;
+  if (n) hoverRing.position.set(n.x, caveFloor(n.level) + 0.1, n.z);
+  if (n && ev) {
+    const r = view.getBoundingClientRect(), m = metric(n, layer);
+    tip.innerHTML = obPick ? `Infect ${n.name}<small>Starts ${DISEASES[obKind.value].name.toLowerCase()} here</small>` : `${n.name}<small>${LEVELS[n.level].code} ${LEVELS[n.level].name}. ${LAYERS[layer].name}: <span class="s${m.s}">${m.label}</span></small>`;
+    tip.style.display = 'block';
+    tip.style.left = Math.min(ev.clientX - r.left + 14, r.width - tip.offsetWidth - 8) + 'px';
+    tip.style.top = (ev.clientY - r.top + 14) + 'px';
+  } else tip.style.display = 'none';
+  renderer.domElement.style.cursor = obPick ? 'crosshair' : n ? 'pointer' : 'grab';
+}
+renderer.domElement.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
+  const n = hit(e); if (!n) return;
+  if (obPick) { setPick(false); startOutbreak(n); showHover(null); return; }
+  select(n);
+});
+renderer.domElement.addEventListener('pointermove', e => { if (e.buttons || e.pointerType === 'touch') { lastMove = null; showHover(null); } else lastMove = e; });
+renderer.domElement.addEventListener('pointerleave', () => { lastMove = null; showHover(null); });
+renderer.domElement.addEventListener('dblclick', e => { if (!hit(e)) { if (selected) select(null); else setFocus(null); } });
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space') { e.preventDefault(); document.querySelector(`[data-speed="${speed ? 0 : 1}"]`).click(); }
+  if (e.key === 'Escape') { if (obPick) setPick(false); else if (selected) select(null); else if (focus !== null) setFocus(null); }
+  if (selected && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+    const sib = LEVELS[selected.level].nbhds, i = sib.indexOf(selected);
+    select(sib[(i + (e.key === 'ArrowRight' ? 1 : -1) + sib.length) % sib.length]);
+  }
+  if (e.key === '/') { e.preventDefault(); findEl.focus(); }
+});
+
+// ---------- loop ----------
+function resize() {
+  const w = view.clientWidth, h = view.clientHeight;
+  renderer.setSize(w, h); labelRenderer.setSize(w, h); composer.setSize(w, h);
+  tiltH.uniforms.h.value = 1.1 / w; tiltV.uniforms.v.value = 1.1 / h;
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(view);
+
+function updatePackets(dt) {
+  const usable = EDGES.filter(e => !e.blocked && (sim.netCut ? e.kind !== 'shaft' && (focus === null || e.level === focus) : (e.kind === 'shaft' || e.kind === 'spur')));
+  const rate = sim.netCut ? 5 : 2;
+  for (let k = 0; k < rate && packets.length < MAXP && usable.length; k++) {
+    const e = usable[Math.floor(Math.random() * usable.length)];
+    packets.push({ e, t: 0, dir: Math.random() < 0.5 ? 1 : -1, v: 9 + Math.random() * 8 });
+  }
+  const col = sim.netCut ? C.green : C.amber;
+  let i = 0;
+  packets = packets.filter(p => { p.t += (p.v * dt) / p.e.len; return p.t < 1 && !p.e.blocked; });
+  for (const p of packets) {
+    const t = p.dir > 0 ? p.t : 1 - p.t;
+    const x = p.e.p0.x + (p.e.p1.x - p.e.p0.x) * t, y = p.e.p0.y + (p.e.p1.y - p.e.p0.y) * t + 0.45, z = p.e.p0.z + (p.e.p1.z - p.e.p0.z) * t;
+    pPos[i * 3] = x; pPos[i * 3 + 1] = y; pPos[i * 3 + 2] = z;
+    pCol[i * 3] = col.r; pCol[i * 3 + 1] = col.g; pCol[i * 3 + 2] = col.b; i++;
+  }
+  pGeo.setDrawRange(0, i);
+  pGeo.attributes.position.needsUpdate = true; pGeo.attributes.color.needsUpdate = true;
+}
+
+let last = performance.now(), drawnT = -1;
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (speed > 0) {
+    sim.acc += dt * speed;
+    while (sim.acc >= 1) { sim.acc -= 1; step(); }
+  }
+  if (sim.t !== drawnT) { drawnT = sim.t; paint(); renderPanels(); }
+  if (tween) {
+    tween.t = Math.min(1, tween.t + dt / tween.dur);
+    const k = ease(tween.t);
+    camera.position.lerpVectors(tween.p0, tween.p1, k);
+    controls.target.lerpVectors(tween.c0, tween.c1, k);
+    if (tween.t >= 1) tween = null;
+  }
+  // blackout flicker: a few windows sputter on emergency power
+  for (const n of NBHDS) if (n.blackout) n.winMat.emissiveIntensity = Math.random() < 0.04 ? 0.5 : 0.02;
+  plant.rotation.z += dt * 0.6 * sim.plant; plantInner.rotation.z -= dt * 0.6 * sim.plant;
+  cage.position.set(0, -60 + Math.sin(now / 4000) * 62, 0);
+  if (overlay) for (const n of NBHDS) n.ring.material.opacity = 0.55 + 0.35 * Math.sin(now / 300 + n.id);
+  if (selected) {
+    selRing.visible = true; selLabel.visible = true;
+    selRing.position.set(selected.x, selected.L.y + 0.12, selected.z);
+    selRing.rotation.y += dt;
+    selLabel.position.set(selected.x, selected.L.y + selected.h + 0.6, selected.z);
+    selLabel.element.textContent = selected.name;
+  } else { selRing.visible = false; selLabel.visible = false; }
+  if (lastMove) { showHover(hit(lastMove), lastMove); lastMove = null; }
+  updatePackets(dt);
+  controls.update();
+  updateMovers(dt, now);
+  for (const L of LEVELS) for (const f of L.fans) f.rotation.z += dt * 9 * (L.lit ?? 1);
+  grade.uniforms.time.value = now * 0.001;
+  composer.render();
+  labelRenderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+initSim();
+setPolicy('directorate', false);
+setLayer('power');
+resize();
+setFocus(null);
+requestAnimationFrame(frame);
+window.__twin_select = n => select(n);
+window.__twin = { sim, NBHDS, LEVELS, camera, controls, step, flyTo, startOutbreak, clearOutbreak, setPolicy, setNet, setLayer, select, setFocus };
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "id": "relay-l8-bore-bend-000101",
+  "device": "relay-l8-bore-bend",
+  "block": "l8-bore-bend",
+  "time": "2026-11-18T20:00:00Z",
+  "kind": "power",
+  "values": {
+    "battery_wh": 412,
+    "draw_w": 96,
+    "supply_w": 40
+  },
+  "hops": 0,
+  "via": []
+}
