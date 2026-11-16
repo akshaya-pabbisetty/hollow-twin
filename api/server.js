@@ -28,6 +28,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const B = require("./blocks");
 const C = require("./contract");
 const L = require("./logic");
 const LIM = require("./limits");
@@ -36,7 +37,6 @@ const SURF = require("./surface");
 
 const PORT = process.env.PORT || 8787;
 const DATA = process.env.DATA || path.join(__dirname, "readings.jsonl");
-const SECTOR = JSON.parse(fs.readFileSync(path.join(__dirname, "shared/sector.json"), "utf8")).blocks;
 const INGEST_KEY = process.env.INGEST_KEY || "";       // when set, every POST needs header x-api-key
 const RATE_LIMIT = Number(process.env.RATE_LIMIT) || LIM.val("ingest_rate_limit_per_s");
 const MAX_BODY = LIM.val("ingest_max_body_bytes");
@@ -88,6 +88,7 @@ function saveMeta(m) { applyMeta(m); fs.appendFileSync(DATA, JSON.stringify({ _m
 // The record uses contract names only: legacy value names are renamed here, on the way in.
 function accept(r, now) {
   const bad = C.problems(r);
+  if (r && typeof r.block === "string" && r.block && B.problem(r.block)) bad.push(B.problem(r.block)); // only blocks in contract/blocks.json, or "surface"
   if (bad.length) return { id: (r && typeof r === "object" && r.id) ?? null, problems: bad };
   // Signature: checked against exactly what the device sent (its own time string and value names), before we touch anything.
   let verified = false, sigUnchecked;
@@ -102,7 +103,8 @@ function accept(r, now) {
   const wrong = C.valueProblems(r.kind, values);
   if (wrong.length) return { id: r.id, problems: wrong };
   const route = C.route(r);
-  const warnings = [...route.warnings];
+  // a device id that does not fit CONTRACT.md section 3 is noted on the record, never a reason to refuse it
+  const warnings = [...route.warnings, ...B.deviceWarnings(r), ...B.messageWarnings({ ...r, values })];
   if (renamed.length) warnings.push(`old field names renamed to contract names: ${renamed.join(", ")}`);
   const rec = { ...r, values, hops: route.hops, via: route.via, source: r.source || "simulated" }; // honest default: only real hardware says "live"
   for (const f of ["seq", "time_estimated", "device_time", "verified", "sig_unchecked", "warnings"]) delete rec[f]; // these are ours to set, never the sender's
@@ -343,8 +345,9 @@ function route(req, res) {
   if (p === "/fairshare") {
     const supply = Number(q.supply_w);
     if (!(supply >= 0)) return send(res, 400, { error: "supply_w required" });
-    if (q.policy) return send(res, 200, L.allocate(SECTOR, supply, q.policy));
-    return send(res, 200, { directorate: L.allocate(SECTOR, supply, "directorate"), fair: L.allocate(SECTOR, supply, "fair") });
+    const sector = L.sector();
+    if (q.policy) return send(res, 200, L.allocate(sector, supply, q.policy));
+    return send(res, 200, { directorate: L.allocate(sector, supply, "directorate"), fair: L.allocate(sector, supply, "fair") });
   }
   if (p === "/queue") return send(res, 200, L.queue(readings, dispatched));
   if (req.method === "POST" && p === "/dispatch") return readBody(req, res, (e, b) => {

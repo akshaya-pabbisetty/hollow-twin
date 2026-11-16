@@ -205,6 +205,14 @@
       "value": 24, "unit": "h", "type": "design choice",
       "reason": "'Latest vitals' must be from the last 24 hours; older readings do not prove someone is healthy today."
     },
+    "fairshare_demand_w_per_person": {
+      "value": 100, "unit": "W per person", "type": "design choice",
+      "reason": "A round planning figure for everything a block runs per resident (air handling, pumps, light, cooking, clinics). Only the ratio between blocks matters to the comparison. Blocks are sized from the people in contract/blocks.json."
+    },
+    "fairshare_critical_w_per_person": {
+      "value": 45, "unit": "W per person", "type": "design choice",
+      "reason": "Life support (air fans and scrubbers, water pumps, medical) is taken as 45% of demand, the same floor the twin's own fair-share rule protects. It is never shed."
+    },
     "battery_warn_hours": {
       "value": 8, "unit": "h", "op": "<", "type": "design choice",
       "reason": "One sleep or work shift: enough warning to charge watches, fill water and move people before the block goes dark."

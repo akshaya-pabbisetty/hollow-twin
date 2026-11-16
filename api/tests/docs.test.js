@@ -23,14 +23,14 @@ test("README documents every endpoint the server has, and every documented GET r
   const routes = [...new Set([...server.matchAll(/p === "(\/[a-z/]+)"/g)].map((m) => m[1]))];
   assert.ok(routes.length >= 17, `found ${routes.length} routes`);
   for (const r of routes) assert.ok(readme.includes(`${r}`), `README is missing ${r}`);
-  for (const p of ["/status", "/history", "/blocks", "/forecast", "/fairshare?supply_w=9000", "/queue", "/truth", "/surface", "/surface/history", "/firstwave?n=20", "/limits"])
+  for (const p of ["/status", "/history", "/blocks", "/forecast", "/fairshare?supply_w=1927020000", "/queue", "/truth", "/surface", "/surface/history", "/firstwave?n=20", "/limits"])
     assert.strictEqual((await s.getRaw(p)).status, 200, p);
 });
 
 test("the original endpoints and fields kept their shape", async () => {
-  const b = "L8-deepwell-03";
-  await s.post("/ingest", s.R("relay-07", b, "power", { battery_pct: 62, draw_w: 41.5, grid_hz: 59.97 }));
-  await s.post("/ingest", s.R("watch-01", b, "button", { button: "help" }));
+  const b = "l8-bore-bend";
+  await s.post("/ingest", s.R("relay", b, "power", { battery_pct: 62, draw_w: 41.5, grid_hz: 59.97 }));
+  await s.post("/ingest", s.R("watch-0001", b, "button", { button: "help" }));
   await s.post("/official", { block: b, count: 2 });
   const has = (obj, keys, what) => { for (const k of keys) assert.ok(k in obj, `${what} lost the field ${k}`); };
   const hist = await s.get("/history");
@@ -42,17 +42,17 @@ test("the original endpoints and fields kept their shape", async () => {
   const fair = await s.get("/fairshare?supply_w=9000");
   has(fair, ["directorate", "fair"], "/fairshare");
   has(fair.fair, ["policy", "supply_w", "blocks", "dark_blocks", "equity_index"], "/fairshare policy");
-  has(fair.fair.blocks[0], ["block", "level", "served_w", "served_pct", "dark"], "/fairshare block");
+  has(fair.fair.blocks[0], ["block", "level", "served_w", "served_pct", "dark", "name", "people", "demand_w", "critical_w"], "/fairshare block");
   has(await s.get("/fairshare?supply_w=9000&policy=fair"), ["policy", "blocks"], "/fairshare?policy=");
   has((await s.get("/queue"))[0], ["id", "device", "block", "time", "score", "vitals"], "/queue");
   const truth = await s.get("/truth");
   has(truth, ["window_h", "residents_total", "official_total", "blocks"], "/truth");
   has(truth.blocks[0], ["block", "residents", "official", "gap"], "/truth block");
-  has((await s.post("/ingest", s.R("relay-07", b, "power", { battery_pct: 61 }))).body, ["added", "dupes", "errors"], "/ingest reply");
+  has((await s.post("/ingest", s.R("relay", b, "power", { battery_pct: 61 }))).body, ["added", "dupes", "errors"], "/ingest reply");
   has((await s.post("/dispatch", { responder: "rover-01" })).body, ["assigned"], "/dispatch reply");
-  assert.deepStrictEqual((await s.post("/family", { group: "g", devices: ["watch-01"] })).body, { ok: true });
+  assert.deepStrictEqual((await s.post("/family", { group: "g", devices: ["watch-0001"] })).body, { ok: true });
   has((await s.get("/family?group=g"))[0], ["device", "last_ok", "block"], "/family");
-  assert.ok(Array.isArray(await s.get("/inbox?device=watch-01")));
+  assert.ok(Array.isArray(await s.get("/inbox?device=watch-0001")));
 });
 
 test("CONTRACT.md: every field, kind and value the team agreed is still there; lane 1's additions are optional and in the changelog", () => {
@@ -85,8 +85,13 @@ test("the guides cover what each lane was promised", () => {
 });
 
 test("README numbers match what the server returns (fair share example)", async () => {
-  const fair = await s.get("/fairshare?supply_w=9000");
-  const deep = fair.fair.blocks.find((x) => x.block === "L8-deepwell-03");
-  assert.ok(read("README.md").includes(`"served_w": ${deep.served_w}, "served_pct": ${deep.served_pct}`), `README should show ${deep.served_w} W / ${deep.served_pct}%`);
-  assert.strictEqual(fair.fair.equity_index, 0.75);
+  const readme = read("README.md");
+  const supply = Number(/GET \/fairshare\?supply_w=(\d+)/.exec(readme)[1]); // the README's own example request
+  const fair = await s.get(`/fairshare?supply_w=${supply}`);
+  const deep = fair.fair.blocks.find((x) => x.block === "l8-bore-bend");
+  assert.ok(readme.includes(`"served_w": ${deep.served_w}, "served_pct": ${deep.served_pct}`), `README should show ${deep.served_w} W / ${deep.served_pct}%`);
+  assert.ok(readme.includes(`"demand_total_w": ${fair.fair.demand_total_w}`), `README should show the sector demand ${fair.fair.demand_total_w}`);
+  assert.ok(readme.includes(`"dark_blocks": [], "equity_index": ${fair.fair.equity_index}`), "README shows the fair-share outcome");
+  assert.strictEqual(fair.directorate.dark_blocks.length, 18);
+  assert.ok(readme.includes("18 blocks"), "README says how many blocks the Directorate's rule leaves dark");
 });

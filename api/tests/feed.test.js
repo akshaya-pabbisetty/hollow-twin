@@ -7,7 +7,7 @@ const { makeServer, readEvents } = require("./helper");
 const s = makeServer();
 before(() => s.start());
 after(() => s.cleanup());
-const air = (n) => s.R("sensor-02", "L2-market-01", "air", { co2_ppm: 700 + n });
+const air = (n) => s.R("sensor", "l2-chalk-gallery", "air", { co2_ppm: 700 + n });
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 
 test("every event has an id that rises by one, and the proxy headers are set", async () => {
@@ -62,7 +62,7 @@ test("sequence numbers survive a restart, so a reconnect after a crash still get
 test("restart after a crash that left half a line in the data file: nothing else is lost", async () => {
   const before = (await s.get("/history")).length;
   await s.stop();
-  fs.appendFileSync(s.data, '{"id":"torn-1","device":"sensor-02","blo'); // power died mid-write
+  fs.appendFileSync(s.data, '{"id":"torn-1","device":"sensor-l2-chalk-gallery","blo'); // power died mid-write
   await s.start();
   assert.strictEqual((await s.get("/history")).length, before, "the torn line is skipped, every whole line is kept");
   const next = air(30);

@@ -4,6 +4,8 @@
 FROM node:22-alpine
 WORKDIR /app
 COPY api ./api
+# the block registry (70 blocks) that the API validates against
+COPY contract ./contract
 
 # PORT: where the server listens (hosts usually override it).
 # DATA: the append-only data file. Mount a persistent volume at /data or it is lost when the container is replaced.

@@ -6,6 +6,12 @@ const os = require("os");
 const path = require("path");
 
 const ROOT = path.join(__dirname, "..");
+const REPO = path.join(ROOT, ".."); // the team repository: CONTRACT.md, contract/, tools/
+// Every block id in contract/blocks.json, in file order (top level first).
+const BLOCK_IDS = JSON.parse(fs.readFileSync(path.join(REPO, "contract", "blocks.json"), "utf8")).blocks.map((b) => b.id);
+// Relay boxes and sensor nodes are named after their block (CONTRACT.md section 3):
+// device "relay" or "sensor" is shorthand for relay-<block> / sensor-<block>.
+const deviceId = (device, block) => (device === "relay" || device === "sensor" ? `${device}-${block}` : device);
 let n = 0;
 
 function makeServer(env = {}) {
@@ -28,7 +34,7 @@ function makeServer(env = {}) {
   s.restart = async () => { await s.stop(); await s.start(); };
   s.cleanup = async () => { await s.stop(); fs.rmSync(data, { force: true }); };
   s.R = (device, block, kind, values, time = Date.now(), extra = {}) =>
-    ({ id: `${device}-${++s.seq}`, device, block, time: new Date(time).toISOString(), kind, values, ...extra });
+    ({ id: `${deviceId(device, block)}-${++s.seq}`, device: deviceId(device, block), block, time: new Date(time).toISOString(), kind, values, hops: 0, via: [], ...extra });
   s.post = (p, body, headers = {}) => fetch(s.api + p, { method: "POST", headers: { "Content-Type": "application/json", ...headers },
     body: typeof body === "string" ? body : JSON.stringify(body) })
     .then(async (r) => ({ status: r.status, headers: r.headers, body: await r.json() }));
@@ -68,4 +74,4 @@ async function readEvents(url, { headers = {}, want = 1, timeoutMs = 3000 } = {}
   return events;
 }
 
-module.exports = { makeServer, readEvents, ROOT };
+module.exports = { makeServer, readEvents, ROOT, REPO, BLOCK_IDS, deviceId };

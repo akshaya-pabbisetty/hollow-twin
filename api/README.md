@@ -272,20 +272,28 @@ GET /forecast?block=L6-borebend-02
 
 ### GET /fairshare
 
-Who gets power for a given supply: the Directorate's rule and fair share side by side. `?policy=directorate` or
-`?policy=fair` returns just one.
+Who gets power for a given supply, across all 70 blocks of `contract/blocks.json`: the Directorate's rule and fair
+share side by side. `?policy=directorate` or `?policy=fair` returns just one. A block's demand is 100 W per person
+and its critical load (air, pumps, medical) 45 W per person; both are design choices in `shared/limits.json`.
+
+The example asks for 60% of what the sector needs. The Directorate's rule serves levels L0 to L6 in full and
+leaves 18 blocks on L7 and L8 dark; fair share leaves none dark.
 
 ```
-GET /fairshare?supply_w=9000
+GET /fairshare?supply_w=1927020000
 ```
 
 ```json
-{ "directorate": { "policy": "directorate", "supply_w": 9000, "rule": "Directorate: upper levels are served in full first; ...",
-                   "blocks": [{ "block": "L8-deepwell-03", "level": 8, "served_w": 0, "served_pct": 0, "dark": true }, "..."],
-                   "dark_blocks": ["L6-borebend-02", "L7-sump-03", "L8-deepwell-03"], "equity_index": 0 },
-  "fair": { "policy": "fair", "supply_w": 9000, "rule": "Fair share: every block's critical load ... first, then the rest split per person.",
-            "blocks": [{ "block": "L8-deepwell-03", "level": 8, "served_w": 1513, "served_pct": 69, "dark": false }, "..."],
-            "dark_blocks": [], "equity_index": 0.75 } }
+{ "directorate": { "policy": "directorate", "supply_w": 1927020000, "demand_total_w": 3211700000, "critical_total_w": 1445265000,
+                   "rule": "Directorate: upper levels are served in full first; ...",
+                   "blocks": [{ "block": "l8-bore-bend", "name": "Bore Bend", "level": "L8", "people": 772000, "demand_w": 77200000,
+                                "critical_w": 34740000, "demand_source": "people", "served_w": 0, "served_pct": 0, "dark": true }, "..."],
+                   "dark_blocks": ["l7-ember-wells", "...", "l8-drift-hollow"], "equity_index": 0 },
+  "fair": { "policy": "fair", "supply_w": 1927020000, "demand_total_w": 3211700000, "critical_total_w": 1445265000,
+            "rule": "Fair share: every block's critical load ... first, then the rest split per person.",
+            "blocks": [{ "block": "l8-bore-bend", "name": "Bore Bend", "level": "L8", "people": 772000, "demand_w": 77200000,
+                         "critical_w": 34740000, "demand_source": "people", "served_w": 46320000, "served_pct": 60, "dark": false }, "..."],
+            "dark_blocks": [], "equity_index": 1 } }
 ```
 
 ### GET /queue and POST /dispatch
@@ -464,7 +472,9 @@ logic.js           forecast, fair share, help queue, truth check
 surface.js         surface verdict, surface record, first wave
 limits.js          loads shared/limits.json
 sign.js            reading signatures (HMAC-SHA256)
-shared/            FORMAT.md, limits.json, sector.json, people.json, keys.example.json
+blocks.js          the 70 blocks of ../contract/blocks.json, device-id checks
+contract.js        the CONTRACT.md message format: kinds, checks, old-name aliases
+shared/            limits.json, people.json, keys.example.json
 tools/scenario.js  demo shots        tools/replay.js  endless fake devices
 tools/sign.js      signing helper    tools/check.js   checks a running or deployed backend
 tests/             end-to-end tests (npm test)

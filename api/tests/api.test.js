@@ -7,6 +7,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const L = require("../logic");
+const { BLOCK_IDS, deviceId } = require("./helper");
 
 const PORT = 18787 + Math.floor(Math.random() * 1000);
 const API = `http://localhost:${PORT}`;
@@ -23,7 +24,7 @@ const stopServer = () => new Promise((res) => { proc.on("exit", res); proc.kill(
 const H = 3600e3;
 const iso = (ms) => new Date(ms).toISOString();
 const R = (device, block, kind, values, time = Date.now()) =>
-  ({ id: `${device}-${++seq}`, device, block, time: iso(time), kind, values });
+  ({ id: `${deviceId(device, block)}-${++seq}`, device: deviceId(device, block), block, time: iso(time), kind, values, hops: 0, via: [] });
 const post = (p, body) => fetch(API + p, { method: "POST", headers: { "Content-Type": "application/json" },
   body: typeof body === "string" ? body : JSON.stringify(body) }).then(async (r) => ({ status: r.status, body: await r.json() }));
 const get = (p) => fetch(API + p).then((r) => r.json());
@@ -32,9 +33,10 @@ before(async () => { fs.rmSync(DATA, { force: true }); await startServer(); });
 after(async () => { await stopServer(); fs.rmSync(DATA, { force: true }); });
 
 test("format: valid readings stored, bad ones rejected with a reason", async () => {
-  const ok = await post("/ingest", R("sensor-01", "L2-market-01", "air", { co2_ppm: 900 }));
+  const ok = await post("/ingest", R("sensor", "l2-chalk-gallery", "air", { co2_ppm: 900 }));
   assert.strictEqual(ok.body.added, 1);
-  const bad = await post("/ingest", [{ id: "x" }, { ...R("s", "b", "smell", {}) }, { ...R("s", "b", "air", {}), time: "yesterday" }]);
+  const b = "l2-chalk-gallery";
+  const bad = await post("/ingest", [{ id: "x" }, { ...R("sensor", b, "smell", {}) }, { ...R("sensor", b, "air", {}), time: "yesterday" }]);
   assert.strictEqual(bad.status, 400);
   assert.deepStrictEqual(bad.body.errors.map((e) => e.err).sort(),
     ["missing device; missing block; missing time; missing kind; missing values", "time is not ISO 8601", 'unknown kind "smell"']);
@@ -43,13 +45,13 @@ test("format: valid readings stored, bad ones rejected with a reason", async () 
 });
 
 test("shot 3, warning: battery drain gives hours left and a watch warning under 8 h", async () => {
-  const now = Date.now() - 3 * H, b = "L6-borebend-02"; // timeline ends at the real "now": readings from the future are rejected
+  const now = Date.now() - 3 * H, b = "l6-flint-face"; // timeline ends at the real "now": readings from the future are rejected
   // 80% -> 70% over the last 2 hours = 5%/h, so 70/5 = 14 h left: no warning yet
-  await post("/ingest", [0, 1, 2].map((i) => R("relay-06", b, "power", { battery_pct: 80 - 5 * i, draw_w: 40 }, now - (2 - i) * H)));
+  await post("/ingest", [0, 1, 2].map((i) => R("relay", b, "power", { battery_pct: 80 - 5 * i, draw_w: 40 }, now - (2 - i) * H)));
   let f = (await get(`/forecast?block=${b}`))[0];
   assert.ok(Math.abs(f.hours_left - 14) < 0.5, `expected ~14 h, got ${f.hours_left}`);
   // drain speeds up: 70 -> 40 in 3 more hours
-  await post("/ingest", [1, 2, 3].map((i) => R("relay-06", b, "power", { battery_pct: 70 - 10 * i, draw_w: 80 }, now + i * H)));
+  await post("/ingest", [1, 2, 3].map((i) => R("relay", b, "power", { battery_pct: 70 - 10 * i, draw_w: 80 }, now + i * H)));
   f = (await get(`/forecast?block=${b}`))[0];
   assert.ok(f.hours_left < 8, `expected under 8 h, got ${f.hours_left}`);
   const alerts = (await get(`/history?kind=alert&block=${b}`)).filter((a) => a.values.hours_left !== undefined);
@@ -58,39 +60,51 @@ test("shot 3, warning: battery drain gives hours left and a watch warning under 
 });
 
 test("hum upgrade: grid frequency sag warns BEFORE any battery is used", async () => {
-  const b = "L5-rivet-01";
-  await post("/ingest", R("relay-05", b, "power", { battery_pct: 100, draw_w: 0, grid_hz: 60.01 }));
+  const b = "l5-rail-face";
+  await post("/ingest", R("relay", b, "power", { battery_pct: 100, draw_w: 0, grid_hz: 60.01 }));
   assert.strictEqual((await get(`/history?kind=alert&block=${b}`)).length, 0, "normal hum: no alert");
-  await post("/ingest", R("relay-05", b, "power", { battery_pct: 100, draw_w: 0, grid_hz: 59.71 }));
+  await post("/ingest", R("relay", b, "power", { battery_pct: 100, draw_w: 0, grid_hz: 59.71 }));
   const a = await get(`/history?kind=alert&block=${b}`);
   assert.strictEqual(a.length, 1);
   assert.match(a[0].values.text, /power cut likely soon/);
   assert.strictEqual((await get(`/forecast?block=${b}`))[0].battery_pct, 100, "battery still full when the warning fires");
 });
 
-test("shot 4, fair share: Directorate darkens deep levels, fair share darkens none", async () => {
-  const r = await get("/fairshare?supply_w=9000"); // sector demand is 16,000 W, critical 4,750 W
-  assert.ok(r.directorate.dark_blocks.length >= 3, `Directorate dark: ${r.directorate.dark_blocks}`);
-  assert.ok(r.directorate.dark_blocks.every((b) => L.levelOf(b) >= 5), "only deep levels go dark");
+test("shot 4, fair share across all 70 contract blocks: Directorate darkens deep levels, fair share darkens none", async () => {
+  // what the sector needs comes from the people in contract/blocks.json: 100 W each, 45 W of it critical
+  const blocks = JSON.parse(fs.readFileSync(path.join(__dirname, "../../contract/blocks.json"), "utf8")).blocks;
+  const people = blocks.reduce((s, b) => s + b.people, 0);
+  const totals = (await get("/fairshare?supply_w=0")).fair;
+  assert.deepStrictEqual([totals.blocks.length, totals.demand_total_w, totals.critical_total_w], [70, people * 100, people * 45]);
+  const supply = Math.round(totals.demand_total_w * 0.6); // only 60% of what the sector needs is available
+  const r = await get(`/fairshare?supply_w=${supply}`);
+  assert.deepStrictEqual(r.fair.blocks.map((b) => b.block), blocks.map((b) => b.id), "every contract block, in the file's order");
+  assert.ok(r.directorate.dark_blocks.length >= 10, `Directorate dark: ${r.directorate.dark_blocks}`);
+  assert.ok(r.directorate.dark_blocks.every((b) => L.levelOf(b) >= 7), "only the deepest levels go dark");
+  assert.ok(r.directorate.blocks.filter((b) => b.level === "L0").every((b) => b.served_pct === 100), "the top level is served in full");
   assert.deepStrictEqual(r.fair.dark_blocks, [], "fair share: nobody loses air or pumps");
   assert.ok(r.fair.equity_index > r.directorate.equity_index);
-  const total = r.fair.blocks.reduce((s, b) => s + b.served_w, 0);
-  assert.ok(Math.abs(total - 9000) <= 9, `fair share uses all supply, used ${total}`);
+  assert.ok(Math.abs(r.fair.served_total_w - supply) <= 70, `fair share uses all supply, used ${r.fair.served_total_w} of ${supply}`);
+  const deep = r.fair.blocks.find((b) => b.block === "l8-bore-bend");
+  assert.deepStrictEqual([deep.name, deep.level, deep.people, deep.demand_w, deep.critical_w, deep.demand_source], ["Bore Bend", "L8", 772000, 77200000, 34740000, "people"]);
+  assert.ok(deep.served_w >= deep.critical_w && deep.served_pct === 60, JSON.stringify(deep));
 });
 
 test("fair share edge cases: below critical, above demand, zero", () => {
-  const S = JSON.parse(fs.readFileSync(path.join(__dirname, "../shared/sector.json"))).blocks;
-  const low = L.allocate(S, 2000, "fair");               // less than critical load
+  const S = L.sector();
+  const crit = S.reduce((s, b) => s + b.critical_w, 0), demand = S.reduce((s, b) => s + b.demand_w, 0);
+  const low = L.allocate(S, crit / 2, "fair");            // less than the critical load
   assert.ok(low.blocks.every((b) => b.served_w > 0), "everyone gets a share of what exists");
-  const high = L.allocate(S, 50000, "fair");
+  assert.strictEqual(low.dark_blocks.length, 70, "and it is said plainly that nobody's critical load is covered");
+  const high = L.allocate(S, demand * 2, "fair");
   assert.ok(high.blocks.every((b) => b.served_pct === 100) && high.dark_blocks.length === 0);
   const zero = L.allocate(S, 0, "fair");
-  assert.strictEqual(zero.dark_blocks.length, 9);
+  assert.strictEqual(zero.dark_blocks.length, 70);
 });
 
 test("shot 5, network dies: relay backlog arrives late and out of order, copies dropped, gap replays in order", async () => {
-  const b = "L7-sump-03", t0 = Date.now() - 30 * 60e3;
-  const held = [0, 1, 2, 3, 4].map((i) => R("sensor-07", b, "air", { co2_ppm: 900 + i }, t0 + i * 60e3));
+  const b = "l7-chalk-cut", t0 = Date.now() - 30 * 60e3;
+  const held = [0, 1, 2, 3, 4].map((i) => R("sensor", b, "air", { co2_ppm: 900 + i }, t0 + i * 60e3));
   const shuffled = [held[3], held[0], held[4], held[1], held[2]];
   const first = await post("/ingest", shuffled);
   assert.strictEqual(first.body.added, 5);
@@ -102,56 +116,56 @@ test("shot 5, network dies: relay backlog arrives late and out of order, copies 
 });
 
 test("shot 5, families: 'I'm OK' from L1 reaches family on L7 only", async () => {
-  await post("/family", { group: "rao", devices: ["watch-11", "watch-71"] });
-  await post("/ingest", R("watch-11", "L1-gallery-02", "button", { button: "ok", family: "rao" }));
-  const inbox = await get("/inbox?device=watch-71");
-  assert.ok(inbox.some((a) => /watch-11 is OK/.test(a.values.text)));
-  const stranger = await get("/inbox?device=watch-99");
+  await post("/family", { group: "rao", devices: ["watch-0011", "watch-0071"] });
+  await post("/ingest", R("watch-0011", "l1-winch-gallery", "button", { button: "ok", family: "rao" }));
+  const inbox = await get("/inbox?device=watch-0071");
+  assert.ok(inbox.some((a) => /watch-0011 is OK/.test(a.values.text)));
+  const stranger = await get("/inbox?device=watch-0099");
   assert.ok(!stranger.some((a) => /is OK/.test(a.values.text)), "not delivered to strangers");
   const fam = await get("/family?group=rao");
-  assert.ok(fam.find((m) => m.device === "watch-11").last_ok);
+  assert.ok(fam.find((m) => m.device === "watch-0011").last_ok);
 });
 
 test("shot 6, bad water: salty cup -> do-not-drink reaches watches in that block", async () => {
-  const b = "L3-farms-04";
-  await post("/ingest", R("watch-31", b, "vitals", { hr_bpm: 75, spo2_pct: 98, temp_c: 36.7 }));
-  await post("/ingest", R("sensor-03", b, "water", { tds_ppm: 240, turbidity_ntu: 0.8 }));
-  assert.ok(!(await get("/inbox?device=watch-31")).some((a) => /Do not drink/.test(a.values.text)), "clean water: silent");
-  await post("/ingest", R("sensor-03", b, "water", { tds_ppm: 1450, turbidity_ntu: 1.1 }));
-  assert.ok((await get("/inbox?device=watch-31")).some((a) => /Do not drink/.test(a.values.text)));
+  const b = "l3-ember-yard";
+  await post("/ingest", R("watch-0031", b, "vitals", { hr_bpm: 75, spo2_pct: 98, temp_c: 36.7 }));
+  await post("/ingest", R("sensor", b, "water", { tds_ppm: 240, turbidity_ntu: 0.8 }));
+  assert.ok(!(await get("/inbox?device=watch-0031")).some((a) => /Do not drink/.test(a.values.text)), "clean water: silent");
+  await post("/ingest", R("sensor", b, "water", { tds_ppm: 1450, turbidity_ntu: 1.1 }));
+  assert.ok((await get("/inbox?device=watch-0031")).some((a) => /Do not drink/.test(a.values.text)));
 });
 
 test("shot 7, truth: residents' count vs the Directorate's count", async () => {
-  const b = "L8-deepwell-03";
-  for (let i = 0; i < 6; i++) await post("/ingest", R(`watch-8${i}`, b, "button", { button: "symptom" }));
-  for (let i = 0; i < 3; i++) await post("/ingest", R(`watch-9${i}`, b, "vitals", { hr_bpm: 96, spo2_pct: 91, temp_c: 38.1 }));
-  await post("/ingest", R("watch-80", b, "button", { button: "symptom" })); // same person twice counts once
+  const b = "l8-bore-bend";
+  for (let i = 0; i < 6; i++) await post("/ingest", R(`watch-008${i}`, b, "button", { button: "symptom" }));
+  for (let i = 0; i < 3; i++) await post("/ingest", R(`watch-009${i}`, b, "vitals", { hr_bpm: 96, spo2_pct: 91, temp_c: 38.1 }));
+  await post("/ingest", R("watch-0080", b, "button", { button: "symptom" })); // same person twice counts once
   await post("/official", { block: b, count: 2 });
   const row = (await get("/truth")).blocks.find((r) => r.block === b);
   assert.deepStrictEqual([row.residents, row.official, row.gap], [9, 2, 7]);
 });
 
 test("shot 8, care: help requests ranked by vitals, top one dispatched, nearest on ties", async () => {
-  await post("/ingest", R("watch-41", "L4-works-02", "vitals", { hr_bpm: 80, spo2_pct: 97, temp_c: 36.8 }));
-  await post("/ingest", R("watch-42", "L8-deepwell-03", "vitals", { hr_bpm: 130, spo2_pct: 89, temp_c: 39.0 }));
-  await post("/ingest", R("watch-41", "L4-works-02", "button", { button: "help" }));
-  await post("/ingest", R("watch-42", "L8-deepwell-03", "button", { button: "help" }));
+  await post("/ingest", R("watch-0041", "l4-coke-yard", "vitals", { hr_bpm: 80, spo2_pct: 97, temp_c: 36.8 }));
+  await post("/ingest", R("watch-0042", "l8-bore-bend", "vitals", { hr_bpm: 130, spo2_pct: 89, temp_c: 39.0 }));
+  await post("/ingest", R("watch-0041", "l4-coke-yard", "button", { button: "help" }));
+  await post("/ingest", R("watch-0042", "l8-bore-bend", "button", { button: "help" }));
   const q = await get("/queue");
-  assert.strictEqual(q[0].device, "watch-42", "the sicker person is first");
+  assert.strictEqual(q[0].device, "watch-0042", "the sicker person is first");
   assert.ok(q[0].score > q[1].score);
-  const d = await post("/dispatch", { responder: "rover-01", block: "L1-gallery-02" });
-  assert.strictEqual(d.body.assigned.device, "watch-42");
-  assert.ok((await get("/inbox?device=watch-42")).some((a) => /rover-01 sent/.test(a.values.text)));
-  assert.strictEqual((await get("/queue"))[0].device, "watch-41", "dispatched request leaves the queue");
+  const d = await post("/dispatch", { responder: "rover-01", block: "l1-winch-gallery" });
+  assert.strictEqual(d.body.assigned.device, "watch-0042");
+  assert.ok((await get("/inbox?device=watch-0042")).some((a) => /rover-01 sent/.test(a.values.text)));
+  assert.strictEqual((await get("/queue"))[0].device, "watch-0041", "dispatched request leaves the queue");
   // ties: equal scores -> nearest level to the responder
-  const q2 = [{ id: "a", block: "L8-x", score: 50, time: iso(0) }, { id: "b", block: "L2-x", score: 50, time: iso(1) }];
-  assert.strictEqual(L.pickRequest(q2, "L1-x").id, "b");
+  const q2 = [{ id: "a", block: "l8-bore-bend", score: 50, time: iso(0) }, { id: "b", block: "l2-chalk-gallery", score: 50, time: iso(1) }];
+  assert.strictEqual(L.pickRequest(q2, "l1-winch-gallery").id, "b");
 });
 
 test("tunnels and floods close routes", async () => {
-  await post("/ingest", R("rover-01", "L7-sump-03", "tunnel", { status: "closed", photo_url: "x.jpg" }));
-  await post("/ingest", R("sensor-07", "L7-sump-03", "flood", { depth_cm: 22 }));
-  const t = (await get("/history?kind=alert&block=L7-sump-03")).map((a) => a.values.text).join(" | ");
+  await post("/ingest", R("rover-01", "l7-chalk-cut", "tunnel", { status: "closed", photo_url: "x.jpg" }));
+  await post("/ingest", R("sensor", "l7-chalk-cut", "flood", { depth_cm: 22 }));
+  const t = (await get("/history?kind=alert&block=l7-chalk-cut")).map((a) => a.values.text).join(" | ");
   assert.match(t, /Tunnel closed/); assert.match(t, /Flooding/);
 });
 
@@ -159,7 +173,7 @@ test("live feed: the twin receives a reading within a second", async () => {
   const ctrl = new AbortController();
   const res = await fetch(API + "/feed", { signal: ctrl.signal });
   const reader = res.body.getReader();
-  const r = R("sensor-02", "L2-market-01", "air", { co2_ppm: 777 });
+  const r = R("sensor", "l2-chalk-gallery", "air", { co2_ppm: 777 });
   const t0 = Date.now();
   setTimeout(() => post("/ingest", r), 100);
   let buf = "";
@@ -169,13 +183,13 @@ test("live feed: the twin receives a reading within a second", async () => {
 });
 
 test("load: 2,000-reading backlog and 50 relays posting at once", async () => {
-  const big = Array.from({ length: 2000 }, (_, i) => R("relay-big", "L4-works-02", "air", { co2_ppm: 800 + (i % 50) }, Date.now() - i * 1000));
+  const big = Array.from({ length: 2000 }, (_, i) => R("relay", "l4-coke-yard", "air", { co2_ppm: 800 + (i % 50) }, Date.now() - i * 1000));
   let t0 = Date.now();
   const r = await post("/ingest", big);
   assert.strictEqual(r.body.added, 2000);
   const backlogMs = Date.now() - t0;
   t0 = Date.now();
-  const rs = await Promise.all(Array.from({ length: 50 }, (_, i) => post("/ingest", R(`relay-p${i}`, "L0-crown-01", "air", { co2_ppm: 700 }))));
+  const rs = await Promise.all(Array.from({ length: 50 }, (_, i) => post("/ingest", R("sensor", BLOCK_IDS[i], "air", { co2_ppm: 700 }))));
   assert.ok(rs.every((x) => x.body.added === 1));
   console.log(`    2,000 backlog: ${backlogMs} ms, 50 parallel posts: ${Date.now() - t0} ms`);
   assert.ok(backlogMs < 3000);
@@ -186,8 +200,8 @@ test("restart: readings, families, official counts and dispatches survive a cras
   await stopServer(); await startServer();
   assert.strictEqual((await get("/history")).length, before);
   assert.ok((await get("/family?group=rao")).length === 2);
-  assert.strictEqual((await get("/truth")).blocks.find((r) => r.block === "L8-deepwell-03").official, 2);
-  assert.ok(!(await get("/queue")).some((x) => x.device === "watch-42"), "dispatched stays dispatched");
+  assert.strictEqual((await get("/truth")).blocks.find((r) => r.block === "l8-bore-bend").official, 2);
+  assert.ok(!(await get("/queue")).some((x) => x.device === "watch-0042"), "dispatched stays dispatched");
   const old = (await get("/history?kind=air"))[0]; // a reading stored before the restart
   assert.strictEqual((await post("/ingest", old)).body.dupes, 1, "a relay re-sending after a restart is still dropped");
 });

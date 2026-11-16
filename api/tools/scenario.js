@@ -50,7 +50,7 @@ const shots = {};
 // Shot: the mains hum sags, the warning fires before any battery is used, then the battery forecast drops under 8 h.
 shots.blackout = async () => {
   title("blackout: the grid warns us before the lights go out");
-  const block = "L6-borebend-02", dev = "relay-06", t0 = Date.now() - 4 * H;
+  const block = "l6-flint-face", dev = "relay-06", t0 = Date.now() - 4 * H;
   say(`Relay ${dev} in ${block} measures the mains frequency and its battery.`);
   say("(Time is compressed: the last 4 hours of relay data are replayed, ending now.)");
   if ((await get(`/history?block=${block}&kind=power`)).length)
@@ -94,26 +94,36 @@ shots.blackout = async () => {
 // Shot: the same supply, shared two ways.
 shots.fairshare = async () => {
   title("fairshare: the same power, shared two ways");
-  const supply = 9000;
+  const MW = (w) => `${Math.round(w / 1e6).toLocaleString("en-US")} MW`;
+  const need = (await get("/fairshare?supply_w=0")).fair; // what the whole sector needs, from the people in contract/blocks.json
+  const supply = Math.round(need.demand_total_w * 0.6);
   const r = await get(`/fairshare?supply_w=${supply}`);
-  say(`The sector needs 16,000 W. Only ${supply} W is available. Who gets it?`);
+  say(`The sector's ${r.fair.blocks.length} blocks need ${MW(need.demand_total_w)}. Only ${MW(supply)} is available (60%). Who gets it?`);
+  say(need.basis);
   step("1. The Directorate's rule");
   say(r.directorate.rule);
   await beat();
   step("2. The fair-share rule");
   say(r.fair.rule);
   await beat();
-  step("3. Side by side (percent of each block's demand that is served)");
-  say(`${pad("block", 18)}${pad("Directorate", 16)}fair share`);
-  for (const d of r.directorate.blocks) {
-    const f = r.fair.blocks.find((b) => b.block === d.block);
-    say(`${pad(d.block, 18)}${pad(`${d.served_pct}%${d.dark ? "  DARK" : ""}`, 16)}${f.served_pct}%${f.dark ? "  DARK" : ""}`);
+  step("3. Side by side, level by level (share of demand served; DARK = blocks without air fans or pumps)");
+  say(`${pad("level", 7)}${pad("blocks", 8)}${pad("Directorate", 22)}fair share`);
+  const cell = (rows) => {
+    const served = rows.reduce((s, b) => s + b.served_w, 0), demand = rows.reduce((s, b) => s + b.demand_w, 0), dark = rows.filter((b) => b.dark).length;
+    return `${Math.round((100 * served) / demand)}%${dark ? `  ${dark} DARK` : ""}`;
+  };
+  for (const level of [...new Set(r.directorate.blocks.map((b) => b.level))]) {
+    const d = r.directorate.blocks.filter((b) => b.level === level), f = r.fair.blocks.filter((b) => b.level === level);
+    say(`${pad(level, 7)}${pad(d.length, 8)}${pad(cell(d), 22)}${cell(f)}`);
     await beat(0.4);
   }
   await beat();
+  const deepest = r.directorate.blocks[r.directorate.blocks.length - 1], same = r.fair.blocks.find((b) => b.block === deepest.block);
+  say(`One block, ${deepest.name} (${deepest.block}, ${deepest.people.toLocaleString("en-US")} people):  Directorate ${deepest.served_pct}%${deepest.dark ? " DARK" : ""}  |  fair share ${same.served_pct}%${same.dark ? " DARK" : ""}`);
   say(`Blocks without air fans or pumps:  Directorate ${r.directorate.dark_blocks.length}  |  fair share ${r.fair.dark_blocks.length}`);
   say(`Equity index (worst-served person / best-served person):  Directorate ${r.directorate.equity_index}  |  fair share ${r.fair.equity_index}`);
-  check(r.directorate.dark_blocks.length >= 3, `the Directorate's rule leaves ${r.directorate.dark_blocks.length} deep blocks dark: ${r.directorate.dark_blocks.join(", ")}`);
+  check(r.fair.blocks.length === 70, "all 70 blocks of contract/blocks.json are in the comparison");
+  check(r.directorate.dark_blocks.length >= 10, `the Directorate's rule leaves ${r.directorate.dark_blocks.length} deep blocks dark`);
   check(r.fair.dark_blocks.length === 0, "fair share keeps air and pumps running in every block");
   check(r.fair.equity_index > r.directorate.equity_index, "fair share is more equal");
 };
@@ -121,7 +131,7 @@ shots.fairshare = async () => {
 // Shot: the network dies, the relay holds readings, then uploads the backlog. The history has no gap.
 shots.networkcut = async () => {
   title("networkcut: the relay stores and forwards, nothing is lost");
-  const block = "L7-sump-03", dev = "sensor-07", gap = 5000, n = 12;
+  const block = "l7-chalk-cut", dev = "sensor-07", gap = 5000, n = 12;
   const t0 = Date.now() - n * gap; // 12 readings, 5 s apart, ending now
   const all = Array.from({ length: n }, (_, i) => R(dev, block, "air", { co2_ppm: 820 + i * 3 }, t0 + (i + 1) * gap));
   say(`Sensor ${dev} in ${block} reads CO2 every 5 seconds and sends it through its relay.`);
@@ -156,7 +166,7 @@ shots.networkcut = async () => {
 // Shot: a clean cup, then a salty cup.
 shots.water = async () => {
   title("water: a clean cup, then a salty cup");
-  const block = "L3-farms-04", sensor = "sensor-03", watch = "watch-31";
+  const block = "l3-ember-yard", sensor = "sensor-03", watch = "watch-0031";
   await send(R(watch, block, "vitals", { hr_bpm: 74, spo2_pct: 98, temp_c: 36.7 }));
   say(`Sensor ${sensor} tests the tap water in ${block}. ${watch} is a resident's watch in the same block.`);
   const inboxNow = async () => (await get(`/inbox?device=${watch}`)).filter((a) => a.id.includes(RUN) && /Do not drink/.test(a.values.text));
@@ -181,7 +191,7 @@ shots.water = async () => {
 // Shot: residents' reports climb while the official count stays at 2.
 shots.outbreak = async () => {
   title("outbreak: the residents' count vs the Directorate's count");
-  const block = "L8-deepwell-03";
+  const block = "l8-bore-bend";
   const row = async () => (await get("/truth")).blocks.find((b) => b.block === block) || { residents: 0, official: 0, gap: 0 };
   const start = (await row()).residents;
   await post("/official", { block, count: 2 });
@@ -212,9 +222,9 @@ shots.outbreak = async () => {
 shots.care = async () => {
   title("care: help requests ranked by need, then a robot is sent");
   const people = [
-    ["watch-41", "L4-works-02", { hr_bpm: 78, spo2_pct: 98, temp_c: 36.8 }, "feels faint, vitals normal"],
-    ["watch-42", "L8-deepwell-03", { hr_bpm: 132, spo2_pct: 89, temp_c: 39.2 }, "very low oxygen, racing pulse, high fever"],
-    ["watch-43", "L5-rivet-01", { hr_bpm: 96, spo2_pct: 96, temp_c: 38.4 }, "fever"],
+    ["watch-0041", "l4-coke-yard", { hr_bpm: 78, spo2_pct: 98, temp_c: 36.8 }, "feels faint, vitals normal"],
+    ["watch-0042", "l8-bore-bend", { hr_bpm: 132, spo2_pct: 89, temp_c: 39.2 }, "very low oxygen, racing pulse, high fever"],
+    ["watch-0043", "l5-rail-face", { hr_bpm: 96, spo2_pct: 96, temp_c: 38.4 }, "fever"],
   ];
   const mine = async () => (await get("/queue")).filter((q) => q.id.includes(RUN));
   step("1. Three residents press HELP, in this order");
@@ -231,27 +241,27 @@ shots.care = async () => {
     for (const why of item.reasons) say(`      ${why}`);
     await beat(1);
   }
-  check(q.length === 3 && q[0].device === "watch-42", "the sickest person is first, although they pressed second");
-  check(q.length === 3 && q[1].device === "watch-43" && q[2].device === "watch-41", "then the fever, then the normal vitals");
+  check(q.length === 3 && q[0].device === "watch-0042", "the sickest person is first, although they pressed second");
+  check(q.length === 3 && q[1].device === "watch-0043" && q[2].device === "watch-0041", "then the fever, then the normal vitals");
   await beat();
 
-  step("3. Rover rover-01 is dispatched from L1-gallery-02");
-  const d = await post("/dispatch", { responder: "rover-01", block: "L1-gallery-02" });
+  step("3. Rover rover-01 is dispatched from l1-winch-gallery");
+  const d = await post("/dispatch", { responder: "rover-01", block: "l1-winch-gallery" });
   say(d.assigned ? `rover-01 is sent to ${d.assigned.device} in ${d.assigned.block}` : "nothing to dispatch");
   await beat();
-  const inbox = (await get("/inbox?device=watch-42")).filter((a) => /rover-01 sent/.test(a.values.text));
-  if (inbox.length) say(`${"watch-42"} shows: ${inbox[inbox.length - 1].values.text}`);
+  const inbox = (await get("/inbox?device=watch-0042")).filter((a) => /rover-01 sent/.test(a.values.text));
+  if (inbox.length) say(`${"watch-0042"} shows: ${inbox[inbox.length - 1].values.text}`);
   q = await mine();
   say(`Next in the queue: ${q[0] ? q[0].device : "nobody"}`);
-  check(!!d.assigned && d.assigned.device === "watch-42", "the robot went to the top of the queue");
+  check(!!d.assigned && d.assigned.device === "watch-0042", "the robot went to the top of the queue");
   check(inbox.length >= 1, "the resident was told help is coming");
-  check(q.length === 2 && q[0].device === "watch-43", "the request left the queue and the next person moved up");
+  check(q.length === 2 && q[0].device === "watch-0043", "the request left the queue and the next person moved up");
 };
 
 // Shot: scout readings arrive, the verdict and the first-wave list update.
 shots.surface = async () => {
   title("surface: is it safe to go up, and who goes first?");
-  const scout = "scout-01", up = "L0-crown-01", home = "L1-gallery-02";
+  const scout = "surface-01", up = "surface", home = "l1-winch-gallery";
   const show = async () => {
     const v = await get("/surface");
     say(`VERDICT: ${v.verdict.toUpperCase()}${v.missing.length ? `   (missing: ${v.missing.join(", ")})` : ""}`);
@@ -280,8 +290,8 @@ shots.surface = async () => {
   step("3. Who goes up first? Residents volunteer from their watches");
   const OK = { hr_bpm: 70, spo2_pct: 98, temp_c: 36.7 };
   const volunteers = [
-    ["watch-51", OK], ["watch-52", OK], ["watch-53", OK],
-    ["watch-54", { hr_bpm: 118, spo2_pct: 93, temp_c: 38.6 }], ["watch-55", OK], ["watch-57", null],
+    ["watch-0051", OK], ["watch-0052", OK], ["watch-0053", OK],
+    ["watch-0054", { hr_bpm: 118, spo2_pct: 93, temp_c: 38.6 }], ["watch-0055", OK], ["watch-0057", null],
   ];
   for (const [dev, vitals] of volunteers) {
     if (vitals) await send(R(dev, home, "vitals", vitals));
@@ -294,9 +304,9 @@ shots.surface = async () => {
   for (const p of f.ranked) { say(`#${p.rank}  ${pad(p.name, 16)} ${pad(p.skills.join(", "), 20)} score ${p.score}`); await beat(0.6); }
   say("Not going:");
   for (const p of f.excluded) say(`    ${pad(p.name || p.device, 16)} ${p.reasons[0]}`);
-  check(f.ranked.length === 3 && f.ranked[0].device === "watch-52", "three healthy volunteers are ranked; the one with two needed skills goes first");
-  check(f.excluded.some((p) => p.device === "watch-53" && /sole caregiver/.test(p.reasons[0])), "the sole caregiver is never sent");
-  check(f.excluded.some((p) => p.device === "watch-54") && f.excluded.some((p) => p.device === "watch-57"), "unwell volunteers and volunteers with no vitals stay below");
+  check(f.ranked.length === 3 && f.ranked[0].device === "watch-0052", "three healthy volunteers are ranked; the one with two needed skills goes first");
+  check(f.excluded.some((p) => p.device === "watch-0053" && /sole caregiver/.test(p.reasons[0])), "the sole caregiver is never sent");
+  check(f.excluded.some((p) => p.device === "watch-0054") && f.excluded.some((p) => p.device === "watch-0057"), "unwell volunteers and volunteers with no vitals stay below");
   check(f.cleared === true, "the list is a go: the verdict allows people up");
   await beat();
 

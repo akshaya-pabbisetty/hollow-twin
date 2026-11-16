@@ -61,6 +61,8 @@ They appear on everything the API sends back (`/live`, `/history`, `/blocks/<blo
 - `hops` and `via` are stored and passed through unchanged. If a message leaves them out, the API stores `"via": []` and `"hops": 0`.
 - `time` before 2020 (an ESP32 that has not synced its clock reports 1970) or more than 5 minutes ahead of the server clock: the message is kept, `time` is replaced by the receive time, and `time_estimated`, `device_time` and a warning are added. A wrong clock never loses a reading and never corrupts the timeline.
 - A message that cannot be used (a field missing, an unknown `kind`, a `time` that is not ISO 8601, a wrong `sig`) is rejected, and the reply says why (section 4).
+- `block` must be an id from [`contract/blocks.json`](contract/blocks.json), or `surface`. Any other block is rejected, and the reply says so (with a hint when only the letter case is wrong).
+- A `device` id that does not match section 3 is still accepted: the stored message carries a warning instead. The same goes for a relay or sensor whose id names a different block from the one in the message. A mislabelled watch must still be able to call for help.
 
 ## 2. Kinds
 
@@ -139,3 +141,4 @@ Additions only. Nothing above was renamed or removed. Each row says where the ad
 | 2026-11-16 | 2.1 | `button` value `volunteer`. |
 | 2026-11-16 | 2.1 | `surface` optional values `o2_pct` and `pm25_ugm3`. |
 | 2026-11-16 | 2.1 | Kind `alert`, written only by the API. |
+| 2026-11-16 | 1.3 | Rules: a `block` that is not in `contract/blocks.json` (and is not `surface`) is rejected; a `device` id that does not match section 3 is accepted with a warning. |

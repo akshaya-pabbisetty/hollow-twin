@@ -9,7 +9,7 @@ const limits = JSON.parse(fs.readFileSync(path.join(ROOT, "shared/limits.json"),
 const s = makeServer();
 before(() => s.start());
 after(() => s.cleanup());
-const scout = (values, source) => s.post("/ingest", s.R("scout-01", "L0-crown-01", "surface", values, Date.now(), source ? { source } : {}));
+const scout = (values, source) => s.post("/ingest", s.R("surface-01", "surface", "surface", values, Date.now(), source ? { source } : {}));
 const SAFE = { co2_ppm: 430, o2_pct: 20.9, temp_c: 18, pm25_ugm3: 12, radiation_usv_h: 0.2 };
 
 test("no readings, then some readings: 'not enough data', never a guess", async () => {
@@ -110,56 +110,56 @@ test("/surface/history: append-only public record of every surface reading and e
 });
 
 test("/firstwave: volunteers only, healthy, no open help request, never sole caregivers, needed skills first", async () => {
-  const b = "L3-farms-04", now = Date.now();
+  const b = "l3-ember-yard", now = Date.now();
   const vit = (d, values, time = now) => s.post("/ingest", s.R(d, b, "vitals", values, time));
   const press = (d, type, time = now) => s.post("/ingest", s.R(d, b, "button", { button: type }, time));
   const OK = { hr_bpm: 70, spo2_pct: 98, temp_c: 36.7 };
   // register (shared/people.json): 51 medic | 52 engineer+farmer | 53 farmer, sole caregiver | 54 engineer | 55 teacher
   //                                56 medic+engineer | 57 farmer | 58 cook | 60 engineer
-  await vit("watch-51", OK); await press("watch-51", "volunteer", now - 50e3);
-  await vit("watch-52", OK); await press("watch-52", "volunteer", now - 40e3);
-  await vit("watch-53", OK); await press("watch-53", "volunteer", now - 90e3);          // sole caregiver
-  await vit("watch-54", { hr_bpm: 118, spo2_pct: 93, temp_c: 38.6 }); await press("watch-54", "volunteer", now - 80e3); // unwell
-  await vit("watch-55", OK); await press("watch-55", "volunteer", now - 70e3);          // healthy, no needed skill
-  await vit("watch-56", OK);                                                            // healthy, best skills, did NOT volunteer
-  await press("watch-57", "volunteer", now - 60e3);                                     // no vitals at all
-  await vit("watch-58", OK); await press("watch-58", "volunteer", now - 30e3); await press("watch-58", "help"); // needs help
-  await vit("watch-60", OK, now - 30 * 3600e3); await press("watch-60", "volunteer", now - 20e3); // vitals 30 h old
-  await vit("watch-99", OK); await press("watch-99", "volunteer", now - 10e3);          // not in the register
+  await vit("watch-0051", OK); await press("watch-0051", "volunteer", now - 50e3);
+  await vit("watch-0052", OK); await press("watch-0052", "volunteer", now - 40e3);
+  await vit("watch-0053", OK); await press("watch-0053", "volunteer", now - 90e3);          // sole caregiver
+  await vit("watch-0054", { hr_bpm: 118, spo2_pct: 93, temp_c: 38.6 }); await press("watch-0054", "volunteer", now - 80e3); // unwell
+  await vit("watch-0055", OK); await press("watch-0055", "volunteer", now - 70e3);          // healthy, no needed skill
+  await vit("watch-0056", OK);                                                            // healthy, best skills, did NOT volunteer
+  await press("watch-0057", "volunteer", now - 60e3);                                     // no vitals at all
+  await vit("watch-0058", OK); await press("watch-0058", "volunteer", now - 30e3); await press("watch-0058", "help"); // needs help
+  await vit("watch-0060", OK, now - 30 * 3600e3); await press("watch-0060", "volunteer", now - 20e3); // vitals 30 h old
+  await vit("watch-0099", OK); await press("watch-0099", "volunteer", now - 10e3);          // not in the register
 
   const f = await s.get("/firstwave");
   assert.strictEqual(f.n, 20);
   assert.strictEqual(f.volunteers, 9);
-  assert.deepStrictEqual(f.ranked.map((p) => p.device), ["watch-52", "watch-51", "watch-55"], "two needed skills, then one, then none");
+  assert.deepStrictEqual(f.ranked.map((p) => p.device), ["watch-0052", "watch-0051", "watch-0055"], "two needed skills, then one, then none");
   assert.deepStrictEqual(f.ranked.map((p) => p.rank), [1, 2, 3]);
   assert.deepStrictEqual(f.ranked.map((p) => p.score), [20, 10, 0]);
-  assert.ok(!f.ranked.some((p) => p.device === "watch-56"), "never someone who did not volunteer");
+  assert.ok(!f.ranked.some((p) => p.device === "watch-0056"), "never someone who did not volunteer");
   const top = f.ranked[0];
   assert.strictEqual(top.name, "Tobin Okafor");
   assert.match(top.reasons.join(" | "), /volunteered at .*not a sole caregiver.*no open help request.*latest vitals healthy: SpO2 98 %, pulse 70 bpm, temperature 36\.7 C \(Royal College of Physicians.*\+10: skill "engineer" is needed.*\+10: skill "farmer" is needed/);
   assert.match(f.ranked[2].reasons.join(" | "), /\+0: none of the needed skills \(medic, engineer, farmer\)/);
   const why = Object.fromEntries(f.excluded.map((p) => [p.device, p.reasons.join(" | ")]));
-  assert.deepStrictEqual(Object.keys(why).sort(), ["watch-53", "watch-54", "watch-57", "watch-58", "watch-60", "watch-99"]);
-  assert.match(why["watch-53"], /sole caregiver: never sent up/);
-  assert.match(why["watch-54"], /SpO2 93 % is below 96 %.*pulse 118 bpm is above 90 bpm.*temperature 38\.6 C is above 38 C/);
-  assert.match(why["watch-57"], /not enough data: no vitals on record/);
-  assert.match(why["watch-58"], /has an open help request/);
-  assert.match(why["watch-60"], /latest vitals are older than 24 h/);
-  assert.match(why["watch-99"], /not in the people register/);
+  assert.deepStrictEqual(Object.keys(why).sort(), ["watch-0053", "watch-0054", "watch-0057", "watch-0058", "watch-0060", "watch-0099"]);
+  assert.match(why["watch-0053"], /sole caregiver: never sent up/);
+  assert.match(why["watch-0054"], /SpO2 93 % is below 96 %.*pulse 118 bpm is above 90 bpm.*temperature 38\.6 C is above 38 C/);
+  assert.match(why["watch-0057"], /not enough data: no vitals on record/);
+  assert.match(why["watch-0058"], /has an open help request/);
+  assert.match(why["watch-0060"], /latest vitals are older than 24 h/);
+  assert.match(why["watch-0099"], /not in the people register/);
 
   // ?n= cuts the list; a bad n is refused
-  assert.deepStrictEqual((await s.get("/firstwave?n=2")).ranked.map((p) => p.device), ["watch-52", "watch-51"]);
+  assert.deepStrictEqual((await s.get("/firstwave?n=2")).ranked.map((p) => p.device), ["watch-0052", "watch-0051"]);
   assert.strictEqual((await s.getRaw("/firstwave?n=0")).status, 400);
   assert.strictEqual((await s.getRaw("/firstwave?n=abc")).status, 400);
 
   // once the help request is answered and fresh vitals arrive, people become eligible
   await s.post("/dispatch", { responder: "rover-01", block: b });
-  await vit("watch-60", OK);
+  await vit("watch-0060", OK);
   const f2 = await s.get("/firstwave");
-  assert.deepStrictEqual(f2.ranked.map((p) => p.device), ["watch-52", "watch-51", "watch-60", "watch-55", "watch-58"]);
+  assert.deepStrictEqual(f2.ranked.map((p) => p.device), ["watch-0052", "watch-0051", "watch-0060", "watch-0055", "watch-0058"]);
   // a volunteer whose latest vitals turn bad drops out
-  await vit("watch-52", { hr_bpm: 70, spo2_pct: 91, temp_c: 36.7 }, now + 1000);
-  assert.ok(!(await s.get("/firstwave")).ranked.some((p) => p.device === "watch-52"));
+  await vit("watch-0052", { hr_bpm: 70, spo2_pct: 91, temp_c: 36.7 }, now + 1000);
+  assert.ok(!(await s.get("/firstwave")).ranked.some((p) => p.device === "watch-0052"));
 });
 
 test("/firstwave is tied to the surface verdict: ranked always, cleared only when people may go up", async () => {

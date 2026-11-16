@@ -26,7 +26,7 @@ const clean = (r) => {
 
 test("blackout: grid warning first, then the battery forecast drops under 8 h", async () => {
   const r = await run("blackout"); clean(r);
-  const b = "L6-borebend-02";
+  const b = "l6-flint-face";
   const f = (await r.s.get(`/forecast?block=${b}`))[0];
   assert.ok(f.hours_left < 8, `forecast ${f.hours_left}`);
   const alerts = await r.s.get(`/history?kind=alert&block=${b}`);
@@ -39,14 +39,16 @@ test("blackout: grid warning first, then the battery forecast drops under 8 h", 
 
 test("fairshare: Directorate vs fair numbers for the same supply", async () => {
   const r = await run("fairshare"); clean(r);
-  assert.match(r.out, /L8-deepwell-03\s+0%\s+DARK\s+69%/, "the table shows the deepest block dark under the Directorate and served under fair share");
-  assert.match(r.out, /Directorate 3\s+\|\s+fair share 0/);
+  assert.match(r.out, /The sector's 70 blocks need 3,212 MW\. Only 1,927 MW is available/);
+  assert.match(r.out, /L0\s+4\s+100%\s+60%/, "the top level is served in full by the Directorate");
+  assert.match(r.out, /L8\s+10\s+0% {2}10 DARK\s+60%/, "the table shows the deepest level dark under the Directorate and served under fair share");
+  assert.match(r.out, /Directorate 18\s+\|\s+fair share 0/);
   assert.strictEqual((await r.s.get("/history")).length, 0, "this shot only reads: it stores nothing");
 });
 
 test("networkcut: relay holds readings, uploads the backlog, history shows no gap", async () => {
   const r = await run("networkcut"); clean(r);
-  const hist = await r.s.get("/history?block=L7-sump-03&kind=air");
+  const hist = await r.s.get("/history?block=l7-chalk-cut&kind=air");
   assert.strictEqual(hist.length, 12);
   const gaps = hist.slice(1).map((x, i) => Date.parse(x.time) - Date.parse(hist[i].time));
   assert.ok(gaps.every((g) => g === 5000), `gaps: ${gaps}`);
@@ -56,7 +58,7 @@ test("networkcut: relay holds readings, uploads the backlog, history shows no ga
 
 test("water: clean cup is silent, salty cup gives do-not-drink", async () => {
   const r = await run("water"); clean(r);
-  const inbox = (await r.s.get("/inbox?device=watch-31")).filter((a) => /Do not drink/.test(a.values.text));
+  const inbox = (await r.s.get("/inbox?device=watch-0031")).filter((a) => /Do not drink/.test(a.values.text));
   assert.strictEqual(inbox.length, 1);
   assert.strictEqual(inbox[0].values.limit.key, "water_tds_max_ppm");
   assert.strictEqual((await r.s.get("/history?kind=water")).length, 2);
@@ -64,7 +66,7 @@ test("water: clean cup is silent, salty cup gives do-not-drink", async () => {
 
 test("outbreak: residents' reports climb while the official count stays at 2", async () => {
   const r = await run("outbreak"); clean(r);
-  const row = (await r.s.get("/truth")).blocks.find((b) => b.block === "L8-deepwell-03");
+  const row = (await r.s.get("/truth")).blocks.find((b) => b.block === "l8-bore-bend");
   assert.deepStrictEqual([row.residents, row.official, row.gap], [12, 2, 10]);
   const counts = [...r.out.matchAll(/residents' count: (\d+)\s+official count: (\d+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
   assert.deepStrictEqual(counts, [[3, 2], [6, 2], [9, 2], [12, 2]], "the narration shows the climb step by step");
@@ -73,8 +75,8 @@ test("outbreak: residents' reports climb while the official count stays at 2", a
 test("care: help requests ranked, then a robot dispatched", async () => {
   const r = await run("care"); clean(r);
   const q = await r.s.get("/queue");
-  assert.deepStrictEqual(q.map((x) => x.device), ["watch-43", "watch-41"], "the dispatched request left the queue");
-  assert.ok((await r.s.get("/inbox?device=watch-42")).some((a) => /rover-01 sent to watch-42/.test(a.values.text)));
+  assert.deepStrictEqual(q.map((x) => x.device), ["watch-0043", "watch-0041"], "the dispatched request left the queue");
+  assert.ok((await r.s.get("/inbox?device=watch-0042")).some((a) => /rover-01 sent to watch-0042/.test(a.values.text)));
 });
 
 test("surface: readings arrive, the verdict and the first-wave list update", async () => {
@@ -84,7 +86,7 @@ test("surface: readings arrive, the verdict and the first-wave list update", asy
   const record = (await r.s.get("/surface/history")).filter((e) => e.type === "verdict").map((e) => e.verdict);
   assert.deepStrictEqual(record, ["not enough data", "suits OK", "sealed domes needed"]);
   const f = await r.s.get("/firstwave");
-  assert.deepStrictEqual(f.ranked.map((p) => p.device), ["watch-52", "watch-51", "watch-55"]);
+  assert.deepStrictEqual(f.ranked.map((p) => p.device), ["watch-0052", "watch-0051", "watch-0055"]);
   assert.strictEqual(f.cleared, true);
 });
 
@@ -97,7 +99,7 @@ test("all: every shot in order against one fresh server, and everything it sent 
   assert.ok(st.readings.simulated > 50);
   assert.ok(Object.values(st.blocks).every((b) => b.source === "simulated"));
   assert.strictEqual(st.surface.verdict, "sealed domes needed");
-  assert.ok(st.forecast.find((f) => f.block === "L6-borebend-02").hours_left < 8);
+  assert.ok(st.forecast.find((f) => f.block === "l6-flint-face").hours_left < 8);
 });
 
 test("scenarios send the API key when INGEST_KEY is set, and explain themselves when it is missing", async () => {

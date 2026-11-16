@@ -166,3 +166,24 @@ sections below replace it.
 - **The signing test vector changed** to contract ids and names (`relay-l8-bore-bend`, `battery_wh`, ...).
 - `shared/FORMAT.md` was removed: `CONTRACT.md` is the one description of the format.
 - Additions written into `CONTRACT.md` in this task: sections 1.1 to 1.3 and 2.1, and the changelog.
+
+## Task 2: blocks
+
+- The sector is `contract/blocks.json`, read from the repository (one level above `api/`), not a copy. A copy
+  inside `api/` could drift from the file the twin and the firmware build against. The price: a host needs the
+  `contract` folder as well as `api` (the Dockerfile copies both; `BLOCKS` can point at the file elsewhere).
+- `shared/sector.json` (9 invented blocks) is gone. Fair share now runs over all 70 blocks. What a block needs
+  comes from its people: 100 W per person demand, 45 W per person critical. Both are design choices in
+  `shared/limits.json`. 45% critical is the same life-support floor the twin's own fair-share rule uses. With one
+  figure per person for every block, fair share serves every resident equally (equity index 1).
+- An unknown `block` is rejected, with a hint when only the case or spacing is wrong. `surface` is accepted for
+  any kind; a `surface` reading filed under an ordinary block is kept with a warning.
+- Device ids: the five patterns of section 3. A relay or sensor id must also name a real block, and the same block
+  as the message. All mismatches are warnings on the stored record (`warnings`), never rejections.
+- Not checked: whether a kind comes from the right type of device (for example `power` from a watch). Section 3
+  only defines the id patterns, and the test tools post kinds from mixed devices.
+- A tunnel's `from_block` / `to_block` that is not a block id is a warning, not a rejection: the rover's
+  "closed" report is still worth having.
+- `level` in responses is the contract's code (`"L8"`), as in `contract/blocks.json`. It used to be a number.
+- The people register (`shared/people.json`) uses `watch-<4 digits>` ids (`watch-0051` to `watch-0060`).
+- The demo scenarios got the minimum change needed to run against real block ids; their full update is task 7.

@@ -1,11 +1,11 @@
 // Fake devices for every lane until real parts post. `node tools/replay.js [api-url]`
-// Sends one reading per kind every 2 s for block L8-deepwell-03, slowly drifting toward trouble.
+// Sends one reading per kind every 2 s for block l8-bore-bend, slowly drifting toward trouble.
 // Every 10th cycle it simulates a network cut: it holds readings, then uploads the backlog in one POST.
 const API = process.argv[2] || "http://localhost:8787";
 let n = 0, seq = 0, backlog = [];
 
 function reading(device, kind, values) {
-  return { id: `${device}-${String(++seq).padStart(6, "0")}`, device, block: "L8-deepwell-03",
+  return { id: `${device}-${String(++seq).padStart(6, "0")}`, device, block: "l8-bore-bend",
     time: new Date().toISOString(), kind, values, source: "simulated" }; // scripted data is always tagged simulated
 }
 
@@ -21,7 +21,7 @@ setInterval(async () => {
   const batch = [
     reading("relay-07", "power", { battery_pct: Math.max(0, 90 - n), draw_w: 40 + Math.random() * 5,
       grid_hz: +(60 - 0.3 * drift + (Math.random() - 0.5) * 0.02).toFixed(3) }),
-    reading("watch-01", "vitals", { hr_bpm: 78 + Math.round(Math.random() * 6), spo2_pct: 97 - Math.round(3 * drift), temp_c: 36.8 }),
+    reading("watch-0001", "vitals", { hr_bpm: 78 + Math.round(Math.random() * 6), spo2_pct: 97 - Math.round(3 * drift), temp_c: 36.8 }),
     reading("sensor-01", "water", { tds_ppm: Math.round(250 + 900 * drift), turbidity_ntu: +(1 + 5 * drift).toFixed(1) }),
     reading("sensor-01", "air", { co2_ppm: Math.round(800 + 900 * drift) }),
     reading("sensor-01", "flood", { depth_cm: +(2 + 18 * drift).toFixed(1) }),

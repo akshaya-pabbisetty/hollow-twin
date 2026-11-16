@@ -60,7 +60,7 @@ test("hops and via: a relayed message keeps them, a message without them gets 0 
 });
 
 test("old field names still work as aliases, but everything stored and served uses the contract names", async () => {
-  const b = "l5-rail-row";
+  const b = "l5-rail-face";
   const vit = M("watch-0077", b, "vitals", { hr: 128, spo2: 90, temp_c: 39.1 });
   const help = M("watch-0077", b, "button", { type: "help" });
   await s.post("/family", { group: "fam-0077", devices: ["watch-0077", "watch-0078"] });
@@ -106,7 +106,7 @@ test("what the contract does not allow is refused with a reason", async () => {
 });
 
 test("tunnel: a closed tunnel names both ends, the reason and the photo, and reaches residents of both blocks", async () => {
-  const from = "l4-drift-yard", to = "l4-ash-hollow";
+  const from = "l4-coke-yard", to = "l4-rivet-face";
   await s.post("/ingest", [M("watch-0201", from, "vitals", { hr_bpm: 70, spo2_pct: 98, temp_c: 36.6 }), M("watch-0202", to, "vitals", { hr_bpm: 70, spo2_pct: 98, temp_c: 36.6 })]);
   await s.post("/ingest", M("rover-01", from, "tunnel", { from_block: from, to_block: to, status: "open", reason: "clear", photo_url: "https://example.invalid/a.jpg" }));
   assert.strictEqual((await s.get(`/history?kind=alert&block=${from}`)).length, 0, "an open tunnel is not an alert");

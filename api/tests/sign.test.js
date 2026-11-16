@@ -10,7 +10,7 @@ const S = require("../sign");
 
 const KEY = "hollow-test-key-0001";
 const keysFile = path.join(os.tmpdir(), `ht-keys-${process.pid}.json`);
-fs.writeFileSync(keysFile, JSON.stringify({ _note: "test keys", "relay-l8-bore-bend": KEY, "watch-01": "another-secret" }));
+fs.writeFileSync(keysFile, JSON.stringify({ _note: "test keys", "relay-l8-bore-bend": KEY, "watch-0001": "another-secret" }));
 const s = makeServer({ KEYS: keysFile });
 before(() => s.start());
 after(async () => { await s.cleanup(); fs.rmSync(keysFile, { force: true }); });
@@ -66,7 +66,7 @@ test("bad signature: rejected with a reason and not stored", async () => {
   const cases = {
     "sig made with the wrong key": { ...base, sig: S.sign(base, "not-the-key") },
     "values changed after signing (a faked reading)": { ...base, values: { battery_pct: 99, grid_hz: 60 }, sig: good },
-    "block changed after signing": { ...base, block: "L0-crown-01", sig: good },
+    "block changed after signing": { ...base, block: "l0-rail-wells", sig: good },
     "time changed after signing": { ...base, time: new Date(Date.now() - 5000).toISOString(), sig: good },
     "sig is not hex": { ...base, sig: "zz-not-a-signature" },
     "sig is the wrong type": { ...base, sig: 12345 },
@@ -83,24 +83,24 @@ test("bad signature: rejected with a reason and not stored", async () => {
 });
 
 test("a signed reading with no clock (1970) verifies against the time the device sent", async () => {
-  const r = { ...s.R("watch-01", "L1-gallery-02", "vitals", { hr_bpm: 72, spo2_pct: 98, temp_c: 36.6 }), time: "1970-01-01T00:01:00Z" };
+  const r = { ...s.R("watch-0001", "l1-winch-gallery", "vitals", { hr_bpm: 72, spo2_pct: 98, temp_c: 36.6 }), time: "1970-01-01T00:01:00Z" };
   assert.strictEqual((await s.post("/ingest", { ...r, sig: S.sign(r, "another-secret") })).body.added, 1);
-  const got = (await s.get("/history?block=L1-gallery-02"))[0];
+  const got = (await s.get("/history?block=l1-winch-gallery"))[0];
   assert.deepStrictEqual([got.verified, got.time_estimated, got.device_time], [true, true, "1970-01-01T00:01:00Z"]);
 });
 
 test("sig from a device with no key on file: stored, but unverified and marked unchecked", async () => {
-  const r = s.R("sensor-99", "L2-market-01", "air", { co2_ppm: 640 });
+  const r = s.R("sensor", "l2-chalk-gallery", "air", { co2_ppm: 640 });
   assert.strictEqual((await s.post("/ingest", { ...r, sig: S.sign(r, "whatever") })).body.added, 1);
-  const got = (await s.get("/history?block=L2-market-01"))[0];
+  const got = (await s.get("/history?block=l2-chalk-gallery"))[0];
   assert.strictEqual(got.verified, false);
-  assert.match(got.sig_unchecked, /no key on file for sensor-99/);
+  assert.match(got.sig_unchecked, /no key on file for sensor-l2-chalk-gallery/);
 });
 
 test("alerts say whether the reading that caused them was verified; verified survives a restart", async () => {
   const bad = s.R("relay-l8-bore-bend", "l8-bore-bend", "power", { battery_pct: 59, grid_hz: 59.5 });
   await s.post("/ingest", { ...bad, sig: S.sign(bad, KEY) });
-  const unsigned = s.R("relay-08", "L7-sump-03", "power", { battery_pct: 59, grid_hz: 59.5 });
+  const unsigned = s.R("relay", "l7-chalk-cut", "power", { battery_pct: 59, grid_hz: 59.5 });
   await s.post("/ingest", unsigned);
   await s.restart();
   const alerts = await s.get("/history?kind=alert");

@@ -2,6 +2,7 @@
 // Pure functions over the stored readings, so they are easy to test and the twin just displays results.
 // Every number comes from shared/limits.json (via ./limits); nothing here is a hard-coded threshold.
 const LIM = require("./limits");
+const B = require("./blocks");
 
 const HOUR = 3600e3;
 const t = (r) => Date.parse(r.time);
@@ -41,28 +42,37 @@ function forecast(readings, block) {
   return { block, battery_pct: last.values.battery_pct, drain_pct_per_h: +slope.toFixed(2), hours_left, grid_hz, grid_stress, reasons };
 }
 
-// 2. Fair share vs Directorate priority for a given supply (watts).
+// 2. Fair share vs Directorate priority for a given supply (watts), across every block in contract/blocks.json.
+// What a block needs is worked out from how many people live there. Both figures are design choices in limits.json:
+//   demand_w   = people x fairshare_demand_w_per_person     everything the block runs
+//   critical_w = people x fairshare_critical_w_per_person   air, pumps, medical: never shed
+function sector(blocks = B.list) {
+  const demand = LIM.val("fairshare_demand_w_per_person"), critical = LIM.val("fairshare_critical_w_per_person");
+  return blocks.map((b) => ({ ...b, demand_w: b.people * demand, critical_w: b.people * critical, demand_source: "people" }));
+}
+
 // Directorate: serve upper levels fully first; deep levels get what is left.
 // Fair share: every block's critical load first (air, pumps, medical), then the rest per person.
 function allocate(blocks, supply_w, policy) {
   const out = blocks.map((b) => ({ ...b, served_w: 0 }));
+  const sum = (k) => out.reduce((s, b) => s + b[k], 0);
   let left = supply_w;
   if (policy === "directorate") {
-    for (const b of [...out].sort((a, c) => a.level - c.level)) {
+    for (const b of [...out].sort((a, c) => a.depth - c.depth)) { // equal depth: the order of contract/blocks.json
       b.served_w = Math.min(b.demand_w, left); left -= b.served_w;
     }
   } else {
-    const crit = out.reduce((s, b) => s + b.critical_w, 0);
-    const k = Math.min(1, left / crit);
+    const crit = sum("critical_w");
+    const k = crit ? Math.min(1, left / crit) : 1;
     out.forEach((b) => { b.served_w = b.critical_w * k; });
     left -= crit * k;
-    // water-fill the remainder by population, capped at each block's demand
+    // water-fill the remainder by people, capped at each block's demand
     let open = out.filter((b) => b.served_w < b.demand_w);
     while (left > 0.01 && open.length) {
-      const pop = open.reduce((s, b) => s + b.population, 0);
+      const people = open.reduce((s, b) => s + b.people, 0);
       let used = 0;
       for (const b of open) {
-        const give = Math.min(left * (b.population / pop), b.demand_w - b.served_w);
+        const give = Math.min(left * (b.people / people), b.demand_w - b.served_w);
         b.served_w += give; used += give;
       }
       left -= used;
@@ -72,18 +82,21 @@ function allocate(blocks, supply_w, policy) {
   }
   for (const b of out) {
     b.served_w = Math.round(b.served_w);
-    b.served_pct = Math.round((100 * b.served_w) / b.demand_w);
-    b.dark = b.served_w < b.critical_w; // air or pumps not covered
+    b.served_pct = b.demand_w ? Math.round((100 * b.served_w) / b.demand_w) : 100;
+    b.dark = b.served_w < Math.round(b.critical_w); // air or pumps not covered
   }
-  const per = out.map((b) => b.served_w / b.population);
+  const per = out.filter((b) => b.people > 0).map((b) => b.served_w / b.people);
   return {
     policy, supply_w,
+    demand_total_w: Math.round(sum("demand_w")), critical_total_w: Math.round(sum("critical_w")), served_total_w: sum("served_w"),
     rule: policy === "directorate"
       ? "Directorate: upper levels are served in full first; deeper levels get whatever is left."
       : "Fair share: every block's critical load (air, pumps, medical) first, then the rest split per person.",
-    blocks: out.map(({ block, level, served_w, served_pct, dark }) => ({ block, level, served_w, served_pct, dark })),
+    basis: `A block's demand is ${LIM.val("fairshare_demand_w_per_person")} W per person and its critical load ${LIM.val("fairshare_critical_w_per_person")} W per person (design choices, see /limits), from the people in contract/blocks.json.`,
+    blocks: out.map(({ block, name, level, people, demand_w, critical_w, demand_source, served_w, served_pct, dark }) =>
+      ({ block, name, level, people, demand_w: Math.round(demand_w), critical_w: Math.round(critical_w), demand_source, served_w, served_pct, dark })),
     dark_blocks: out.filter((b) => b.dark).map((b) => b.block),
-    equity_index: +(Math.min(...per) / Math.max(...per)).toFixed(2),
+    equity_index: per.length && Math.max(...per) > 0 ? +(Math.min(...per) / Math.max(...per)).toFixed(2) : 0,
   };
 }
 
@@ -123,7 +136,7 @@ function queue(readings, dispatched, now = Date.now()) {
   }).sort((a, b) => b.score - a.score || t(a) - t(b));
 }
 
-const levelOf = (block) => Number((block.match(/^L(\d+)/) || [0, 99])[1]);
+const levelOf = B.levelOf; // how deep a block is, from contract/blocks.json (0 = the top level)
 
 // Pick the top-priority request; among equal scores, the one nearest the responder's level.
 function pickRequest(q, responderBlock) {
@@ -155,4 +168,4 @@ function truth(readings, official, now = Date.now(), windowH = LIM.val("truth_wi
     rule: `A resident counts once if, in the last ${windowH} h, their watch sent a symptom press or SpO2 below ${low.value}% (${low.source}).` };
 }
 
-module.exports = { forecast, allocate, triage, triageDetail, queue, pickRequest, truth, levelOf, gridOff, gridWhy };
+module.exports = { forecast, sector, allocate, triage, triageDetail, queue, pickRequest, truth, levelOf, gridOff, gridWhy };
