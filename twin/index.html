@@ -156,6 +156,9 @@
   #api-url { font: inherit; font-size: 12px; flex: 1; min-width: 0; padding: 4px 6px; border: 1px solid var(--line-2); background: var(--well); border-radius: 2px; color: var(--ink); }
   .lbl-src { font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 2px; background: rgba(20,22,24,.82); color: #e9eae6; white-space: nowrap; }
   .lbl-src.dev { background: #1f7a4d; color: #fff; }
+  .lbl-flag { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 2px; white-space: nowrap; }
+  .lbl-flag.bad { background: #C8102E; color: #fff; }
+  .lbl-flag.fault { background: #6b6f73; color: #fff; }
   .lbl-courier { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: #fff; color: var(--ink); white-space: nowrap; transform: translateY(-18px); box-shadow: 0 2px 8px rgba(0,0,0,.4); }
   .ck { padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
   .ck b { font-weight: 600; }
@@ -1945,7 +1948,38 @@ function pin(n) {
 const fed = n => Object.keys(n.api).length > 0 || !!n.liveMsg;
 const pinAll = () => { for (const n of NBHDS) if (fed(n)) pin(n); };
 
+const escH = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const shortJSON = v => { const t = JSON.stringify(v); return t && t.length > 90 ? t.slice(0, 89) + '…' : t; };
+
+// a tag over a block for a few seconds: a forgery the API refused, or a sensor the API stopped trusting
+function blockTag(n, text, cls, ms) {
+  if (!n.flagTag) n.flagTag = addLabel('', 'lbl-flag', new THREE.Vector3(n.x, caveFloor(n.level) + n.h + 4.2, n.z));
+  n.flagTag.element.textContent = text; n.flagTag.element.className = 'lbl-flag ' + cls; n.flagTag.visible = true;
+  clearTimeout(n.flagTimer); n.flagTimer = setTimeout(() => { n.flagTag.visible = false; }, ms);
+}
+
+// A message with a signature that does not match the device's key. The API refused it; it never becomes a reading.
+// Everything in it was written by whoever forged it, so it is only ever shown as escaped text.
+function onForgery(f) {
+  const n = BYID[f.block];
+  const claim = f.claimed_values ? shortJSON(f.claimed_values) : `${f.claimed_bytes || 'over 2,000'} bytes`;
+  log('crit', `Forged ${escH(KINDS[f.kind] || f.kind || 'message').toLowerCase()} for ${escH(blockName(f.block))} rejected: it claimed to come from ${escH(f.device)}, but the signature does not match that device's key. It claimed ${escH(claim)}. The block's numbers are unchanged.`, n ? [n] : null, 'API');
+  api.feed.unshift({ line: `FORGED, rejected: ${escH(f.device)} in ${escH(blockName(f.block))}`, src: 'API', at: Date.now(), live: false });
+  if (api.feed.length > 5) api.feed.length = 5;
+  renderFeed();
+  if (n) { flash(n, '#E0182F'); blockTag(n, 'FORGED: rejected', 'bad', 9000); }
+}
+
 function onReading(m, fresh) {
+  // a reading the API judged impossible for the sensor (a jump, drift or impossible value): it is stored, but the
+  // API leaves it out of everything, so it must not move this block's numbers or colours either
+  if (m.plausible === false) {
+    const n = BYID[m.block];
+    if (n) { n.fault = m; blockTag(n, 'Sensor fault', 'fault', 12000); }
+    if (fresh) log('warn', `Sensor fault at ${escH(blockName(m.block))}: ${escH(m.sensor_error || 'the reading is not plausible')}. The reading is ignored.`, n ? [n] : null, prov(m));
+    api.dirty = true;
+    return;
+  }
   if (m.device) api.deviceBlock[m.device] = m.block;
   const n = BYID[m.block];
   if (n && (m.kind === 'power' || m.kind === 'air' || m.kind === 'water' || m.kind === 'flood')) {
@@ -1985,12 +2019,12 @@ const senderOf = v => (String(v.cause).match(/^watch-\d{4}/) || [])[0] || (Strin
 
 // What a family check-in says. Its status is "ok", "help", "msg:<text>" or "morse:<text>" (the lane 2 watch).
 function checkinWords(c) {
-  const s = c.status || 'ok';
+  const s = String(c.status || 'ok'); // free text typed on a watch: escaped wherever it is shown as HTML
   if (s === 'ok') return { says: 'is OK', level: 'ok', label: "I'm OK" };
   if (s === 'help') return { says: 'needs help', level: 'crit', label: 'Help!' };
-  if (s.startsWith('morse:')) return { says: `sent “${s.slice(6)}” in Morse`, level: 'info', label: s.slice(6) };
-  if (s.startsWith('msg:')) return { says: `says “${s.slice(4)}”`, level: 'info', label: s.slice(4) };
-  return { says: `checked in: ${s}`, level: 'info', label: s };
+  if (s.startsWith('morse:')) return { says: `sent “${escH(s.slice(6))}” in Morse`, level: 'info', label: s.slice(6) };
+  if (s.startsWith('msg:')) return { says: `says “${escH(s.slice(4))}”`, level: 'info', label: s.slice(4) };
+  return { says: `checked in: ${escH(s)}`, level: 'info', label: s };
 }
 
 function announceCheckin(c) {
@@ -2005,7 +2039,7 @@ function announceCheckin(c) {
 // the strip that shows messages arriving, so the path from a device to this screen is visible
 function feedPush(m) {
   const fam = m.kind === 'alert' && m.values.family && m.values.cause;
-  const line = fam ? `Family: ${senderOf(m.values)} ${checkinWords({ status: m.values.status }).says}`
+  const line = fam ? `Family: ${escH(senderOf(m.values))} ${checkinWords({ status: m.values.status }).says}`
     : m.kind === 'alert' ? `Alert: ${nice(m.values.text)}` : `${KINDS[m.kind] || m.kind} from ${blockName(m.block)} (${m.device})${m.hops ? `, over ${m.hops} relay${m.hops > 1 ? 's' : ''}` : ''}`;
   api.feed.unshift({ line, src: m.kind === 'alert' ? 'API' : prov(m), at: Date.now(), live: m.source === 'live' });
   if (api.feed.length > 5) api.feed.length = 5;
@@ -2045,6 +2079,7 @@ function openStream() {
   const take = e => { const m = JSON.parse(e.data); api.seq = Number(e.lastEventId) || m.seq || api.seq; if (api.seen.has(m.id)) return null; api.seen.add(m.id); return m; };
   es.addEventListener('reading', e => { const m = take(e); if (m) onReading(m, true); });
   es.addEventListener('alert', e => { const a = take(e); if (a) onAlert(a, true); });
+  es.addEventListener('forgery', e => { try { onForgery(JSON.parse(e.data)); } catch (err) { /* malformed: ignore */ } }); // no event id: never replayed
   es.addEventListener('reset', () => apiConnect(api.url)); // the API's data was wiped: start again
   es.onopen = () => { if (api.es === es) { api.state = 'on'; apiPaint(); } };
   es.onerror = () => {
@@ -2161,7 +2196,7 @@ function courier(a, b, text) {
   const pts = nodes.map(v => new THREE.Vector3(v.x, caveFloor(v.level) + 1.5, v.z));
   const seg = pts.slice(1).map((p, i) => p.distanceTo(pts[i])), len = seg.reduce((s, d) => s + d, 0);
   const m = new THREE.Mesh(new THREE.SphereGeometry(0.8, 16, 12), new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }));
-  const lbl = addLabel(text, 'lbl-courier', new THREE.Vector3(0, 0, 0), m);
+  const lbl = addLabel(escH(text), 'lbl-courier', new THREE.Vector3(0, 0, 0), m);
   const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.7, depthTest: false, toneMapped: false }));
   scene.add(m, line); flash(a);
   couriers.push({ m, lbl, line, pts, seg, len, d: 0, v: len / clamp(len / 26, 3, 7), to: b });
