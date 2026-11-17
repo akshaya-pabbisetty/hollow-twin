@@ -1,6 +1,13 @@
 # Lane 2: Watch
 
-> **On hold (plan of Nov 17).** This is not on the path to the submission. The one hardware add-on still open is two ESP32 relays passing an "I'm OK" with Wi-Fi off; see [`docs/PLAN.md`](../../docs/PLAN.md).
+Two watches are built:
+
+| Watch | What it is | Guide |
+| --- | --- | --- |
+| [`watch.ino`](watch.ino) | An Arduino with an "I'm OK" button, wired by USB to a Raspberry Pi relay ([`../relay/relay.py`](../relay/relay.py)) that signs its messages and holds them through a real network cut | [`docs/HARDWARE.md`](../../docs/HARDWARE.md) |
+| [`web/index.html`](web/index.html) | The family watch on a phone: I'M OK, help, family status, walkie-talkie presets and Morse. Its relays are simulated | below |
+
+The ESP32 wrist watch described next is the original design and is not built.
 
 An ESP32 board with a small screen and battery, a MAX30102 pulse and oxygen sensor, a temperature sensor, three buttons (help, symptom, I'm OK) and a buzzer, on a wrist strap.
 

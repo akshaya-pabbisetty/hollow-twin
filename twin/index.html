@@ -1971,13 +1971,17 @@ function onAlert(a, fresh) {
   api.alerts.unshift(a); if (api.alerts.length > 60) api.alerts.pop();
   const v = a.values, n = BYID[a.block];
   if (v.family && v.cause) { // a family check-in was delivered
-    const c = { id: a.id, from: String(v.cause).replace(/-\d+$/, '') || (String(v.text).match(/^(\S+) is/) || [])[1] || 'A watch', status: v.status || 'ok', block: a.block, to: v.to || [], family: v.family, hops: v.hops || 0, via: v.via || [], sent: v.sent, delivered: a.time, source: a.source, verified: v.cause_verified === true };
+    const c = { id: a.id, from: senderOf(v), status: v.status || 'ok', block: a.block, to: v.to || [], family: v.family, hops: v.hops || 0, via: v.via || [], sent: v.sent, delivered: a.time, source: a.source, verified: v.cause_verified === true };
     api.checkins.unshift(c); if (api.checkins.length > 12) api.checkins.pop();
     if (fresh) announceCheckin(c);
   } else if (fresh) log(v.level === 'danger' ? 'crit' : v.level === 'warn' ? 'warn' : 'info', nice(v.text) + '.', n ? [n] : null, a.source === 'live' ? 'API, from a device' : 'API, simulated');
   if (fresh) feedPush(a);
   api.dirty = true;
 }
+
+// Who sent a family check-in. Message ids are <device>-<counter>, and a device id may itself contain dashes,
+// so the device is matched by the contract's pattern (CONTRACT.md section 3) rather than by cutting the id.
+const senderOf = v => (String(v.cause).match(/^watch-\d{4}/) || [])[0] || (String(v.text).match(/^(\S+) (is|checked)/) || [])[1] || 'A watch';
 
 // What a family check-in says. Its status is "ok", "help", "msg:<text>" or "morse:<text>" (the lane 2 watch).
 function checkinWords(c) {
@@ -2001,7 +2005,7 @@ function announceCheckin(c) {
 // the strip that shows messages arriving, so the path from a device to this screen is visible
 function feedPush(m) {
   const fam = m.kind === 'alert' && m.values.family && m.values.cause;
-  const line = fam ? `Family: ${String(m.values.cause).replace(/-\d+$/, '')} ${checkinWords({ status: m.values.status }).says}`
+  const line = fam ? `Family: ${senderOf(m.values)} ${checkinWords({ status: m.values.status }).says}`
     : m.kind === 'alert' ? `Alert: ${nice(m.values.text)}` : `${KINDS[m.kind] || m.kind} from ${blockName(m.block)} (${m.device})${m.hops ? `, over ${m.hops} relay${m.hops > 1 ? 's' : ''}` : ''}`;
   api.feed.unshift({ line, src: m.kind === 'alert' ? 'API' : prov(m), at: Date.now(), live: m.source === 'live' });
   if (api.feed.length > 5) api.feed.length = 5;
