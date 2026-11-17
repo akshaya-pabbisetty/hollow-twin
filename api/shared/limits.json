@@ -295,6 +295,14 @@
       "value": 20, "unit": "requests/s per device", "type": "design choice",
       "reason": "No real device needs more than 20 single posts a second; a backlog sent as one array counts as one request and is never dropped. Override with the RATE_LIMIT env var."
     },
+    "forgery_max_values_bytes": {
+      "value": 2048, "unit": "bytes", "type": "design choice",
+      "reason": "A forged message's claimed id, time, values and route are shown publicly (GET /forgeries, event: forgery on /live). A real contract message's values are well under 300 bytes; past 2 KB the claim is replaced by its size, so the public log cannot be used to push large payloads to every screen."
+    },
+    "forgery_log_max": {
+      "value": 1000, "unit": "entries", "type": "design choice",
+      "reason": "GET /forgeries serves the newest 1,000 forgeries (about 0.5 MB); the twin only flashes the newest, and the data file still keeps every one. Bounds memory when someone keeps forging."
+    },
     "ingest_clock_warn_ahead_ms": {
       "value": 1000, "unit": "ms", "type": "design choice",
       "reason": "Any time ahead of the receive time is replaced by the receive time and marked time_estimated (CONTRACT.md 1.3). The warning that the device's clock is fast is only added when it is more than 1 second ahead: two honest clocks always disagree by a few milliseconds (NTP-synced devices by tens of milliseconds, two Node processes on one Windows machine by 1 to 3 ms), and a warning the builder cannot act on is noise."

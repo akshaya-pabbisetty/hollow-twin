@@ -436,3 +436,33 @@ since that branch was cut, so task 4 brings it over as it was, adapted where tas
 - `tests/thresholds.test.js` parses the 6.1 table row by row and checks each limit cell against
   `shared/limits.json`, each status cell for "agreed by the team" and its source, that the old rows are gone, and
   that the changelog row is there. README, FIRMWARE.md and TWIN.md (lane 4) no longer describe two sets of numbers.
+
+## Task 3: forged readings are visible
+
+- Where: `accept()` already refused a wrong `sig` for a device with a key on file. It now also returns the public
+  record of the forgery, and the ingest handler publishes it (`publishForgery`). Nothing else changed in the
+  refusal: same reason sentence, same `rejected` entry, same `422` when nothing else in the request was stored.
+- A forgery is not a record: no `seq`, not in `readings`, not in `seen`. Reasons: a seq would make it part of the
+  replayable timeline and of every `Last-Event-ID` (the brief says never store it as a reading); and if its id
+  were marked seen, anyone could forge a message id first and get the genuine message dropped as a duplicate.
+  The test posts the genuine message with the same id afterwards and it is accepted.
+- `event: forgery` goes to `/live` clients only, with no `id:` line. `/feed` sends unnamed events that older
+  clients treat as records; and an event without an id leaves the browser's Last-Event-ID alone, so reconnects
+  stay exact. Missed forgeries are fetched from `GET /forgeries?after=<n>`.
+- Persisted as `{ "_forgery": ... }` lines in the data file (like `_meta`), so the public log survives a restart;
+  `load()` skips them as readings. Entries are numbered `n` across restarts.
+- **Rate limit, like ingest:** the same number (20 per device per second, `RATE_LIMIT` overrides it), the same
+  one-second window, keyed by the claimed device. One deliberate difference: ingest never limits an array
+  (a backlog is real data that must not be lost); for forgeries every message counts, also inside an array,
+  because one array of thousands would otherwise flash thousands of times on every screen. Over-limit forgeries
+  are still refused and listed in the reply's `rejected`; they are only not logged, and are counted in
+  `rate_limited` (in memory, since the server started). The table is keyed by devices that have a key on file
+  (only those can produce a forgery), so it cannot grow without bound.
+- Two new design-choice limits: `forgery_max_values_bytes` (2 KB: past it the claim is replaced by its size, so
+  the public log cannot carry large payloads to every screen) and `forgery_log_max` (1,000 entries served and
+  held in memory; the data file keeps all).
+- Docs: CONTRACT.md 1.1, 4.1 (the event and the log), 4.2 (the endpoint), changelog; README; TWIN.md (lane 4)
+  has the listener and how to show "FORGED: rejected". It warns not to pass a forgery through the guide's
+  `once()` helper, which marks ids as seen and would then skip the genuine message.
+- Not done: `GET /status` does not count forgeries. Not asked for; the twin gets them from `/live`, and
+  `GET /forgeries` has the count.

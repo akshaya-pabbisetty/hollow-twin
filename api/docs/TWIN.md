@@ -49,6 +49,9 @@ function connect() {
   live.addEventListener("reading", (e) => { const m = once(e); if (m) updateBlock(m); });
   // lane 1 addition: the API's own warnings arrive on the same stream as `event: alert`
   live.addEventListener("alert", (e) => { const a = once(e); if (a) showAlert(a); });
+  // lane 1 addition: a forged reading (wrong signature) was refused. Flash it; never draw it as data, and do not
+  // pass it through once(): the genuine message with the same id may still arrive and must not be skipped.
+  live.addEventListener("forgery", (e) => showForgery(JSON.parse(e.data)));
 
   // The API's data file was wiped (a free-tier disk reset): forget everything and reload.
   live.addEventListener("reset", () => { seen.clear(); lastSeq = 0; live.close(); start(); });
@@ -91,6 +94,29 @@ Rules you can rely on:
   the connection.
 - No SSE available (a locked-down network)? Poll `GET API/history?after_seq=<lastSeq>` every few seconds: it
   returns the same records.
+
+### Forged readings: show "FORGED: rejected"
+
+When a message arrives with a `sig` that does not match the key the API holds for that device (someone faking a
+relay's numbers, or changing them in transit), the API refuses it as before, and now also says so in public
+(CONTRACT.md section 4.1):
+
+```
+event: forgery
+data: {"time":"2026-11-17T20:03:11.402Z","device":"relay-l8-bore-bend","block":"l8-bore-bend","kind":"power","id":"relay-l8-bore-bend-000124","claimed_time":"2026-11-17T20:03:10Z","claimed_values":{"battery_wh":9900,"draw_w":96,"supply_w":96},"hops":0,"via":[],"reason":"bad signature for relay-l8-bore-bend: sig does not match id|device|block|time|kind|values","rejected":true,"n":7}
+```
+
+- Flash the block named in `block` with **FORGED: rejected**, and if there is room, what it claimed
+  (`claimed_values`) and `reason`. The block's real numbers do not change: a forgery is never a reading, never in
+  `/history`, `/blocks` or `/status`, and never raises an alert.
+- Draw `claimed_values` as text (`textContent`), never as HTML: it is whatever the forger sent. Past 2 KB it is
+  `null` and `claimed_bytes` says how big the claim was.
+- A forgery event has no `id:` line, so it does not move `lastSeq`, and it is not replayed on reconnect.
+  To catch up on forgeries missed while disconnected, or to list them on a page, use
+  `GET API/forgeries?after=<n>` (the newest 1,000, oldest first; `n` numbers them; `count` is the total ever).
+- At most 20 per device per second are shown (the ingest rate limit); the rest are still refused and are counted
+  in `GET /forgeries` as `rate_limited`.
+- `/feed` (the older stream with unnamed events) never carries forgeries.
 
 ### The twin's four tasks, in API terms
 

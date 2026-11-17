@@ -10,11 +10,11 @@
 //                         An unknown block is rejected; a device id that does not fit section 3 is a warning.
 //                         The old value names (hr, spo2, button type) are accepted as aliases and renamed.
 //                         If the INGEST_KEY env var is set, every POST needs the header x-api-key.
-//                         Optional "sig" (HMAC-SHA256, see sign.js): valid = stored verified:true, wrong = rejected,
-//                         none = stored verified:false.
+//                         Optional "sig" (HMAC-SHA256, see sign.js): valid = stored verified:true, wrong = rejected
+//                         and made public as a forgery (GET /forgeries, event: forgery), none = stored verified:false.
 // GET  /live              server-sent events: `event: reading` per accepted message, `event: alert` per alert. Each event
 //                         has an id (the record's seq); reconnect with the Last-Event-ID header or ?lastEventId= to get
-//                         everything missed, in order
+//                         everything missed, in order. `event: forgery` (no id) for each refused forged message.
 // GET  /blocks/<id>/latest  the latest message of each kind for one block
 // GET  /help              open help requests, highest priority first (?status=assigned|all, &to=rover-01)
 // POST /help/<id>/assign  { to: "rover-01" }  marks a help request as assigned and tells the resident
@@ -42,6 +42,8 @@
 // GET  /status            everything the twin needs in one poll: forecast per block, alerts in the last hour, help queue,
 //                         truth totals, surface verdict, live vs simulated per block, verified vs unverified counts
 // GET  /limits            every threshold in use, with its published source (shared/limits.json)
+// GET  /forgeries         ?after=<n>  the public log of forged readings (wrong sig): refused, never stored as readings;
+//                         each one also goes out on /live as `event: forgery`
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
@@ -75,6 +77,14 @@ const forecastTold = new Map(); // block -> the worst battery level its resident
 const learned = {};             // family group -> Set of watches that have checked in naming it
 let surfaceVerdict = null; // the last verdict written to the public record
 let lastSeq = 0;       // every stored record gets the next number; it is the SSE event id and is saved with the record
+// Forged readings (CONTRACT.md section 4.1): a message whose sig is wrong for a device we hold a key for is refused,
+// and the refusal is made public (GET /forgeries, `event: forgery` on /live) so the twin can show "FORGED: rejected".
+// A forgery is never a reading: it is not in `readings`, has no seq, and its id is not marked seen (so a forger
+// cannot burn the id of a real message that has not arrived yet).
+const forgeries = [];  // the public log, oldest first: the newest forgery_log_max entries (the data file keeps them all)
+let forgeryCount = 0;  // every forgery ever logged; each entry's `n`
+let forgeryLimited = 0; // forgeries refused but not logged because of the rate limit, since this server started
+const forgeryRate = new Map(); // claimed device -> { start, count } for the current one-second window
 
 function load() {
   fs.mkdirSync(path.dirname(DATA), { recursive: true }); // e.g. DATA=/home/data/readings.jsonl on a fresh host
@@ -88,6 +98,7 @@ function load() {
     try { r = JSON.parse(line); } catch { console.error("skipping a damaged line in the data file"); continue; }
     if (!r || typeof r !== "object") continue;
     if (r._meta) { applyMeta(r._meta); continue; }
+    if (r._forgery) { remember(r._forgery); continue; } // the public forgery log, never a reading
     if (!r.source) r.source = "simulated"; // lines written before the field existed
     if (r.verified === undefined && r.kind !== "alert") r.verified = false;
     // lines written before the contract: rename their values so everything served uses contract names
@@ -126,7 +137,10 @@ function accept(r, now) {
   if (r.sig !== undefined) {
     const key = KEYS[r.device];
     if (key) {
-      if (!SIGN.check(r, key)) return { id: r.id, problems: [`bad signature for ${r.device}: sig does not match id|device|block|time|kind|values`] };
+      if (!SIGN.check(r, key)) {
+        const reason = `bad signature for ${r.device}: sig does not match id|device|block|time|kind|values`;
+        return { id: r.id, problems: [reason], forgery: forged(r, reason, now) };
+      }
       verified = true;
     } else sigUnchecked = `no key on file for ${r.device}`; // cannot check it, so it is stored as unverified
   }
@@ -157,6 +171,36 @@ function accept(r, now) {
   }
   if (warnings.length) rec.warnings = warnings;
   return { rec };
+}
+
+// The public record of one forged message: who it claimed to be, where, what it claimed, and why it was refused.
+// What a forger claims is capped (forgery_max_values_bytes) so the log cannot be used to push large payloads.
+function forged(r, reason, now) {
+  const route = C.route(r);
+  const claimed = { id: r.id, claimed_time: r.time, claimed_values: r.values, hops: route.hops, via: route.via };
+  const bytes = Buffer.byteLength(JSON.stringify(claimed));
+  const shown = bytes <= LIM.val("forgery_max_values_bytes") ? claimed
+    : { id: r.id.slice(0, 100), claimed_time: r.time.slice(0, 40), claimed_values: null, hops: route.hops, via: [], claimed_bytes: bytes };
+  return { time: new Date(now).toISOString(), device: r.device, block: r.block, kind: r.kind, ...shown, reason, rejected: true };
+}
+function remember(f) {
+  forgeries.push(f);
+  forgeryCount = Math.max(forgeryCount, f.n || 0);
+  if (forgeries.length > LIM.val("forgery_log_max")) forgeries.splice(0, forgeries.length - LIM.val("forgery_log_max"));
+}
+// Logs a forgery and sends it to /live, at most RATE_LIMIT per claimed device per second (the ingest limit). Unlike
+// ingest, every forged message counts, also inside an array: a real backlog must never be dropped, but a forgery is
+// not data, and one array of thousands must not flood every screen showing the twin.
+function publishForgery(f, now) {
+  let w = forgeryRate.get(f.device);
+  if (!w || now - w.start >= 1000) forgeryRate.set(f.device, (w = { start: now, count: 0 }));
+  if (++w.count > RATE_LIMIT) { forgeryLimited++; return; }
+  f.n = forgeryCount + 1;
+  remember(f);
+  fs.appendFileSync(DATA, JSON.stringify({ _forgery: f }) + "\n");
+  // only /live (named events): /feed's unnamed events are all readings and alerts, and old clients treat them so.
+  // No `id:` line, so a client's Last-Event-ID stays the seq of the last real record.
+  for (const [c, named] of clients) if (named) c.write(`event: forgery\ndata: ${JSON.stringify(f)}\n\n`);
 }
 
 function alert(r, level, text, extra = {}, suffix = "0") {
@@ -368,7 +412,10 @@ function route(req, res) {
     const recs = [];
     for (const r of [].concat(body)) {
       const a = accept(r, now);
-      if (a.problems) rejected.push({ id: a.id, problems: a.problems }); else recs.push(a.rec);
+      if (a.problems) {
+        rejected.push({ id: a.id, problems: a.problems });
+        if (a.forgery) publishForgery(a.forgery, now); // still rejected; made public, never stored as a reading
+      } else recs.push(a.rec);
     }
     recs.sort((a, b) => Date.parse(a.time) - Date.parse(b.time)); // stable: equal times keep the order they were sent in
     for (const r of recs) {
@@ -537,6 +584,13 @@ function route(req, res) {
         live: count((r) => r.source === "live"), simulated: count((r) => r.source !== "live") },
       feed_clients: clients.size,
     });
+  }
+  // CONTRACT.md section 4.1: the public log of forged readings (refused, never stored as readings). ?after=<n> for new ones.
+  if (p === "/forgeries") {
+    const after = Number(q.after) || 0;
+    return send(res, 200, { count: forgeryCount, rate_limited: forgeryLimited, kept: forgeries.length,
+      forgeries: forgeries.filter((f) => f.n > after),
+      rule: `A message whose sig does not match the key on file for its device is refused and never stored as a reading. Each refusal is logged here and sent on GET /live as event: forgery, at most ${RATE_LIMIT} per device per second; the newest ${LIM.val("forgery_log_max")} are kept here.` });
   }
   if (p === "/limits") return send(res, 200, LIM.all);
   if (p === "/truth") return send(res, 200, L.truth(readings, official, q.now ? Date.parse(q.now) : Date.now()));

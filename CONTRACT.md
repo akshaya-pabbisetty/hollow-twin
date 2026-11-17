@@ -41,7 +41,7 @@ Both are optional. A message without them is a valid contract message.
 | Field | Meaning |
 | --- | --- |
 | `source` | `live` (real hardware) or `simulated` (scripts, replays, the twin's own simulation). Left out, the API stores `simulated`, so only a real device can claim to be live. Any other value is rejected. |
-| `sig` | Proof that the device itself sent the message: lowercase hex HMAC-SHA256, keyed with that device's secret, over `id|device|block|time|kind|VALUES` (VALUES = the `values` JSON, keys sorted, no spaces). `hops` and `via` are not signed, because relays change them. Left out: stored with `verified: false`. Correct: `verified: true`. Wrong: rejected. Exact rule, test vector and ESP32 code: [`api/docs/FIRMWARE.md`](api/docs/FIRMWARE.md). |
+| `sig` | Proof that the device itself sent the message: lowercase hex HMAC-SHA256, keyed with that device's secret, over `id|device|block|time|kind|VALUES` (VALUES = the `values` JSON, keys sorted, no spaces). `hops` and `via` are not signed, because relays change them. Left out: stored with `verified: false`. Correct: `verified: true`. Wrong: rejected, and the rejection is made public as a forgery (section 4.1). Exact rule, test vector and ESP32 code: [`api/docs/FIRMWARE.md`](api/docs/FIRMWARE.md). |
 
 ### 1.2 Fields the API adds to a stored message (lane 1)
 
@@ -139,6 +139,15 @@ The real API is in [`api/`](api/) and listens on port 8787 by default. Every res
 
 **`GET /live`** sends `event: reading` for every accepted message, with the stored message as `data` (section 1.2 lists the fields the API adds). Alerts (section 2.1) arrive on the same stream as `event: alert`. Every event has an `id` (the message's `seq`). A client that reconnects with the `Last-Event-ID` header, or with `?lastEventId=<id>`, first receives everything it missed, in order, then live events. A first connection without an id gets live events only; `?lastEventId=0` replays everything. If the client's id is ahead of the server (the server's data was reset) it receives `event: reset` and then everything from the start. A relay backlog posted as one array is played out oldest first.
 
+**Forged readings.** A message whose `sig` does not match the key the API holds for its device is still rejected (`bad signature for <device>` in `rejected`), and its values are never stored as a reading: not in `/history`, not "latest" anywhere, no alert. The rejection itself is made public, so the twin can show "FORGED: rejected":
+
+- `GET /live` sends `event: forgery` with `data` = `{ time, device, block, kind, id, claimed_time, claimed_values, hops, via, reason, rejected: true, n }`: `time` is when the API refused it, `claimed_time` and `claimed_values` are what the message claimed, `reason` is the same sentence as in `rejected`, `n` numbers the forgeries. The event has no `id:` line, so it does not change a client's `Last-Event-ID` and is not replayed on reconnect. `/feed` never carries it.
+- `GET /forgeries` is the public log: `{ count, rate_limited, kept, forgeries: [...oldest first], rule }`, the newest 1,000 entries; `?after=<n>` returns only newer ones.
+- Rate limit, like `POST /ingest`: at most 20 forgeries per device per second are logged and sent; every forged message counts, also inside an array. The rest are still rejected and counted in `rate_limited`.
+- A claim over 2 KB is not repeated: `claimed_values` is `null` and `claimed_bytes` gives its size.
+- A forger cannot burn a message id: the genuine message with that id is still accepted when it arrives.
+- Only a wrong `sig` for a device with a key on file is a forgery. No `sig` (stored `verified: false`) and a `sig` from a device with no key (stored with `sig_unchecked`) are not.
+
 ```
 id: 41
 event: reading
@@ -200,6 +209,7 @@ All optional to use. Details and examples are in [`api/README.md`](api/README.md
 | `GET /surface`, `GET /surface/history` | The surface verdict in full, and its public record. |
 | `GET /firstwave` | Who goes up first: healthy volunteers, never sole caregivers, needed skills first. |
 | `GET /limits` | Every threshold the API uses, with its source. |
+| `GET /forgeries` | The public log of forged readings (wrong `sig`): refused, never stored as readings. See 4.1. |
 | `GET /feed`, `GET /queue`, `POST /dispatch` | Earlier names kept working: `/feed` is `/live` with unnamed events, `/queue` is `/help`, `/dispatch` assigns the top request. |
 
 ## 5. When the Directorate cuts the network
@@ -269,3 +279,4 @@ Additions, except the rows marked **Removed**, which say what was taken out and 
 | 2026-11-17 | 4.2 | `GET /fairshare`: one per-person model for the table, `levels` summary, and a separate `measured` section for blocks with a real relay. |
 | 2026-11-17 | 1.2, 1.3, 5 | Clock rule: any `time` ahead of the receive time (not only more than 5 minutes ahead) is replaced by the receive time, with `time_estimated: true` and `device_time`. "Latest" per block and kind is the greatest stored `time`, ties broken by `seq`; a late relay backlog never replaces a fresher reading. |
 | 2026-11-17 | 6, 6.1 | The sourced limits in 6.1 are agreed by the team; the twin reads them from `GET /limits`. **Removed:** the twin's old thresholds table (CO2 2,000 / 4,000 ppm, air temperature 39 / 43 °C, flood 25 / 45 cm) and the "water is still open" line (6.2 fills it in). |
+| 2026-11-17 | 1.1, 4.1, 4.2 | Forged readings are visible: a message with a wrong `sig` is still rejected and never stored as a reading, and the rejection goes out on `GET /live` as `event: forgery` and into the public log `GET /forgeries`, rate-limited like `POST /ingest`. |

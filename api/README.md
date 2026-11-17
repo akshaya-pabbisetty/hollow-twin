@@ -195,6 +195,7 @@ shortened with `...`.
 | `GET /surface`, `GET /surface/history` | The surface verdict in full, and its public record |
 | `GET /firstwave` | Who goes up first |
 | `GET /limits` | Every threshold, with its source |
+| `GET /forgeries` | The public log of forged readings (wrong `sig`): refused, never stored as readings |
 | `GET /feed`, `GET /queue`, `POST /dispatch` | Earlier names, kept working |
 
 ### POST /ingest
@@ -283,7 +284,8 @@ These are the limits the team agreed (`CONTRACT.md` section 6.1). The twin uses 
 
 Server-sent events. `event: reading` for every accepted message, `event: alert` for every alert. Every event has an
 `id` (the message's `seq`). Reconnect with the `Last-Event-ID` header, or `?lastEventId=`, to receive everything
-missed, in order. See `docs/TWIN.md`.
+missed, in order. See `docs/TWIN.md`. A message refused for a wrong `sig` is sent as `event: forgery` (no `id`, never
+replayed; see `GET /forgeries`).
 
 ```
 GET /live?lastEventId=41
@@ -600,6 +602,27 @@ GET /limits
 { "water_tds_max_ppm": { "value": 1000, "unit": "ppm", "op": ">", "type": "safety fact", "source": "WHO, ...", "url": "https://...", "verified": true, "note": "..." },
   "battery_warn_hours": { "value": 24, "unit": "h", "op": "<", "type": "design choice", "reason": "CONTRACT.md section 6, ..." },
   "...": "..." }
+```
+
+### GET /forgeries
+
+The public log of forged readings: messages whose `sig` does not match the key on file for their device. Each one
+is refused on `POST /ingest` (`bad signature for <device>`) and never stored as a reading; it is logged here and
+sent on `GET /live` as `event: forgery`. At most 20 per device per second are logged (`ingest_rate_limit_per_s`,
+counting every message, also inside an array); the rest are counted in `rate_limited` (since the server started).
+The newest 1,000 are kept here (`forgery_log_max`); the data file keeps all. A claim over 2 KB
+(`forgery_max_values_bytes`) is replaced by `claimed_bytes`. `?after=<n>` returns only newer entries.
+
+```
+GET /forgeries?after=6
+```
+
+```json
+{ "count": 7, "rate_limited": 0, "kept": 7,
+  "forgeries": [{ "time": "2026-11-17T20:03:11.402Z", "device": "relay-l8-bore-bend", "block": "l8-bore-bend", "kind": "power",
+    "id": "relay-l8-bore-bend-000124", "claimed_time": "2026-11-17T20:03:10Z", "claimed_values": { "battery_wh": 9900, "draw_w": 96, "supply_w": 96 },
+    "hops": 0, "via": [], "reason": "bad signature for relay-l8-bore-bend: sig does not match id|device|block|time|kind|values", "rejected": true, "n": 7 }],
+  "rule": "A message whose sig does not match the key on file for its device is refused and never stored as a reading. ..." }
 ```
 
 ### Anything else
