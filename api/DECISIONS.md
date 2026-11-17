@@ -368,3 +368,16 @@ contract carries the same table for the team.
 - Alert level for a verdict change: suits info, domes warn, outposts and stay danger.
 - The surface test server runs with `RATE_LIMIT=1000`: one scout posts more than 20 readings a second there, and
   the 429 was silently dropping readings.
+
+## Task 2: fair share for the demo
+
+- The 70-block table is one model: every block sized from its people (100 W and 45 W per person, as before). The
+  task-3 rule that swapped in a relay's measured `draw_w` is gone, and so is `?measured=`. A desk relay's 96 W
+  against a 77 MW estimate made the deepest block look free to serve; now a relay never changes the table.
+- What a relay measures is a separate `measured` section: battery, draw, supply, net drain, hours left and level
+  from the forecast, the relay's own supply-over-draw as `served_pct`, and a `tag` of `LIVE` or `SIMULATED` from the
+  message's source. One entry per block with a power message, oldest first.
+- `levels` sums each policy per level (blocks, people, percent served, dark blocks) so the shot reads at a glance;
+  the demo shot prints that table and the measured section.
+- Implausible power messages (`plausible: false`, task 3) are left out of `measured`.
+- No new limits.

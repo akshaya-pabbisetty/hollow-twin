@@ -102,7 +102,7 @@ test("the guides cover what each lane was promised", () => {
 test("README numbers match what the server returns (fair share example)", async () => {
   const readme = read("README.md");
   assert.ok(readme.includes("GET /fairshare?supply_pct=60"), "the README shows this example request");
-  const fair = await s.get("/fairshare?supply_pct=60&measured=0"); // the README shows a sector with no power readings yet
+  const fair = await s.get("/fairshare?supply_pct=60");
   const deep = fair.fair.blocks.find((x) => x.block === "l8-bore-bend");
   assert.ok(readme.includes(`"served_w": ${deep.served_w}, "served_pct": ${deep.served_pct}`), `README should show ${deep.served_w} W / ${deep.served_pct}%`);
   assert.ok(readme.includes(`"demand_total_w": ${fair.fair.demand_total_w}`), `README should show the sector demand ${fair.fair.demand_total_w}`);

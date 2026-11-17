@@ -82,13 +82,13 @@ test("hum upgrade: grid frequency sag warns BEFORE any battery is used", async (
 
 test("shot 4, fair share across all 70 contract blocks: Directorate darkens deep levels, fair share darkens none", async () => {
   // what the sector needs comes from the people in contract/blocks.json: 100 W each, 45 W of it critical
-  // (measured=0: this server already holds power readings from the tests above; tests/logic.test.js covers those)
+  // (this server already holds power readings from the tests above; they must not change the table)
   const blocks = JSON.parse(fs.readFileSync(path.join(__dirname, "../../contract/blocks.json"), "utf8")).blocks;
   const people = blocks.reduce((s, b) => s + b.people, 0);
-  const totals = (await get("/fairshare?supply_w=0&measured=0")).fair;
+  const totals = (await get("/fairshare?supply_w=0")).fair;
   assert.deepStrictEqual([totals.blocks.length, totals.demand_total_w, totals.critical_total_w], [70, people * 100, people * 45]);
   const supply = Math.round(totals.demand_total_w * 0.6); // only 60% of what the sector needs is available
-  const r = await get(`/fairshare?supply_w=${supply}&measured=0`);
+  const r = await get(`/fairshare?supply_w=${supply}`);
   assert.deepStrictEqual(r.fair.blocks.map((b) => b.block), blocks.map((b) => b.id), "every contract block, in the file's order");
   assert.ok(r.directorate.dark_blocks.length >= 10, `Directorate dark: ${r.directorate.dark_blocks}`);
   assert.ok(r.directorate.dark_blocks.every((b) => L.levelOf(b) >= 7), "only the deepest levels go dark");
@@ -97,7 +97,7 @@ test("shot 4, fair share across all 70 contract blocks: Directorate darkens deep
   assert.ok(r.fair.equity_index > r.directorate.equity_index);
   assert.ok(Math.abs(r.fair.served_total_w - supply) <= 70, `fair share uses all supply, used ${r.fair.served_total_w} of ${supply}`);
   const deep = r.fair.blocks.find((b) => b.block === "l8-bore-bend");
-  assert.deepStrictEqual([deep.name, deep.level, deep.people, deep.demand_w, deep.critical_w, deep.demand_source], ["Bore Bend", "L8", 772000, 77200000, 34740000, "people"]);
+  assert.deepStrictEqual([deep.name, deep.level, deep.people, deep.demand_w, deep.critical_w], ["Bore Bend", "L8", 772000, 77200000, 34740000]);
   assert.ok(deep.served_w >= deep.critical_w && deep.served_pct === 60, JSON.stringify(deep));
 });
 

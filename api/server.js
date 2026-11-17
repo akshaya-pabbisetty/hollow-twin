@@ -25,7 +25,8 @@
 // GET  /history           ?block=&kind=&since=&after_seq=  stored messages in time order (replays a network gap)
 // GET  /blocks            latest message per block and kind, for every block
 // GET  /forecast          ?block=  battery hours left = battery_wh / (draw_w - supply_w), + grid frequency stress
-// GET  /fairshare         ?supply_w= or ?supply_pct=  &policy=directorate|fair  &measured=0   who gets power, all 70 blocks
+// GET  /fairshare         ?supply_w= or ?supply_pct=  &policy=directorate|fair   who gets power, all 70 blocks (one per-person
+//                         model), plus `measured`: what each block's real relay reports, kept apart
 // GET  /queue             the same list as /help (its earlier name)
 // POST /dispatch          {responder, block}  sends the responder to the top request
 // POST /family            {group, devices:[...]}  links watches into a family group
@@ -430,15 +431,17 @@ function route(req, res) {
     return send(res, 200, blocks.map((b) => L.forecast(readings, b)));
   }
   if (p === "/fairshare") {
-    // demand per block: its people, or its measured draw_w once it has sent a power message (?measured=0 = people only)
-    const sector = L.sector(readings, !["0", "false", "off", "no"].includes(q.measured));
+    // The 70-block table is one model: every block sized from its people (megawatts). What real relays measure
+    // (watts) is a separate section, `measured`, so an estimate and a reading are never compared in one table.
+    const sector = L.sector();
     // the supply, in watts (supply_w) or as a share of what the sector needs (supply_pct)
     const supply = q.supply_pct !== undefined && q.supply_w === undefined
       ? Math.round((sector.reduce((s, b) => s + b.demand_w, 0) * Number(q.supply_pct)) / 100) : Number(q.supply_w);
     if (!(supply >= 0)) return send(res, 400, { error: "supply_w (watts) or supply_pct (percent of sector demand) required" });
     if (q.policy && !["directorate", "fair"].includes(q.policy)) return send(res, 400, { error: "policy must be directorate or fair" });
-    if (q.policy) return send(res, 200, L.allocate(sector, supply, q.policy));
-    return send(res, 200, { directorate: L.allocate(sector, supply, "directorate"), fair: L.allocate(sector, supply, "fair") });
+    const measured = L.measured(readings);
+    if (q.policy) return send(res, 200, { ...L.allocate(sector, supply, q.policy), measured });
+    return send(res, 200, { directorate: L.allocate(sector, supply, "directorate"), fair: L.allocate(sector, supply, "fair"), measured });
   }
   // CONTRACT.md section 4: GET /help = open help requests, highest priority first. /queue is the same list under its old name.
   // ?status=assigned or ?status=all also shows requests somebody was sent to; &to=rover-01 narrows to one responder.

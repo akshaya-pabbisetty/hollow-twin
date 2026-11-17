@@ -113,8 +113,7 @@ shots.blackout = async () => {
 shots.fairshare = async () => {
   title("fairshare: the same power, shared two ways");
   const MW = (w) => `${Math.round(w / 1e6).toLocaleString("en-US")} MW`;
-  // measured=0: size every block from its people, so the comparison does not depend on which relays have reported
-  const r = await get("/fairshare?supply_pct=60&measured=0"), need = r.fair, supply = r.fair.supply_w;
+  const r = await get("/fairshare?supply_pct=60"), need = r.fair, supply = r.fair.supply_w;
   say(`The sector's ${r.fair.blocks.length} blocks need ${MW(need.demand_total_w)}. Only ${MW(supply)} is available (60%). Who gets it?`);
   say(need.basis);
   step("1. The Directorate's rule");
@@ -137,6 +136,10 @@ shots.fairshare = async () => {
   await beat();
   const deepest = r.directorate.blocks[r.directorate.blocks.length - 1], same = r.fair.blocks.find((b) => b.block === deepest.block);
   say(`One block, ${deepest.name} (${deepest.block}, ${deepest.people.toLocaleString("en-US")} people):  Directorate ${deepest.served_pct}%${deepest.dark ? " DARK" : ""}  |  fair share ${same.served_pct}%${same.dark ? " DARK" : ""}`);
+  if (r.measured.length) {
+    say("Blocks with a real relay reporting (watts, kept apart from the estimate above):");
+    for (const m of r.measured) say(`  ${pad(m.block, 18)} ${pad(m.tag, 10)} battery ${m.battery_wh} Wh, draw ${m.draw_w} W, supply ${m.supply_w} W  ->  ${m.hours_left === null ? "not draining" : m.hours_left + " h left"} (${m.level_name})`);
+  }
   say(`Blocks without air fans or pumps:  Directorate ${r.directorate.dark_blocks.length}  |  fair share ${r.fair.dark_blocks.length}`);
   say(`Equity index (worst-served person / best-served person):  Directorate ${r.directorate.equity_index}  |  fair share ${r.fair.equity_index}`);
   check(r.fair.blocks.length === 70, "all 70 blocks of contract/blocks.json are in the comparison");

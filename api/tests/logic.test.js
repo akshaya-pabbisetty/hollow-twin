@@ -92,33 +92,54 @@ test("grid hum: the optional grid_hz on a contract power message still gives the
   assert.strictEqual(typeof f.grid_hz, "number");
 });
 
-test("fair share: a block with a power reading uses its measured draw_w instead of the per-person estimate", async () => {
-  const b = "l5-ash-court"; // 397,000 people: 39.7 MW by the estimate
-  const before = (await s.get("/fairshare?supply_pct=60&measured=0")).fair;
-  const est = before.blocks.find((x) => x.block === b);
-  assert.deepStrictEqual([est.demand_w, est.critical_w, est.demand_source], [39700000, 17865000, "people"]);
-  const m = s.R("relay", b, "power", { battery_wh: 9e9, draw_w: 50000000, supply_w: 50000000 }, Date.now(), { source: "live" });
-  await s.post("/ingest", m);
+test("fair share: one consistent per-person table; what a real relay measures is reported apart, never mixed in", async () => {
+  const s = makeServer(); await s.start(); // a fresh server: the forecast tests above have relays reporting
+  try {
+  // the sector table before any relay has reported
+  const before = await s.get("/fairshare?supply_pct=60");
+  const est = before.fair.blocks.find((x) => x.block === "l8-bore-bend");
+  assert.deepStrictEqual([est.demand_w, est.critical_w], [77200000, 34740000], "77.2 MW from 772,000 people");
+  assert.deepStrictEqual(before.measured, [], "no relay has reported yet");
+  // the contract's own power sample: a desk relay in l8-bore-bend drawing 96 W
+  const sample = JSON.parse(require("fs").readFileSync(require("path").join(__dirname, "..", "..", "contract", "samples", "power.json"), "utf8"));
+  const desk = { ...sample, id: `${sample.device}-desk-1`, time: new Date().toISOString(), source: "live" };
+  assert.strictEqual((await s.post("/ingest", desk)).body.accepted, 1);
   const r = await s.get("/fairshare?supply_pct=60");
-  const row = r.fair.blocks.find((x) => x.block === b);
-  assert.deepStrictEqual([row.demand_w, row.critical_w, row.demand_source], [50000000, 22500000, "power reading"], "measured draw, and the same 45% of it is critical");
-  assert.deepStrictEqual(row.demand_reading, { id: m.id, device: m.device, time: m.time, source: "live" });
-  assert.ok(r.fair.measured_blocks.includes(b));
-  assert.ok(r.fair.blocks.filter((x) => x.block.startsWith("l0-")).every((x) => x.demand_source === "people"), "blocks without a reading keep the estimate");
-  // a newer reading replaces it; measured=0 ignores readings altogether
-  await s.post("/ingest", s.R("relay", b, "power", { battery_wh: 9e9, draw_w: 30000000, supply_w: 30000000 }, Date.now() + 1000));
-  assert.strictEqual((await s.get("/fairshare?supply_pct=60")).fair.blocks.find((x) => x.block === b).demand_w, 30000000);
-  assert.deepStrictEqual((await s.get("/fairshare?supply_pct=60&measured=0")).fair.blocks.find((x) => x.block === b), est);
+  // the table has not moved: the 96 W reading did not replace the 77.2 MW estimate
+  assert.deepStrictEqual(r.fair.blocks.find((x) => x.block === "l8-bore-bend"), est);
+  assert.deepStrictEqual([r.fair.demand_total_w, r.fair.supply_w], [before.fair.demand_total_w, before.fair.supply_w]);
+  assert.ok(r.fair.blocks.every((x) => x.demand_source === undefined && x.demand_reading === undefined), "one model: no per-block switch between estimate and reading");
+  // the demo outcome holds with the desk relay present: Directorate darkens deep blocks, fair share darkens none
+  assert.strictEqual(r.directorate.dark_blocks.length, 18);
+  assert.ok(r.directorate.dark_blocks.every((x) => /^l[78]-/.test(x)), "the Directorate's dark blocks are all on L7 and L8");
+  assert.ok(r.directorate.dark_blocks.includes("l8-bore-bend"), "Deepwell's blocks go dark under the Directorate");
+  assert.deepStrictEqual(r.fair.dark_blocks, []);
+  assert.ok(r.fair.equity_index > r.directorate.equity_index);
+  // the relay's own numbers are in the separate section, in watts, tagged LIVE, with the forecast made from them
+  assert.strictEqual(r.measured.length, 1);
+  const m = r.measured[0];
+  assert.deepStrictEqual([m.block, m.name, m.level, m.tag, m.source, m.device, m.battery_wh, m.draw_w, m.supply_w, m.net_drain_w, m.hours_left, m.level_name, m.served_pct],
+    ["l8-bore-bend", "Bore Bend", "L8", "LIVE", "live", "relay-l8-bore-bend", 412, 96, 40, 56, 7.4, "alarm", 42]);
+  assert.match(m.note, /never mixed/);
+  // the per-level summary keeps the comparison readable
+  assert.deepStrictEqual(r.directorate.levels.map((x) => [x.level, x.served_pct, x.dark_blocks]).slice(-2), [["L7", 17, 8], ["L8", 0, 10]]);
+  assert.ok(r.fair.levels.every((x) => x.served_pct === 60 && x.dark_blocks === 0));
+  // a simulated relay is tagged as such; ?policy= carries the section too
+  await s.post("/ingest", s.R("relay", "l7-chalk-cut", "power", { battery_wh: 1000, draw_w: 50, supply_w: 50 }));
+  const one = await s.get("/fairshare?supply_pct=60&policy=fair");
+  assert.deepStrictEqual(one.measured.map((x) => [x.block, x.tag, x.hours_left]), [["l8-bore-bend", "LIVE", 7.4], ["l7-chalk-cut", "SIMULATED", null]]);
+  assert.strictEqual(one.blocks.length, 70);
+  } finally { await s.cleanup(); }
 });
 
 test("fair share: supply_pct is a share of what the sector needs; bad requests are refused", async () => {
-  const r = await s.get("/fairshare?supply_pct=60&measured=0");
+  const r = await s.get("/fairshare?supply_pct=60");
   assert.strictEqual(r.fair.supply_w, Math.round(r.fair.demand_total_w * 0.6));
   assert.deepStrictEqual([r.fair.dark_blocks.length, r.directorate.dark_blocks.length], [0, 18]);
-  assert.strictEqual((await s.get("/fairshare?supply_pct=100&measured=0&policy=directorate")).dark_blocks.length, 0);
+  assert.strictEqual((await s.get("/fairshare?supply_pct=100&policy=directorate")).dark_blocks.length, 0);
   for (const bad of ["/fairshare", "/fairshare?supply_w=-5", "/fairshare?supply_pct=abc", "/fairshare?supply_pct=60&policy=mine"])
     assert.strictEqual((await s.getRaw(bad)).status, 400, bad);
-  assert.strictEqual(L.sector([], true).every((b) => b.demand_source === "people"), true);
+  assert.strictEqual(L.sector().length, 70);
 });
 
 test("checkin: routed to the watches in `to` and to its family group, with hops and via, and to nobody else", async () => {

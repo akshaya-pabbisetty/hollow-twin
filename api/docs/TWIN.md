@@ -136,7 +136,8 @@ function tagFor(blockId, status) {
 | One block, when its panel opens | `GET /blocks/<block id>/latest` | `latest.power`, `latest.air`, `latest.water`, `latest.flood`, `latest.vitals`, ... each a full contract message; `source` |
 | Power layer: hours left per block | `status.forecast[]` or `GET /forecast?block=` | `hours_left` (null = not draining), `level` (`ok` / `warn` / `alarm` / `unknown`), `dark`, `battery_wh`, `draw_w`, `supply_w`, `reasons[]` |
 | Power layer: "grid unstable" halo | same | `grid_stress` (true/false), `grid_hz` |
-| Fair-share overlay | `GET /fairshare?supply_pct=60` | `directorate.blocks[]` against `fair.blocks[]`: `served_pct`, `dark`; plus `dark_blocks`, `equity_index`, `rule`. All 70 blocks, in the order of `contract/blocks.json` |
+| Fair-share overlay (the one switch) | `GET /fairshare?supply_pct=60` | `directorate.blocks[]` against `fair.blocks[]`: `served_pct`, `dark`; `levels[]` for a per-level summary; plus `dark_blocks`, `equity_index`, `rule`. All 70 blocks, in the order of `contract/blocks.json` |
+| A block with a real relay | same, `measured[]` | the relay's own `battery_wh`, `draw_w`, `supply_w`, `hours_left`, `level_name`, with `tag` `LIVE` or `SIMULATED`. Show it beside the block, never in place of the table's estimate |
 | Air, heat, water, flood state of a block | `/live` events with `kind` `air`, `water`, `flood` | `values`, `source` |
 | Tunnels | `/live` events with `kind: "tunnel"` | `values.from_block`, `values.to_block`, `values.status`, `values.reason`, `values.photo_url` |
 | Alert markers and the alert list | `status.alerts.latest[]` (last hour, newest first), then `event: alert` | `values.level` (`info` / `warn` / `danger`), `values.text`, `values.why`, `values.limit` |
@@ -167,11 +168,11 @@ block can be amber in the twin while the API has raised no alert, or the other w
 The simplest way to show one truth is to colour from the API's alerts and `forecast[].level` rather than from the
 raw values.
 
-**Fair share.** The API's numbers are in watts: 100 W per person, 45 W of it critical, from the people in
+**Fair share.** The API's table is in watts: 100 W per person, 45 W of it critical, from the people in
 `contract/blocks.json` (3,212 MW for the sector). The twin's own units are different, so pass the supply as a
-share: `GET /fairshare?supply_pct=60`. A block that has sent a real `power` message uses its measured `draw_w`
-instead of the estimate, and a desk relay drawing 96 W makes its block look almost free to serve. Add
-`&measured=0` for a comparison from people only.
+share: `GET /fairshare?supply_pct=60`. Shot 4 of the video is two calls with the same supply: show
+`directorate.blocks[]` (Deepwell's blocks dark), then `fair.blocks[]` (none dark). A desk relay's real 96 W never
+changes that table; its numbers are in `measured[]`, to show beside its block with the `LIVE` tag.
 
 ### The public broadcast page
 

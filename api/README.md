@@ -454,12 +454,14 @@ Who gets power for a given supply, across all 70 blocks of `contract/blocks.json
 share side by side. `?policy=directorate` or `?policy=fair` returns just one. A block's demand is 100 W per person
 and its critical load (air, pumps, medical) 45 W per person; both are design choices in `shared/limits.json`.
 
-Give the supply in watts (`supply_w`) or as a share of what the sector needs (`supply_pct`). A block that has sent a
-`power` message uses its measured `draw_w` as demand instead of the estimate (`demand_source: "power reading"`);
-`&measured=0` ignores readings.
+Give the supply in watts (`supply_w`) or as a share of what the sector needs (`supply_pct`).
 
-The example asks for 60% of what the sector needs, before any relay has reported. The Directorate's rule serves
-levels L0 to L6 in full and leaves 18 blocks on L7 and L8 dark; fair share leaves none dark.
+The 70-block table is one consistent model: every block is sized from its people, in megawatts. What a real relay
+measures (watts) never goes into that table. It is reported beside it, under `measured`: one entry per block with a
+relay, with its battery, draw, supply and the hours left worked out from them, tagged `LIVE` or `SIMULATED`.
+
+The example asks for 60% of what the sector needs. The Directorate's rule serves levels L0 to L6 in full and leaves
+18 blocks on L7 and L8 dark; fair share leaves none dark. `levels` sums the comparison per level.
 
 ```
 GET /fairshare?supply_pct=60
@@ -469,17 +471,23 @@ GET /fairshare?supply_pct=60
 { "directorate": { "policy": "directorate", "supply_w": 1927020000, "demand_total_w": 3211700000, "critical_total_w": 1445265000,
                    "rule": "Directorate: upper levels are served in full first; ...",
                    "blocks": [{ "block": "l8-bore-bend", "name": "Bore Bend", "level": "L8", "people": 772000, "demand_w": 77200000,
-                                "critical_w": 34740000, "demand_source": "people", "served_w": 0, "served_pct": 0, "dark": true }, "..."],
+                                "critical_w": 34740000, "served_w": 0, "served_pct": 0, "dark": true }, "..."],
+                   "levels": [{ "level": "L0", "blocks": 4, "people": 428000, "served_pct": 100, "dark_blocks": 0 }, "...", { "level": "L8", "blocks": 10, "people": 7425000, "served_pct": 0, "dark_blocks": 10 }],
                    "dark_blocks": ["l7-ember-wells", "...", "l8-drift-hollow"], "equity_index": 0 },
   "fair": { "policy": "fair", "supply_w": 1927020000, "demand_total_w": 3211700000, "critical_total_w": 1445265000,
             "rule": "Fair share: every block's critical load ... first, then the rest split per person.",
             "blocks": [{ "block": "l8-bore-bend", "name": "Bore Bend", "level": "L8", "people": 772000, "demand_w": 77200000,
-                         "critical_w": 34740000, "demand_source": "people", "served_w": 46320000, "served_pct": 60, "dark": false }, "..."],
-            "dark_blocks": [], "equity_index": 1 } }
+                         "critical_w": 34740000, "served_w": 46320000, "served_pct": 60, "dark": false }, "..."],
+            "levels": ["..."], "dark_blocks": [], "equity_index": 1 },
+  "measured": [
+    { "block": "l8-bore-bend", "name": "Bore Bend", "level": "L8", "people": 772000, "tag": "LIVE", "source": "live", "device": "relay-l8-bore-bend",
+      "time": "2026-11-18T20:00:00Z", "verified": false, "battery_wh": 412, "draw_w": 96, "supply_w": 40, "net_drain_w": 56,
+      "hours_left": 7.4, "level_name": "alarm", "dark": false, "served_pct": 42,
+      "note": "What this block's own relay measured, in watts. The per-person table estimates the whole sector in megawatts; the two are never mixed." } ] }
 ```
 
 `dark` means the block's critical load is not covered. A block with `served_pct` under 100 that is not dark is in
-brownout.
+brownout. `measured[].served_pct` is the relay's own supply over its own draw.
 
 ### POST /family, GET /family, GET /inbox
 

@@ -17,6 +17,7 @@ function gridWhy(hz) {
 
 const isNum = (x) => typeof x === "number" && !Number.isNaN(x);
 const isAmount = (x) => isNum(x) && x >= 0; // a measured quantity that cannot be negative
+const isPositive = (x) => isNum(x) && x > 0;
 const byTime = (a, b) => t(a) - t(b);
 
 // Least-squares slope of y against time, per hour. Negative = falling.
@@ -98,19 +99,26 @@ function forecast(readings, block) {
 // What a block needs is worked out from how many people live there. Both figures are design choices in limits.json:
 //   demand_w   = people x fairshare_demand_w_per_person     everything the block runs
 //   critical_w = people x fairshare_critical_w_per_person   air, pumps, medical: never shed
-// A block that has sent a `power` message is no longer an estimate: its latest measured draw_w is its demand, and its
-// critical load keeps the same share of it. Pass measured = false to ignore readings and use people only.
-function sector(readings = [], measured = true, blocks = B.list) {
+// Every block is sized the same way, from its people, so the 70-block table is one consistent model (megawatts).
+// A real relay's own numbers (watts) never go into this table: they are reported beside it by `measured`.
+function sector(blocks = B.list) {
   const demand = LIM.val("fairshare_demand_w_per_person"), critical = LIM.val("fairshare_critical_w_per_person");
-  const latest = {}; // block -> its newest power reading that carries a usable draw_w
-  if (measured)
-    for (const r of readings)
-      if (r.kind === "power" && isAmount(r.values.draw_w) && (!latest[r.block] || t(r) >= t(latest[r.block]))) latest[r.block] = r;
-  return blocks.map((b) => {
-    const p = latest[b.block];
-    if (!p) return { ...b, demand_w: b.people * demand, critical_w: b.people * critical, demand_source: "people" };
-    return { ...b, demand_w: p.values.draw_w, critical_w: (p.values.draw_w * critical) / demand, demand_source: "power reading",
-      demand_reading: { id: p.id, device: p.device, time: p.time, source: p.source } };
+  return blocks.map((b) => ({ ...b, demand_w: b.people * demand, critical_w: b.people * critical }));
+}
+
+// The blocks that have a real relay reporting: what it measured (battery_wh, draw_w, supply_w) and the forecast
+// from it, tagged LIVE or SIMULATED by the message's source. Kept apart from the per-person table above.
+function measured(readings) {
+  const latest = {}; // block -> its newest power message
+  for (const r of readings)
+    if (r.kind === "power" && r.plausible !== false && (!latest[r.block] || t(r) >= t(latest[r.block]))) latest[r.block] = r;
+  return Object.values(latest).sort(byTime).map((p) => {
+    const f = forecast(readings, p.block), b = B.get(p.block);
+    return { block: p.block, name: b ? b.name : null, level: b ? b.level : null, people: b ? b.people : null,
+      tag: p.source === "live" ? "LIVE" : "SIMULATED", source: p.source, device: p.device, time: p.time, verified: p.verified === true,
+      battery_wh: f.battery_wh, draw_w: f.draw_w, supply_w: f.supply_w, net_drain_w: f.net_drain_w,
+      hours_left: f.hours_left, level_name: f.level, dark: f.dark, served_pct: isPositive(f.draw_w) && isAmount(f.supply_w) ? Math.min(100, Math.round((100 * f.supply_w) / f.draw_w)) : null,
+      note: "What this block's own relay measured, in watts. The per-person table estimates the whole sector in megawatts; the two are never mixed." };
   });
 }
 
@@ -155,11 +163,14 @@ function allocate(blocks, supply_w, policy) {
     rule: policy === "directorate"
       ? "Directorate: upper levels are served in full first; deeper levels get whatever is left."
       : "Fair share: every block's critical load (air, pumps, medical) first, then the rest split per person.",
-    basis: `A block's demand is ${LIM.val("fairshare_demand_w_per_person")} W per person and its critical load ${LIM.val("fairshare_critical_w_per_person")} W per person (design choices, see /limits), from the people in contract/blocks.json. A block that has sent a power message uses its measured draw_w instead (demand_source: "power reading").`,
-    measured_blocks: out.filter((b) => b.demand_source !== "people").map((b) => b.block),
-    blocks: out.map(({ block, name, level, people, demand_w, critical_w, demand_source, demand_reading, served_w, served_pct, dark }) =>
-      ({ block, name, level, people, demand_w: Math.round(demand_w), critical_w: Math.round(critical_w), demand_source,
-        ...(demand_reading ? { demand_reading } : {}), served_w, served_pct, dark })),
+    basis: `A block's demand is ${LIM.val("fairshare_demand_w_per_person")} W per person and its critical load ${LIM.val("fairshare_critical_w_per_person")} W per person (design choices, see /limits), from the people in contract/blocks.json. Every block is sized this way; what real relays measure is reported separately under "measured".`,
+    blocks: out.map(({ block, name, level, people, demand_w, critical_w, served_w, served_pct, dark }) =>
+      ({ block, name, level, people, demand_w: Math.round(demand_w), critical_w: Math.round(critical_w), served_w, served_pct, dark })),
+    // the comparison at a glance, per level
+    levels: [...new Set(out.map((b) => b.level))].map((level) => {
+      const rows = out.filter((b) => b.level === level), served = rows.reduce((s, b) => s + b.served_w, 0), demand = rows.reduce((s, b) => s + b.demand_w, 0);
+      return { level, blocks: rows.length, people: rows.reduce((s, b) => s + b.people, 0), served_pct: demand ? Math.round((100 * served) / demand) : 100, dark_blocks: rows.filter((b) => b.dark).length };
+    }),
     dark_blocks: out.filter((b) => b.dark).map((b) => b.block),
     equity_index: per.length && Math.max(...per) > 0 ? +(Math.min(...per) / Math.max(...per)).toFixed(2) : 0,
   };
@@ -238,4 +249,4 @@ function truth(readings, official, now = Date.now(), windowH = LIM.val("truth_wi
     rule: `A resident counts once if, in the last ${windowH} h, their watch sent a symptom press or SpO2 below ${low.value}% (${low.source}).` };
 }
 
-module.exports = { forecast, sector, allocate, triage, triageDetail, queue, pickRequest, truth, levelOf, gridOff, gridWhy };
+module.exports = { forecast, sector, measured, allocate, triage, triageDetail, queue, pickRequest, truth, levelOf, gridOff, gridWhy };

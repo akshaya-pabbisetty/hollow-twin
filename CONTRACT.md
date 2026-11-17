@@ -192,7 +192,7 @@ All optional to use. Details and examples are in [`api/README.md`](api/README.md
 | `GET /history` | Stored messages in the order they were measured. Filters: `block`, `kind`, `since`, `after_seq`. This is how a network gap is replayed. |
 | `GET /blocks` | The latest message of each kind for every block at once. |
 | `GET /forecast` | Battery hours left per block: `battery_wh / (draw_w - supply_w)`, with `level` `ok`, `warn` or `alarm` (section 6). |
-| `GET /fairshare` | Who gets power for a given supply (`supply_w` or `supply_pct`): the Directorate's rule against fair share, for all 70 blocks. |
+| `GET /fairshare` | Who gets power for a given supply (`supply_w` or `supply_pct`): the Directorate's rule against fair share, for all 70 blocks sized from their people, with a per-level summary. What real relays measure is reported apart, under `measured`, tagged `LIVE` or `SIMULATED`. |
 | `GET /inbox` | `?device=watch-0042`: the alerts for one watch. A relay fetches these and passes them down. |
 | `POST /family`, `GET /family` | Register a family group's watches; see who has checked in. |
 | `POST /official`, `GET /truth` | The Directorate's published case count against the residents' own count. |
@@ -275,3 +275,4 @@ Additions only. Nothing above was renamed or removed. Each row says where the ad
 | 2026-11-17 | 6.1 | Proposed limits with sources for CO2, air temperature (heat index), flood depth and mains frequency, beside the twin's numbers. The twin's table is unchanged. |
 | 2026-11-17 | 6.2 | The open water item filled in: `tds_ppm` over 1,000 ppm (WHO) or `turbidity_ntu` over 5 NTU (US EPA) means do not drink. |
 | 2026-11-17 | 4.1, 4.3 | Surface verdict covers all four return options (`sealed outposts needed` added); only the contract's three surface readings are required, `o2_pct` and `pm25_ugm3` are optional and listed in `not_measured`; each limit says which option it leads to. |
+| 2026-11-17 | 4.2 | `GET /fairshare`: one per-person model for the table, `levels` summary, and a separate `measured` section for blocks with a real relay. |
