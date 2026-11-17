@@ -23,6 +23,7 @@ Wire it first. Buttons go between the pin and GND; no resistors needed.
 | --- | --- | --- |
 | 2 | button, then GND | "I'm OK" |
 | 3 | button, then GND | "Help" (optional) |
+| 4 | button, then GND | "I feel sick" (optional): counts toward the residents' sickness number |
 | 8 | buzzer, then GND | warnings (optional) |
 
 No button? Touch a jumper wire from pin 2 to GND.

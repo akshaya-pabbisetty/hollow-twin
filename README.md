@@ -28,7 +28,7 @@ Our most distinctive part: a six-wheel rocker-bogie rover, designed in CAD down 
 - **Carries communications:** it has the same relay box as every block, so it drives to where the signal is and brings held messages out.
 - **Scouts tunnels** before people use them, and reports open or closed in the same message format as every other device.
 
-In the twin, open any block and press **Send the rover**. The full design (CAD model, parts list, a mission down a flooded tunnel) is at [hollow-twin.vercel.app/scout](https://hollow-twin.vercel.app/scout/). The rover is designed and simulated, not built.
+In the twin, open any block and press **Send the rover**, or send it to a help request from the overview's help list. Connected to the API, the rover takes the request, and when it arrives the API closes the request and tells the resident's watch "rover-01 reached you" (on the Arduino it beeps). The full design (CAD model, parts list, a mission down a flooded tunnel) is at [hollow-twin.vercel.app/scout](https://hollow-twin.vercel.app/scout/). The rover is designed and simulated, not built.
 
 In the story's scenario a geothermal unit fails. Under the Directorate's rule, 12 deep blocks are dark by hour 30 and 8.5 million people have no fans or scrubbers. With the same supply shared fairly, no block goes dark.
 
@@ -91,7 +91,7 @@ Other scenarios: `blackout`, `fairshare`, `water`, `outbreak`, `care`, `surface`
 
 ## Also in the prototype
 
-Built while exploring the track, and working, but not part of the claim above: an outbreak simulator that spreads a disease along tunnels, lifts and water lines and lets you quarantine blocks; water and flood layers; a count of sickness reported by residents against the Directorate's number; and a surface-safety verdict in the API.
+Built while exploring the track, and working, but not part of the claim above: an outbreak simulator that spreads a disease along tunnels, lifts and water lines and lets you quarantine blocks; water and flood layers; a count of sickness reported by residents (the "I feel sick" button on either watch) against the Directorate's number; and a surface-safety verdict with a public, read-only [surface broadcast page](https://hollow-twin.vercel.app/broadcast/) that shows every reading against its published limit.
 
 ## Team
 

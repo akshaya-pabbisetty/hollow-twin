@@ -16,7 +16,7 @@ In the Hollow, a power failure is not shared equally. The Directorate serves the
 
 Hollow Twin is a live model of one sector: nine levels, 70 blocks, 32 million people. It forecasts every block's battery and warns the ones that will run dry before their lights go out. It replaces "upper levels first" with a rule anyone can check: life support for every block first, then the rest per person. In our scenario that turns 12 dark blocks into none, on the same supply. When the network is cut, relay boxes store each message, pass it block to block, and deliver a family's "I'm OK" with the route it took.
 
-Where even the relays cannot reach, our scout rover goes: a six-wheel rocker-bogie designed in CAD, it rides the lift and drives the tunnels with a med kit, a battery pack or water filters, and its own relay box carries held messages back into range.
+Where even the relays cannot reach, our scout rover goes: a six-wheel rocker-bogie designed in CAD, it rides the lift and drives the tunnels with a med kit, a battery pack or water filters, and its own relay box carries held messages back into range. A help press on a watch puts the request in the queue; the rover takes it, and when it arrives the watch is told.
 
 A Node API does the forecasting, allocation and delivery; a real Arduino watch and Raspberry Pi relay hold a check-in through a real network cut.
 

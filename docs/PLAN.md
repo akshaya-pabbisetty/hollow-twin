@@ -24,11 +24,13 @@ We stopped claiming the rest. The outbreak simulator, the water and flood layers
 | Hardware | Five devices by Wednesday | One watch (Arduino) and one relay box (Raspberry Pi), already written and tested against the API; see docs/HARDWARE.md | Uses parts we have; proves the network-cut claim with real hardware |
 | AI | "Add AI that does real work" | No AI. Pitch rules where every alert cites a published limit | There is no real data to train or test on; a rushed estimator would dress up invented numbers as evidence. The claim that judges want AI came from our own notes, not from the organizers |
 | Who owns the numbers | Twin and API each had their own forecast, allocation and limits | The API owns them. The twin shows them and falls back to its own simulation only where the API has no data | A judge asking "which number is true?" must get one answer |
-| Broadcast page and surface story | Planned | Not built for the submission | The verdict logic exists in the API; a page for it is an add-on only |
+| Broadcast page and surface story | Planned | A minimal read-only page (twin/broadcast/), not part of the claim | The verdict logic exists in the API; the page only shows it |
 | Video | Ten shots, three minutes | Five beats, about 100 seconds | One story a judge can retell |
 | Feature freeze | Thursday 6 PM | Thursday noon | Friday is for the video and the form, not for code |
 
 ## Where things stand (Nov 17, early morning ET)
+
+Update, Nov 17 afternoon: the help loop is closed end to end. A help press on the Arduino goes through the Pi relay to the API, shows in the twin's help list, "Send the rover" assigns it, and on arrival the API marks it delivered (`POST /help/<id>/delivered`) and the watch beeps "rover-01 reached watch-0012: med kit". Tested on the stand-in watch, not yet on the boards. Both watches have an "I feel sick" button that feeds `/truth`. The public broadcast page is built.
 
 - Done: the twin reads the API (live stream, forecasts, allocation, check-ins, alerts), uses the API's limits, tags where every number comes from, and has a 75-second guided story for someone who opens the link cold.
 - Done: the API (merged as PR #1), with scenario scripts that play each video beat through the real pipeline.
@@ -56,7 +58,7 @@ We stopped claiming the rest. The outbreak simulator, the water and flood layers
 
 1. A second relay box, so the radio hop between relays is real too. Only if the Arduino-and-Pi take already works.
 2. Narration, captions and a second pair of eyes on the video.
-3. A minimal broadcast page that reads `GET /broadcast`.
+3. ~~A minimal broadcast page that reads `GET /broadcast`.~~ Done Nov 17: twin/broadcast/.
 
 ## The proof shot
 
