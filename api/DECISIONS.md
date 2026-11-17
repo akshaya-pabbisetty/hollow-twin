@@ -277,3 +277,20 @@ contract carries the same table for the team.
 - Flood stays one level (closed over 15 cm). I did not add a second, lower "warning" level: no source for one.
 - Water: the open item in section 6 is filled in as a proposal. WHO's 1,000 mg/litre is about taste and
   acceptability, not health; lane 3 should confirm both cut-offs against the calibrated probe.
+
+## Task 6: the team's tools against the API
+
+- Run by hand on 2026-11-17, unedited, against a fresh server on port 8787:
+  `node tools/replay.mjs http://localhost:8787/ingest 1 3` printed `200 {"accepted":9,"duplicates":0,"rejected":[],"warnings":[]}`
+  for all three rounds.
+- `node tools/catcher.mjs` was started beside it and sent the same requests. Its replies and the API's match in
+  keys, reasons, order of reasons and status codes (`422` for an unusable message, `400 {"error":"body is not JSON"}`,
+  `200` with `duplicates: 1` for a repeat). The API adds one key, `warnings`.
+- `tests/tools.test.js` posts every file in `contract/samples/` unchanged and runs `tools/replay.mjs` (three quick
+  rounds). It does not start the catcher: the catcher appends to `tools/received.ndjson`, and `tools/` is not lane
+  1's folder to write in on every test run. The catcher's reply shapes are pinned by fixed expectations instead,
+  plus a check that the catcher's source still contains them.
+- Until 2026-11-18 20:00 UTC the samples' fixed time is in the future, so they are stored with the receive time and
+  a warning (task 1). After that moment they are stored with their own time. The test accepts both.
+- Replay ids repeat when the tool is restarted (`<device>-replay-<round>-<kind>`), so a second run against the same
+  server reports `duplicates: 9`. That is the contract's duplicate rule working, not a fault.
