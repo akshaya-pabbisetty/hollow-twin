@@ -24,7 +24,7 @@ A Node API does the forecasting, allocation and delivery; the 3D twin shows it. 
 
 ## What is real and what is simulated
 
-Real: the twin, the API (ingest, live stream, forecast, allocation, alerts, check-in delivery, replay after a cut), the shared message format. Simulated: all sensor data, the population, and the relay radio links. No hardware was built. The screen labels every reading with its source.
+Real: the twin, the API (ingest, live stream, forecast, allocation, alerts, check-in delivery, replay after a cut), the shared message format, and one watch (an Arduino) with one relay box (a Raspberry Pi) that holds messages through a real network cut. Simulated: all sensor data, the population, the other relays and the radio links between relays. The screen labels every reading with its source.
 
 ## Links
 
@@ -44,7 +44,7 @@ Record at 1440 x 900 or larger. Run the API locally (or use the hosted one) and 
 | 4 | 60 to 85 | Split screen: a terminal running `npm run scenario -- networkcut`, and the twin. The strip at the top left shows messages arriving; "I'm OK" travels up the lift; the right panel shows the delivery | "Then the Directorate cuts the network. Relay boxes hold every message and pass it block to block. This check-in was pressed during the cut. When a relay gets through, the backend delivers it to the family's level, with the route it took. The relays here are simulated; the store, forward and delivery are real." |
 | 5 | 85 to 100 | A block card: readings with their sources, an alert with its limit | "Every alert cites a published safety limit, and every number says where it came from. The same pieces matter after any disaster that takes out a city's grid and its phones." |
 
-If real ESP32 relays are working by Wednesday night, beat 4 shows them: a button press with the router unplugged, then the same arrival on screen, and the narration drops "simulated".
+Beat 4 with the real watch and relay (docs/HARDWARE.md, "What to film"): turn the laptop's Wi-Fi off, press the Arduino's button, the Pi prints HELD; Wi-Fi back on, the Pi uploads it and the twin draws it arriving. The narration then says "a real watch and relay" for that message, and "simulated" only for the relays in between.
 
 ## Before recording, check
 

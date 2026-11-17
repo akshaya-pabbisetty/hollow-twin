@@ -21,7 +21,7 @@ We stopped claiming the rest. The outbreak simulator, the water and flood layers
 | Decision | Before | Now | Why |
 | --- | --- | --- | --- |
 | Problems claimed | 8 or 9 | 4 | Four connected claims that all work beat nine with gaps |
-| Hardware | Five devices by Wednesday | None on the critical path. One add-on: two ESP32 boards passing an "I'm OK" with Wi-Fi off | Two people are active and no parts are confirmed |
+| Hardware | Five devices by Wednesday | One watch (Arduino) and one relay box (Raspberry Pi), already written and tested against the API; see docs/HARDWARE.md | Uses parts we have; proves the network-cut claim with real hardware |
 | AI | "Add AI that does real work" | No AI. Pitch rules where every alert cites a published limit | There is no real data to train or test on; a rushed estimator would dress up invented numbers as evidence. The claim that judges want AI came from our own notes, not from the organizers |
 | Who owns the numbers | Twin and API each had their own forecast, allocation and limits | The API owns them. The twin shows them and falls back to its own simulation only where the API has no data | A judge asking "which number is true?" must get one answer |
 | Broadcast page and surface story | Planned | Not built for the submission | The verdict logic exists in the API; a page for it is an add-on only |
@@ -39,7 +39,7 @@ We stopped claiming the rest. The outbreak simulator, the water and flood layers
 ## Verify first (Tuesday morning, before any building)
 
 1. **Open the judging platform** and write down: video length limit and format, whether a public repo or live link is required, every form field, the exact deadline. The official doc gives the deadline as both "Friday" and "Saturday" Nov 20; Nov 20 is a Friday. Treat it as Friday.
-2. **Hardware: yes or no.** Does anyone have two ESP32 boards in hand today? If not, hardware is out and nobody thinks about it again.
+2. **Hardware: run docs/HARDWARE.md once on the real Arduino and Pi** (about half an hour). The code is written and tested with a stand-in watch; it has not touched the physical boards yet.
 3. **Teammates: a reply by Tuesday noon ET.** After that, the plan assumes two people and offers the add-ons below to anyone who shows up.
 4. **Hosting: who has an account that can keep the API awake?** Azure for Students, Render, or a tunnel from a machine that stays on. See the first task below.
 
@@ -54,7 +54,7 @@ We stopped claiming the rest. The outbreak simulator, the water and flood layers
 
 **If the other two teammates join**, in this order, and only if it is working by Wednesday 8 PM:
 
-1. Two ESP32 boards passing one "I'm OK" with the router unplugged, through the same API and screen. This replaces the scripted relay in beat 4 of the video.
+1. A second relay box, so the radio hop between relays is real too. Only if the Arduino-and-Pi take already works.
 2. Narration, captions and a second pair of eyes on the video.
 3. A minimal broadcast page that reads `GET /broadcast`.
 

@@ -34,9 +34,9 @@ One sector of the Hollow in the year 2124, 37 years after the collapse: nine lev
 
 ```mermaid
 flowchart LR
-  W["Watch<br/>(not built yet)"] -.-> R["Relay box in each block<br/>(not built yet)"]
-  S["Sensor node<br/>(not built yet)"] -.-> R
-  R -. "stores and forwards<br/>when the network is cut" .-> A
+  W["Watch<br/>(an Arduino)"] -- "USB" --> R["Relay box<br/>(a Raspberry Pi)"]
+  S["Sensor node<br/>(not built)"] -.-> R
+  R -- "stores and forwards<br/>when the network is cut" --> A
   X["Scenario scripts<br/>(scripted data)"] --> A["API<br/>ingest, forecast, fair share,<br/>alerts, check-ins"]
   A -- "live stream" --> T["3D twin"]
   A -. "alerts back down" .-> R
@@ -57,8 +57,8 @@ We would rather tell you than have you find out.
 | The 3D twin, the guided story, block cards, the power rules | Real and running at the link above |
 | The API: ingest, live stream, forecast, fair share, alerts, check-in delivery, replay after a network cut | Real code, with tests. Run it locally (below). It is not hosted yet, so the public link runs on the twin's built-in simulation |
 | Sensor readings, populations, the failure scenario | Simulated. The screen tags every reading as twin simulation, scripted data through the API, or a device |
-| Watches, relay boxes, sensors | Not built. The message format and firmware notes are ready for them ([`api/docs/FIRMWARE.md`](api/docs/FIRMWARE.md)); the relays in the demo are scripted |
-| Radio links between relays | Simulated. What is real is the store, forward, de-duplicate and replay logic the relays' messages go through |
+| One watch and one relay box | Real: an Arduino with an "I'm OK" button, and a Raspberry Pi that signs its messages, holds them while the network is down and uploads them when it returns ([`docs/HARDWARE.md`](docs/HARDWARE.md)). The family member upstairs is scripted |
+| The other 69 relays, the radio links between relays, sensor nodes | Simulated. One real relay talks to the API directly; relay-to-relay radio is not built |
 
 ## Run it yourself
 
