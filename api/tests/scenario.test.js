@@ -1,20 +1,20 @@
-// Task 8: every demo scenario runs clean in --fast mode against a fresh, empty server, and leaves the
+// Task 7: every demo scenario runs clean in --fast mode against a fresh, empty server, speaks the contract, and leaves the
 // outcome the video shot is meant to show.
 const { test, after } = require("node:test");
 const assert = require("node:assert");
 const { execFile } = require("child_process");
 const path = require("path");
-const { makeServer, ROOT } = require("./helper");
+const { makeServer, ROOT, BLOCK_IDS } = require("./helper");
 
 const servers = [];
 after(() => Promise.all(servers.map((s) => s.cleanup())));
 
 // Starts a fresh server, runs `node tools/scenario.js <name> <url> --fast`, returns the server and the script's output.
-async function run(name, env = {}, serverEnv = {}) {
+async function run(name, env = {}, serverEnv = {}, fastFlag = true) {
   const s = await makeServer(serverEnv).start();
   servers.push(s);
   const { code, out } = await new Promise((res) =>
-    execFile(process.execPath, [path.join(ROOT, "tools/scenario.js"), name, s.api, "--fast"], { env: { ...process.env, INGEST_KEY: "", ...env } },
+    execFile(process.execPath, [path.join(ROOT, "tools/scenario.js"), name, s.api, ...(fastFlag ? ["--fast"] : [])], { env: { ...process.env, INGEST_KEY: "", npm_config_fast: "", ...env } },
       (err, stdout, stderr) => res({ code: err ? err.code : 0, out: stdout + stderr })));
   return { s, code, out };
 }
@@ -47,14 +47,18 @@ test("fairshare: Directorate vs fair numbers for the same supply", async () => {
   assert.strictEqual((await r.s.get("/history")).length, 0, "this shot only reads: it stores nothing");
 });
 
-test("networkcut: relay holds readings, uploads the backlog, history shows no gap", async () => {
+test("networkcut: relay holds readings and a check-in, the backlog hops to a neighbour and goes up, history shows no gap", async () => {
   const r = await run("networkcut"); clean(r);
   const hist = await r.s.get("/history?block=l7-chalk-cut&kind=air");
   assert.strictEqual(hist.length, 12);
+  assert.deepStrictEqual(hist.map((x) => x.hops), [0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 0, 0], "the held readings carry the two hops they travelled");
+  assert.deepStrictEqual(hist[5].via, ["relay-l7-chalk-cut", "relay-l7-ash-wells"]);
+  const told = (await r.s.get("/inbox?device=watch-0011")).find((a) => /watch-0071 is OK \(l7-chalk-cut\)/.test(a.values.text));
+  assert.ok(told && told.values.hops === 2 && told.values.family === "fam-0071", "the relayed check-in reached the relative on L1");
   const gaps = hist.slice(1).map((x, i) => Date.parse(x.time) - Date.parse(hist[i].time));
   assert.ok(gaps.every((g) => g === 5000), `gaps: ${gaps}`);
   assert.deepStrictEqual(hist.map((x) => x.values.co2_ppm), Array.from({ length: 12 }, (_, i) => 820 + i * 3), "in the order they were taken");
-  assert.match(r.out, /accepted 6, duplicates 1, rejected 0/, "the backlog went up as one request and the duplicate was dropped");
+  assert.match(r.out, /accepted 7, duplicates 1, rejected 0/, "the backlog went up as one request and the duplicate was dropped");
 });
 
 test("water: clean cup is silent, salty cup gives do-not-drink", async () => {
@@ -101,6 +105,26 @@ test("all: every shot in order against one fresh server, and everything it sent 
   assert.ok(Object.values(st.blocks).every((b) => b.source === "simulated"));
   assert.strictEqual(st.surface.verdict, "sealed domes needed");
   assert.ok(st.forecast.find((f) => f.block === "l6-flint-face").hours_left < 8);
+  // every message the scenarios sent is a clean contract message: real block ids, device ids that fit section 3
+  const blocks = new Set([...BLOCK_IDS, "surface"]);
+  const sent = (await r.s.get("/history")).filter((m) => m.kind !== "alert");
+  assert.ok(sent.length > 50);
+  for (const m of sent) {
+    assert.ok(blocks.has(m.block), `${m.id}: block ${m.block}`);
+    assert.match(m.device, /^(watch-\d{4}|rover-\d{2}|surface-\d{2}|(relay|sensor)-l\d-[a-z-]+)$/, m.id);
+    assert.strictEqual(m.warnings, undefined, `${m.id}: ${JSON.stringify(m.warnings)}`);
+    assert.ok(Number.isInteger(m.hops) && Array.isArray(m.via), `${m.id} carries hops and via`);
+  }
+  for (const d of ["relay-l6-flint-face", "sensor-l7-chalk-cut", "sensor-l3-ember-yard", "watch-0042", "surface-01"]) assert.ok(sent.some((m) => m.device === d), d);
+});
+
+test("npm run scenario is wired up, and --fast is honoured even when npm swallows the flag", async () => {
+  const pkg = JSON.parse(require("fs").readFileSync(path.join(ROOT, "package.json"), "utf8"));
+  assert.strictEqual(pkg.scripts.scenario, "node tools/scenario.js");
+  const t0 = Date.now();
+  const r = await run("water", { npm_config_fast: "true" }, {}, false); // no --fast argument, as when npm keeps it for itself
+  clean(r);
+  assert.ok(Date.now() - t0 < 4000, "no on-camera pauses");
 });
 
 test("scenarios send the API key when INGEST_KEY is set, and explain themselves when it is missing", async () => {
@@ -110,7 +134,7 @@ test("scenarios send the API key when INGEST_KEY is set, and explain themselves 
   assert.match(without.out, /set the INGEST_KEY environment variable/);
 });
 
-test("replay.js tags its readings simulated (static check: it runs forever, so it is not executed here)", () => {
+test("replay.js tags its messages simulated (static check: it runs forever, so it is not executed here)", () => {
   const src = require("fs").readFileSync(path.join(ROOT, "tools/replay.js"), "utf8");
   assert.match(src, /source: "simulated"/);
 });

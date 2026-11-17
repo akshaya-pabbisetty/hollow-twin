@@ -1,15 +1,19 @@
 // Demo scenarios: one scripted video shot each, with narration.
 //
-//   node tools/scenario.js <name> [apiUrl] [--fast]
+//   node tools/scenario.js <name> [apiUrl] [--fast]        or, from the api folder:  npm run scenario -- <name> --fast
 //
 //   names: blackout, fairshare, networkcut, water, outbreak, care, surface, all
 //   apiUrl defaults to http://localhost:8787. --fast removes the pauses (used by the tests).
 //   If the backend needs an API key, set the INGEST_KEY environment variable before running.
 //
-// Every reading sent from here is tagged "source": "simulated": scripted data never claims to be live hardware.
+// Every message is in the CONTRACT.md format, with real block ids from contract/blocks.json and device ids that fit
+// section 3 (relay-l6-flint-face, watch-0042, sensor-l7-chalk-cut, rover-01, surface-01).
+// Every message sent from here is tagged "source": "simulated": scripted data never claims to be live hardware.
 // Each shot works against a fresh, empty server. Each ends with CHECK lines; a failed check exits with code 1.
 const args = process.argv.slice(2);
-const FAST = args.includes("--fast");
+// --fast on the command line. Some shells hand "--fast" to npm instead of to this script when it is run as
+// `npm run scenario -- all --fast`; npm then sets npm_config_fast, so that is honoured too.
+const FAST = args.includes("--fast") || process.env.npm_config_fast === "true";
 const [NAME, URL_ARG] = args.filter((a) => !a.startsWith("--"));
 const API = (URL_ARG || process.env.API || "http://localhost:8787").replace(/\/$/, "");
 const KEY = process.env.INGEST_KEY || "";
@@ -25,8 +29,9 @@ const step = (s) => out(`\n--- ${s}`);
 const say = (s) => out(`    ${s}`);
 function check(ok, text) { if (!ok) failed++; out(`    CHECK ${ok ? "ok    " : "FAILED"}: ${text}`); return ok; }
 
-const R = (device, block, kind, values, time = Date.now()) =>
-  ({ id: `${device}-${RUN}-${++counter}`, device, block, time: new Date(time).toISOString(), kind, values, source: "simulated" });
+// One contract message. hops and via are 0 and [] unless a relay carried it (see the networkcut shot).
+const R = (device, block, kind, values, time = Date.now(), route = {}) =>
+  ({ id: `${device}-${RUN}-${++counter}`, device, block, time: new Date(time).toISOString(), kind, values, hops: 0, via: [], ...route, source: "simulated" });
 
 async function call(method, path, body) {
   for (let attempt = 0; ; attempt++) {
@@ -143,10 +148,12 @@ shots.fairshare = async () => {
 // Shot: the network dies, the relay holds readings, then uploads the backlog. The history has no gap.
 shots.networkcut = async () => {
   title("networkcut: the relay stores and forwards, nothing is lost");
-  const block = "l7-chalk-cut", dev = "sensor-07", gap = 5000, n = 12;
+  const block = "l7-chalk-cut", dev = `sensor-${block}`, relay = `relay-${block}`, next = "relay-l7-ash-wells", gap = 5000, n = 12;
+  const watch = "watch-0071", family = "fam-0071", upstairs = "watch-0011"; // a resident down here, a relative on L1
   const t0 = Date.now() - n * gap; // 12 readings, 5 s apart, ending now
-  const all = Array.from({ length: n }, (_, i) => R(dev, block, "air", { co2_ppm: 820 + i * 3 }, t0 + (i + 1) * gap));
-  say(`Sensor ${dev} in ${block} reads CO2 every 5 seconds and sends it through its relay.`);
+  const all = Array.from({ length: n }, (_, i) => R(dev, block, "air", { co2_ppm: 820 + i * 3, temp_c: 24.5, humidity_pct: 55 }, t0 + (i + 1) * gap));
+  await send(R(upstairs, "l1-winch-gallery", "checkin", { status: "ok", family, to: [] }, t0)); // the relative is known to the family group
+  say(`Sensor ${dev} reads the air every 5 seconds and sends it through its relay, ${relay}.`);
 
   step("1. Network up: readings arrive as they are taken");
   for (const r of all.slice(0, 4)) { await send(r); say(`sent  ${r.time.slice(11, 19)}  CO2 ${r.values.co2_ppm} ppm`); await beat(1); }
@@ -154,12 +161,18 @@ shots.networkcut = async () => {
   step("2. NETWORK CUT. The relay keeps every reading");
   const held = [];
   for (const r of all.slice(4, 10)) { held.push(r); say(`held  ${r.time.slice(11, 19)}  CO2 ${r.values.co2_ppm} ppm   (relay is holding ${held.length})`); await beat(1); }
+  // a resident presses "I'm OK" while the block is cut off: the relay holds that too
+  const checkin = R(watch, block, "checkin", { status: "ok", family, to: [upstairs] }, all[7].time);
+  say(`held  ${checkin.time.slice(11, 19)}  ${watch} presses "I'm OK" for family ${family}`);
+  await beat(1);
   const during = (await get(`/history?block=${block}&kind=air`)).filter((r) => r.id.includes(RUN));
   say(`The backend has ${during.length} readings. The newest is ${during[during.length - 1].time.slice(11, 19)}: ${held.length * 5} seconds are missing.`);
   await beat();
 
-  step("3. Network back: the relay uploads the backlog in ONE request (out of order, with a duplicate)");
-  const shuffled = [held[3], held[0], held[5], held[1], held[4], held[2], held[1]];
+  step(`3. ${relay} cannot reach the API, but ${next} can: the backlog hops across and goes up in ONE request`);
+  // every message that crossed the gap carries the route it took: 2 hops, via both relays (CONTRACT.md section 5)
+  const hop = (r) => ({ ...r, hops: 2, via: [relay, next] });
+  const shuffled = [held[3], held[0], checkin, held[5], held[1], held[4], held[2], held[1]].map(hop); // out of order, with one duplicate
   const up = await send(shuffled);
   say(`backend answered: accepted ${up.accepted}, duplicates ${up.duplicates}, rejected ${up.rejected.length}`);
   await beat();
@@ -169,7 +182,11 @@ shots.networkcut = async () => {
   const hist = (await get(`/history?block=${block}&kind=air`)).filter((r) => r.id.includes(RUN));
   say(hist.map((r) => r.time.slice(14, 19)).join("  "));
   const gaps = hist.slice(1).map((r, i) => Date.parse(r.time) - Date.parse(hist[i].time));
-  check(up.accepted === 6 && up.duplicates === 1, "the whole backlog was stored and the duplicate was dropped");
+  const told = (await get(`/inbox?device=${upstairs}`)).find((a) => a.values.cause === checkin.id);
+  if (told) { say(`${upstairs} on L1 shows: ${told.values.text}`); say(`why: ${told.values.why}`); }
+  check(up.accepted === 7 && up.duplicates === 1 && up.rejected.length === 0, "the whole backlog was stored and the duplicate was dropped");
+  check(hist.filter((r) => r.hops === 2).length === 6 && hist.filter((r) => r.hops === 2).every((r) => r.via.join() === [relay, next].join()), "the six held readings kept their route: 2 hops, via both relays");
+  check(!!told && told.values.hops === 2 && told.values.sent === checkin.time, "the check-in crossed the cut and reached the family upstairs, with its original time");
   check(hist.length === n, `all ${n} readings are in the history`);
   check(gaps.every((g) => g === gap), "no gap: every reading is exactly 5 s after the one before, with its original time");
   check(hist.every((r, i) => r.values.co2_ppm === 820 + i * 3), "and they are in the right order");
@@ -178,7 +195,7 @@ shots.networkcut = async () => {
 // Shot: a clean cup, then a salty cup.
 shots.water = async () => {
   title("water: a clean cup, then a salty cup");
-  const block = "l3-ember-yard", sensor = "sensor-03", watch = "watch-0031";
+  const block = "l3-ember-yard", sensor = `sensor-${block}`, watch = "watch-0031";
   await send(R(watch, block, "vitals", { hr_bpm: 74, spo2_pct: 98, temp_c: 36.7 }));
   say(`Sensor ${sensor} tests the tap water in ${block}. ${watch} is a resident's watch in the same block.`);
   const inboxNow = async () => (await get(`/inbox?device=${watch}`)).filter((a) => a.id.includes(RUN) && /Do not drink/.test(a.values.text));
@@ -209,19 +226,21 @@ shots.outbreak = async () => {
   await post("/official", { block, count: 2 });
   say(`The Directorate's bulletin for ${block}: 2 cases.`);
   await beat();
+  // twelve watches, numbered from the clock so a second take on the same server uses twelve different people
+  const first = 1000 + (Math.floor(Date.now() / 1000) % 8000);
   let watchNo = 0, r;
   const waves = [["symptom", 3], ["symptom", 3], ["low oxygen", 3], ["symptom", 3]];
   for (const [i, [kind, count]] of waves.entries()) {
     step(`${i + 1}. ${count} more residents: ${kind === "symptom" ? "they press the symptom button" : "their watches measure low blood oxygen"}`);
     for (let k = 0; k < count; k++) {
-      const dev = `watch-8${RUN.slice(-3)}${++watchNo}`;
+      const dev = `watch-${first + watchNo++}`;
       await send(kind === "symptom" ? R(dev, block, "button", { button: "symptom" }) : R(dev, block, "vitals", { hr_bpm: 104, spo2_pct: 90, temp_c: 38.4 }));
     }
     r = await row();
     say(`residents' count: ${pad(r.residents, 4)} official count: ${pad(r.official, 4)} hidden: ${r.gap}`);
     await beat();
   }
-  await send(R(`watch-8${RUN.slice(-3)}1`, block, "button", { button: "symptom" }));
+  await send(R(`watch-${first}`, block, "button", { button: "symptom" }));
   r = await row();
   say("(One resident pressed twice: a person is only counted once.)");
   say((await get("/truth")).rule);
@@ -238,7 +257,7 @@ shots.care = async () => {
     ["watch-0042", "l8-bore-bend", { hr_bpm: 132, spo2_pct: 89, temp_c: 39.2 }, "very low oxygen, racing pulse, high fever"],
     ["watch-0043", "l5-rail-face", { hr_bpm: 96, spo2_pct: 96, temp_c: 38.4 }, "fever"],
   ];
-  const mine = async () => (await get("/queue")).filter((q) => q.id.includes(RUN));
+  const mine = async () => (await get("/help")).filter((q) => q.id.includes(RUN));
   step("1. Three residents press HELP, in this order");
   for (const [dev, block, vitals, text] of people) {
     await send(R(dev, block, "vitals", vitals));
@@ -257,15 +276,17 @@ shots.care = async () => {
   check(q.length === 3 && q[1].device === "watch-0043" && q[2].device === "watch-0041", "then the fever, then the normal vitals");
   await beat();
 
-  step("3. Rover rover-01 is dispatched from l1-winch-gallery");
-  const d = await post("/dispatch", { responder: "rover-01", block: "l1-winch-gallery" });
-  say(d.assigned ? `rover-01 is sent to ${d.assigned.device} in ${d.assigned.block}` : "nothing to dispatch");
+  step("3. The top request is assigned to rover-01");
+  const d = q[0] ? await post(`/help/${encodeURIComponent(q[0].id)}/assign`, { to: "rover-01" }) : {};
+  say(d.assigned ? `rover-01 is sent to ${d.assigned.device} in ${d.assigned.block}` : "nothing to assign");
   await beat();
   const inbox = (await get("/inbox?device=watch-0042")).filter((a) => /rover-01 sent/.test(a.values.text));
   if (inbox.length) say(`${"watch-0042"} shows: ${inbox[inbox.length - 1].values.text}`);
   q = await mine();
   say(`Next in the queue: ${q[0] ? q[0].device : "nobody"}`);
-  check(!!d.assigned && d.assigned.device === "watch-0042", "the robot went to the top of the queue");
+  const jobs = (await get("/help?status=assigned&to=rover-01")).filter((x) => x.id.includes(RUN));
+  check(!!d.assigned && d.assigned.device === "watch-0042" && d.assigned.assigned_to === "rover-01", "the robot went to the top of the queue");
+  check(jobs.length === 1 && jobs[0].device === "watch-0042", "the rover can read its own job from GET /help?status=assigned&to=rover-01");
   check(inbox.length >= 1, "the resident was told help is coming");
   check(q.length === 2 && q[0].device === "watch-0043", "the request left the queue and the next person moved up");
 };
@@ -274,26 +295,26 @@ shots.care = async () => {
 shots.surface = async () => {
   title("surface: is it safe to go up, and who goes first?");
   const scout = "surface-01", up = "surface", home = "l1-winch-gallery";
+  // GET /broadcast is what the public page shows: the verdict, one plain sentence, every reading against its limits
   const show = async () => {
-    const v = await get("/surface");
+    const v = await get("/broadcast");
     say(`VERDICT: ${v.verdict.toUpperCase()}${v.missing.length ? `   (missing: ${v.missing.join(", ")})` : ""}`);
+    say(`the broadcast page says: ${v.text}`);
     return v;
   };
-  say(`Scout robot ${scout} climbs to the surface and reports what it measures.`);
-  step("1. The first readings arrive. The backend refuses to guess");
-  await send(R(scout, up, "surface", { co2_ppm: 430, temp_c: 17.5 }));
-  say("CO2 430 ppm, temperature 17.5 C");
+  say(`The surface scout ${scout} climbs out and reports what it measures, as block "${up}".`);
+  step("1. The first message arrives: the three readings of the contract, and a photo. The API refuses to guess");
+  await send(R(scout, up, "surface", { co2_ppm: 430, temp_c: 17.5, radiation_usv_h: 0.3, photo_url: `https://example.invalid/${scout}/000001.jpg` }));
+  say("CO2 430 ppm, temperature 17.5 C, radiation 0.3 uSv/h");
   let v = await show();
   check(v.verdict !== "suits OK" || v.missing.length === 0, "with readings missing there is no 'safe' verdict");
   await beat();
-  await send(R(scout, up, "surface", { o2_pct: 20.9, pm25_ugm3: 14 }, Date.now() + 1));
-  say("oxygen 20.9 %, fine dust 14 ug/m3");
-  await show();
+  check(v.missing.join() === "o2_pct,pm25_ugm3", "oxygen and fine dust have not been measured yet, and the page says so");
   await beat();
 
-  step("2. The radiation reading completes the picture");
-  await send(R(scout, up, "surface", { radiation_usv_h: 0.3 }, Date.now() + 2));
-  say("radiation 0.3 uSv/h");
+  step("2. The scout's oxygen and dust sensors complete the picture");
+  await send(R(scout, up, "surface", { o2_pct: 20.9, pm25_ugm3: 14 }, Date.now() + 2));
+  say("oxygen 20.9 %, fine dust 14 ug/m3");
   v = await show();
   for (const r of v.readings) say(`  ${pad(r.label, 12)} ${pad(`${r.value} ${r.unit}`, 14)} ${r.status}`);
   check(v.verdict === "suits OK", "all five readings are inside their limits: suits OK");
@@ -328,7 +349,7 @@ shots.surface = async () => {
   v = await show();
   say(`why: ${v.reasons[0]}`);
   await beat();
-  const record = (await get("/surface/history")).filter((e) => e.type === "verdict" && e.id.includes(RUN));
+  const record = (await get(v.history)).filter((e) => e.type === "verdict" && e.id.includes(RUN)); // the link the broadcast page gives
   say("The public record of verdict changes (nobody can quietly rewrite it):");
   for (const e of record) say(`    ${e.time.slice(11, 19)}  ${e.previous || "(none)"}  ->  ${e.verdict}`);
   f = await get("/firstwave");

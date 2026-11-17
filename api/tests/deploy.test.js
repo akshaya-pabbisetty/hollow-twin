@@ -17,7 +17,7 @@ test("zero dependencies: package.json has none and the code only requires Node b
   const pkg = JSON.parse(read("package.json"));
   assert.strictEqual(pkg.dependencies, undefined);
   assert.strictEqual(pkg.devDependencies, undefined);
-  assert.deepStrictEqual(pkg.scripts, { start: "node server.js", test: "node --test" });
+  assert.deepStrictEqual(pkg.scripts, { start: "node server.js", test: "node --test", scenario: "node tools/scenario.js" });
   const builtin = new Set(require("module").builtinModules);
   for (const f of CODE.concat(["tools/scenario.js", "tools/replay.js", "tools/sign.js", "tools/check.js"]))
     for (const m of read(f).matchAll(/require\("([^"]+)"\)/g))

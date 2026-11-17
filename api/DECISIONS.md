@@ -294,3 +294,22 @@ contract carries the same table for the team.
   a warning (task 1). After that moment they are stored with their own time. The test accepts both.
 - Replay ids repeat when the tool is restarted (`<device>-replay-<round>-<kind>`), so a second run against the same
   server reports `duplicates: 9`. That is the contract's duplicate rule working, not a fault.
+
+## Task 7: scenarios on contract ids
+
+- Every scenario message is a clean contract message: real block ids, device ids that fit section 3
+  (`relay-l6-flint-face`, `sensor-l7-chalk-cut`, `sensor-l3-ember-yard`, `watch-0042`, `rover-01`, `surface-01`),
+  `hops` and `via` on every message. A test checks that nothing the scenarios send is stored with a warning.
+- `npm run scenario -- all --fast` was run in PowerShell against a server on port 8787 on 2026-11-17: exit code 0,
+  seven shots, 40 checks, all passed.
+- PowerShell can hand `--fast` to npm instead of to the script. npm then sets `npm_config_fast`, and the script
+  honours that too, so the command works either way.
+- **networkcut** now shows the contract's section 5: the held messages (six air readings and one family check-in)
+  go up with `hops: 2` and `via` naming both relays, and the check-in reaches a relative on L1.
+- **care** uses the contract endpoints: `GET /help`, then `POST /help/<message id>/assign` with `{ "to": "rover-01" }`.
+- **surface** starts with the contract's own three readings and a photo, shows the broadcast page saying "not
+  enough data", then completes the verdict with `o2_pct` and `pm25_ugm3`.
+- **outbreak** numbers its twelve watches from the clock (`watch-<4 digits>`), so a second take on the same server
+  counts twelve new people. Two takes that happen to start a multiple of 8,000 seconds apart would reuse numbers.
+- `tools/replay.js` (my endless fake devices) was rewritten on contract ids and values. The team's
+  `tools/replay.mjs` at the top of the repository is untouched and does a different job (fixed samples).
