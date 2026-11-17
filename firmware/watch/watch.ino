@@ -7,6 +7,7 @@
 // Wiring. Buttons go between the pin and GND; the pins use the built-in pull-ups, so no resistors.
 //   pin 2  -> button -> GND      "I'm OK"
 //   pin 3  -> button -> GND      "Help"                  (optional)
+//   pin 4  -> button -> GND      "I feel sick"           (optional, a symptom report)
 //   pin 8  -> buzzer -> GND      warnings from the API   (optional)
 //   No buttons? Touch a jumper wire from pin 2 to GND.
 //
@@ -20,6 +21,7 @@
 //   HELLO watch                 after a reset
 //   BTN ok <n>                  "I'm OK" pressed, n counts presses since the reset
 //   BTN help <n>                "Help" pressed
+//   BTN symptom <n>             "I feel sick" pressed
 // What the relay sends back:
 //   NET up <held>               the API is reachable; <held> messages are still waiting
 //   NET down <held>             the API is not reachable
@@ -28,6 +30,7 @@
 
 const uint8_t PIN_OK = 2;
 const uint8_t PIN_HELP = 3;
+const uint8_t PIN_SICK = 4;
 const uint8_t PIN_BUZZER = 8;
 const unsigned long DEBOUNCE_MS = 40;
 const unsigned long RELAY_SILENT_MS = 15000; // no word from the relay for this long: treat it as gone
@@ -37,7 +40,7 @@ Net net = NET_NONE;
 unsigned long lastHeard = 0;
 
 struct Button { uint8_t pin; const char *name; bool down; unsigned long changedAt; };
-Button buttons[] = { { PIN_OK, "ok", false, 0 }, { PIN_HELP, "help", false, 0 } };
+Button buttons[] = { { PIN_OK, "ok", false, 0 }, { PIN_HELP, "help", false, 0 }, { PIN_SICK, "symptom", false, 0 } };
 unsigned int presses = 0;
 
 char line[96];
@@ -112,6 +115,7 @@ void showLink() {
 void setup() {
   pinMode(PIN_OK, INPUT_PULLUP);
   pinMode(PIN_HELP, INPUT_PULLUP);
+  pinMode(PIN_SICK, INPUT_PULLUP);
   pinMode(PIN_BUZZER, OUTPUT);
   pinMode(LED_BUILTIN, OUTPUT);
   Serial.begin(9600);

@@ -48,6 +48,7 @@
   .okbtn.busy { background: radial-gradient(circle at 50% 35%, #e3b341, var(--warn)); box-shadow: 0 0 0 6px rgba(210,153,34,.2); }
   .helpbtn { margin-top: 10px; padding: 6px 16px; border-radius: 999px; border: 1px solid var(--danger-lo);
     background: rgba(248,81,73,.12); color: #ffb4ad; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+  .sickbtn { margin-top: 6px; padding: 4px 14px; border-radius: 999px; border: 1px solid #6b6f73; background: none; color: inherit; font: inherit; font-size: 11px; opacity: .85; }
   .helpbtn.arm { background: var(--danger-lo); color: #fff; }
   .status { margin-top: 8px; min-height: 2.5em; font-size: 12px; color: var(--dim); max-width: 92%; }
   .status b { color: var(--text); }
@@ -152,6 +153,7 @@
     <div class="screen on" id="s-home">
       <button class="okbtn" id="ok" aria-label="Tell my family I'm OK">I'M OK</button>
       <button class="helpbtn" id="help">NEED HELP</button>
+      <button class="sickbtn" id="sick">I feel sick</button>
       <div class="status" id="status">Tap to tell your family you're safe.</div>
     </div>
 
@@ -456,6 +458,17 @@ function send(status) {
   if (navigator.vibrate) navigator.vibrate(40);
   paint(); flush();
 }
+
+// "I feel sick": a symptom report (CONTRACT.md: button symptom). It goes to the API, not to the family, and
+// counts toward the residents' own sickness count that is compared with the Directorate's (GET /truth).
+function reportSymptom() {
+  const m = { id: nextId(), device: cfg.device, block: cfg.block, time: new Date().toISOString(), kind: 'button', values: { button: 'symptom' }, hops: 0, via: [], source: 'live' };
+  queue.push(m); store.set(S('queue'), queue);
+  if (navigator.vibrate) navigator.vibrate(40);
+  say('Symptom reported.<br>It counts toward the residents\' own sickness numbers.');
+  flush();
+}
+$('sick').addEventListener('click', reportSymptom);
 
 // the radio route around a cut: watch → this block's relay → the next block's relay, which still has a line out
 function neighbour(b) {
