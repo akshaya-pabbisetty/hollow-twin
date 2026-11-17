@@ -207,6 +207,37 @@ What the API does with that array (lane 1): it sorts it by `time` before storing
 
 Water is still open: lanes 1 and 3 pick the `tds_ppm` and `turbidity_ntu` cut-offs after calibrating the probe with a clean cup and a salty cup.
 
+### 6.1 Limits proposed by lane 1 (not agreed yet)
+
+The table above is what the twin uses and is unchanged. The API (lane 1) alerts on the limits below instead, each taken from a published source. Until the team agrees one set, the twin and the API can disagree about the same reading, so every row is marked. All of them, with links, are served by `GET /limits` and kept in [`api/shared/limits.json`](api/shared/limits.json).
+
+| Reading | Twin today (table above) | API today | Status |
+| --- | --- | --- | --- |
+| Battery left (from `power`) | warning under 24 h, alarm under 8 h or dark | the same: warning under 24 h, alarm under 8 h or dark | same numbers; no published limit exists for battery hours |
+| CO2, warning | over 2,000 ppm | over 1,000 ppm | proposed by lane 1, source: Health Canada, Residential indoor air quality guidelines: Carbon dioxide (2021), long-term exposure limit |
+| CO2, alarm | over 4,000 ppm | over 5,000 ppm | proposed by lane 1, source: OSHA PEL / NIOSH REL for carbon dioxide (NIOSH Pocket Guide), 8-hour limit for workers |
+| Air temperature, warning | over 39 °C | heat index 39.4 °C or more | proposed by lane 1, source: US National Weather Service, heat index classification: Danger (103 °F) |
+| Air temperature, alarm | over 43 °C | heat index 51.7 °C or more | proposed by lane 1, source: US National Weather Service, heat index classification: Extreme Danger (125 °F) |
+| Flood depth | warning over 25 cm, alarm over 45 cm (tunnel closes) | tunnel closed over 15 cm (one level) | proposed by lane 1, source: US National Weather Service, Flood Safety ("six inches of fast-moving water can knock over and carry off an adult") |
+| Mains frequency (`grid_hz`, optional) | not used | power cut likely when more than 0.036 Hz from 60 Hz | proposed by lane 1, source: NERC, Reliability Guideline: Primary Frequency Control (2023), maximum governor deadband |
+
+Notes on the rows:
+
+- **Air temperature.** The API does not compare the thermometer reading alone. It works out the heat index (how hot the air feels) from `temp_c` and `humidity_pct` with the National Weather Service equation, because humid air is dangerous at a much lower temperature than dry air. Example: the sample `air` message (40.2 °C at 71 % humidity) has a heat index far above 51.7 °C, so the API raises its top heat alert, while the twin's dry-air rule shows a warning (over 39 °C, under 43 °C). If a sensor sends no `humidity_pct`, the API compares `temp_c` itself.
+- **Flood.** The API has one level, at 15 cm, and calls it "tunnel closed". The twin warns at 25 cm and closes at 45 cm.
+- **CO2.** The API warns earlier than the twin (1,000 against 2,000 ppm) and raises its alarm later (5,000 against 4,000 ppm).
+
+### 6.2 Water cut-offs (the open item above, filled in by lane 1)
+
+Proposed by lane 1. Lane 3 still has to confirm them against the probe once it is calibrated with the clean cup and the salty cup.
+
+| Reading | Do not drink when | Status |
+| --- | --- | --- |
+| `tds_ppm` | over 1,000 ppm | proposed by lane 1, source: WHO, Total dissolved solids in drinking-water (background document, 2003): water below 1,000 mg/litre is "usually acceptable to consumers". 1 mg/litre is 1 ppm in water. This is an acceptability limit; WHO sets no health-based value for TDS. |
+| `turbidity_ntu` | over 5 NTU | proposed by lane 1, source: US EPA, National Primary Drinking Water Regulations: turbidity must at no time exceed 5 NTU. |
+
+Either reading over its cut-off raises one alert, "Do not drink", for the block. The sample `water` message (840 ppm, 6.5 NTU) raises it because of the turbidity. The twin's own water layer uses a simulated "contamination index" (warning over 25, alarm over 50) that no device measures; with real probes it would use the two cut-offs above.
+
 ## Changelog (lane 1)
 
 Additions only. Nothing above was renamed or removed. Each row says where the addition is written down.
@@ -227,3 +258,5 @@ Additions only. Nothing above was renamed or removed. Each row says where the ad
 | 2026-11-17 | 4.1 | Response shapes for `GET /blocks/<block id>/latest`, `GET /help` (with `?status=` and `&to=`), `POST /help/<message id>/assign` and `GET /broadcast`. |
 | 2026-11-17 | 4.2 | New endpoints: `/status`, `/history`, `/blocks`, `/forecast`, `/fairshare`, `/inbox`, `/family`, `/official`, `/truth`, `/surface`, `/surface/history`, `/firstwave`, `/limits`, and the earlier names `/feed`, `/queue`, `/dispatch`. |
 | 2026-11-17 | 5 | What the API does with a backlog array: sorted by `time`, duplicates dropped, replayed in order on `/live`. |
+| 2026-11-17 | 6.1 | Proposed limits with sources for CO2, air temperature (heat index), flood depth and mains frequency, beside the twin's numbers. The twin's table is unchanged. |
+| 2026-11-17 | 6.2 | The open water item filled in: `tds_ppm` over 1,000 ppm (WHO) or `turbidity_ntu` over 5 NTU (US EPA) means do not drink. |

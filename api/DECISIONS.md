@@ -245,3 +245,35 @@ sections below replace it.
   `not enough data` until a scout also sends `o2_pct` and `pm25_ugm3` (both now optional in the contract).
 - The contract's lane 4 wording for the return options is "suits, domes or sealed outposts". The API's verdicts are
   `suits OK`, `sealed domes needed`, `stay underground`. I did not invent a mapping for "sealed outposts".
+
+## Task 5: thresholds
+
+The twin's numbers (CONTRACT.md section 6) against what the API uses. The twin was not changed. Section 6.1 of the
+contract carries the same table for the team.
+
+| Reading | Twin | API | Why the API differs |
+|---|---|---|---|
+| Battery | warn under 24 h, alarm under 8 h or dark | the same | No sourced limit exists, so the contract's numbers were adopted (task 3). Brownout is not detected by the API. |
+| CO2 warning | over 2,000 ppm | over 1,000 ppm | Health Canada residential long-term limit |
+| CO2 alarm | over 4,000 ppm | over 5,000 ppm | OSHA PEL / NIOSH REL, 8-hour worker limit |
+| Air temperature warning | over 39 °C | heat index 39.4 °C or more | NWS heat index "Danger" (103 °F) |
+| Air temperature alarm | over 43 °C | heat index 51.7 °C or more | NWS heat index "Extreme Danger" (125 °F) |
+| Flood | warn over 25 cm, close over 45 cm | closed over 15 cm, one level | NWS: six inches of moving water can knock over an adult |
+| Water | simulated index 25 / 50 | TDS over 1,000 ppm or turbidity over 5 NTU | WHO (acceptability, not health-based) and US EPA |
+
+- **The heat rule is new.** The standalone backend had no rule for air temperature inside a block, because its
+  `air` kind carried only CO2. The contract's `air` message has `temp_c` and `humidity_pct`, and section 6 has a
+  heat row, so the API now alerts on heat. It uses the NWS limits it already used for the surface (39.4 and
+  51.7 °C), but on the heat index worked out from temperature and humidity, since both are in the message. The
+  equation and the classification were read on `weather.gov/ama/heatindex` on 2026-11-17 and the code is tested
+  against five cells of the NWS chart. Without `humidity_pct` the thermometer reading is compared as it is.
+- This makes the API much stricter than the twin in humid air and more lenient in very dry air. The contract's own
+  `air` sample (40.2 °C at 71 %) is a top-level heat alert for the API and only a warning for the twin. The heat
+  index formula is extended well beyond the NWS chart there (the chart stops near 58 °C), so the "feels like"
+  number itself is rough at that extreme; the level is not in doubt.
+- The formula's coefficients and its 80 °F lower bound are in `heat.js` with the source, not in `limits.json`:
+  they are part of a published equation, not thresholds.
+- The surface verdict still compares plain temperature (a surface message has no humidity). Unchanged.
+- Flood stays one level (closed over 15 cm). I did not add a second, lower "warning" level: no source for one.
+- Water: the open item in section 6 is filled in as a proposal. WHO's 1,000 mg/litre is about taste and
+  acceptability, not health; lane 3 should confirm both cut-offs against the calibrated probe.

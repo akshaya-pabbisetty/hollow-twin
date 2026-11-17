@@ -30,6 +30,7 @@ const fs = require("fs");
 const path = require("path");
 const B = require("./blocks");
 const C = require("./contract");
+const HEAT = require("./heat");
 const L = require("./logic");
 const LIM = require("./limits");
 const SIGN = require("./sign");
@@ -179,6 +180,18 @@ function rules(r) {
     const bad = LIM.hits([["air_co2_danger_ppm", v.co2_ppm, "CO2"]]), stale = LIM.hits([["air_co2_stale_ppm", v.co2_ppm, "CO2"]]);
     if (bad.length) out.push(alert(r, "danger", `Air unsafe in ${r.block}: CO2 ${v.co2_ppm} ppm`, LIM.because(bad)));
     else if (stale.length) out.push(alert(r, "warn", `Air going stale in ${r.block}: CO2 ${v.co2_ppm} ppm`, LIM.because(stale)));
+    // Heat: the contract's air message carries temp_c and humidity_pct, so the US National Weather Service heat index
+    // (how hot it feels) can be compared with the NWS danger levels. Without humidity the air temperature is used.
+    const heat = HEAT.feelsLike(v.temp_c, v.humidity_pct);
+    if (heat) {
+      const extreme = LIM.hits([["air_heat_danger_c", heat.c, heat.label]]), danger = LIM.hits([["air_heat_warn_c", heat.c, heat.label]]);
+      const hit = extreme.length ? extreme : danger;
+      if (hit.length) {
+        const why = LIM.because(hit);
+        out.push(alert(r, extreme.length ? "danger" : "warn", `${extreme.length ? "Extreme heat" : "Dangerous heat"} in ${r.block}: feels like ${Math.round(heat.c)} C`,
+          { ...why, why: `${why.why}; ${heat.detail}`, feels_like_c: heat.c }, "heat"));
+      }
+    }
   }
   if (r.kind === "flood") {
     const h = LIM.hits([["flood_depth_closed_cm", v.depth_cm, "flood depth"]]);
