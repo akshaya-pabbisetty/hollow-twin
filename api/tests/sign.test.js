@@ -52,8 +52,8 @@ test("valid sig: stored with verified true (the vector itself, posted to a real 
 });
 
 test("no sig: accepted but verified false, and a sender cannot just claim verified", async () => {
-  const plain = s.R("relay-l8-bore-bend", "l8-bore-bend", "power", { battery_pct: 61, grid_hz: 60 });
-  const liar = { ...s.R("relay-l8-bore-bend", "l8-bore-bend", "power", { battery_pct: 60, grid_hz: 60 }), verified: true };
+  const plain = s.R("relay-l8-bore-bend", "l8-bore-bend", "power", { battery_wh: 6100, draw_w: 96, supply_w: 96, grid_hz: 60 });
+  const liar = { ...s.R("relay-l8-bore-bend", "l8-bore-bend", "power", { battery_wh: 6000, draw_w: 96, supply_w: 96, grid_hz: 60 }), verified: true };
   assert.strictEqual((await s.post("/ingest", [plain, liar])).body.added, 2);
   const hist = await s.get("/history?block=l8-bore-bend&kind=power");
   assert.strictEqual(hist.find((r) => r.id === plain.id).verified, false);
@@ -61,11 +61,11 @@ test("no sig: accepted but verified false, and a sender cannot just claim verifi
 });
 
 test("bad signature: rejected with a reason and not stored", async () => {
-  const base = s.R("relay-l8-bore-bend", "l8-bore-bend", "power", { battery_pct: 10, grid_hz: 60 });
+  const base = s.R("relay-l8-bore-bend", "l8-bore-bend", "power", { battery_wh: 1000, draw_w: 96, supply_w: 96, grid_hz: 60 });
   const good = S.sign(base, KEY);
   const cases = {
     "sig made with the wrong key": { ...base, sig: S.sign(base, "not-the-key") },
-    "values changed after signing (a faked reading)": { ...base, values: { battery_pct: 99, grid_hz: 60 }, sig: good },
+    "values changed after signing (a faked reading)": { ...base, values: { battery_wh: 9900, draw_w: 96, supply_w: 96, grid_hz: 60 }, sig: good },
     "block changed after signing": { ...base, block: "l0-rail-wells", sig: good },
     "time changed after signing": { ...base, time: new Date(Date.now() - 5000).toISOString(), sig: good },
     "sig is not hex": { ...base, sig: "zz-not-a-signature" },
@@ -98,9 +98,9 @@ test("sig from a device with no key on file: stored, but unverified and marked u
 });
 
 test("alerts say whether the reading that caused them was verified; verified survives a restart", async () => {
-  const bad = s.R("relay-l8-bore-bend", "l8-bore-bend", "power", { battery_pct: 59, grid_hz: 59.5 });
+  const bad = s.R("relay-l8-bore-bend", "l8-bore-bend", "power", { battery_wh: 5900, draw_w: 96, supply_w: 96, grid_hz: 59.5 });
   await s.post("/ingest", { ...bad, sig: S.sign(bad, KEY) });
-  const unsigned = s.R("relay", "l7-chalk-cut", "power", { battery_pct: 59, grid_hz: 59.5 });
+  const unsigned = s.R("relay", "l7-chalk-cut", "power", { battery_wh: 5900, draw_w: 96, supply_w: 96, grid_hz: 59.5 });
   await s.post("/ingest", unsigned);
   await s.restart();
   const alerts = await s.get("/history?kind=alert");

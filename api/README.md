@@ -276,11 +276,15 @@ Who gets power for a given supply, across all 70 blocks of `contract/blocks.json
 share side by side. `?policy=directorate` or `?policy=fair` returns just one. A block's demand is 100 W per person
 and its critical load (air, pumps, medical) 45 W per person; both are design choices in `shared/limits.json`.
 
-The example asks for 60% of what the sector needs. The Directorate's rule serves levels L0 to L6 in full and
+Give the supply in watts (`supply_w`) or as a share of what the sector needs (`supply_pct`). A block that has sent a
+`power` message uses its measured `draw_w` as demand instead of the estimate (`demand_source: "power reading"`);
+`&measured=0` ignores readings.
+
+The example asks for 60% of what the sector needs, before any relay has reported. The Directorate's rule serves levels L0 to L6 in full and
 leaves 18 blocks on L7 and L8 dark; fair share leaves none dark.
 
 ```
-GET /fairshare?supply_w=1927020000
+GET /fairshare?supply_pct=60
 ```
 
 ```json

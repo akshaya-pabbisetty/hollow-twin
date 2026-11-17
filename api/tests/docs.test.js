@@ -23,13 +23,13 @@ test("README documents every endpoint the server has, and every documented GET r
   const routes = [...new Set([...server.matchAll(/p === "(\/[a-z/]+)"/g)].map((m) => m[1]))];
   assert.ok(routes.length >= 17, `found ${routes.length} routes`);
   for (const r of routes) assert.ok(readme.includes(`${r}`), `README is missing ${r}`);
-  for (const p of ["/status", "/history", "/blocks", "/forecast", "/fairshare?supply_w=1927020000", "/queue", "/truth", "/surface", "/surface/history", "/firstwave?n=20", "/limits"])
+  for (const p of ["/status", "/history", "/blocks", "/forecast", "/fairshare?supply_pct=60", "/queue", "/truth", "/surface", "/surface/history", "/firstwave?n=20", "/limits"])
     assert.strictEqual((await s.getRaw(p)).status, 200, p);
 });
 
 test("the original endpoints and fields kept their shape", async () => {
   const b = "l8-bore-bend";
-  await s.post("/ingest", s.R("relay", b, "power", { battery_pct: 62, draw_w: 41.5, grid_hz: 59.97 }));
+  await s.post("/ingest", s.R("relay", b, "power", { battery_wh: 412, draw_w: 96, supply_w: 40, grid_hz: 59.97 }));
   await s.post("/ingest", s.R("watch-0001", b, "button", { button: "help" }));
   await s.post("/official", { block: b, count: 2 });
   const has = (obj, keys, what) => { for (const k of keys) assert.ok(k in obj, `${what} lost the field ${k}`); };
@@ -38,7 +38,7 @@ test("the original endpoints and fields kept their shape", async () => {
   has(hist[0], ["id", "device", "block", "time", "kind", "values"], "a reading");
   has(hist.find((r) => r.kind === "alert").values, ["level", "text", "cause"], "an alert");
   assert.ok(Array.isArray(await s.get("/blocks")));
-  has((await s.get(`/forecast?block=${b}`))[0], ["block", "battery_pct", "hours_left", "grid_hz", "grid_stress"], "/forecast");
+  has((await s.get(`/forecast?block=${b}`))[0], ["block", "battery_wh", "draw_w", "supply_w", "net_drain_w", "hours_left", "method", "level", "dark", "grid_hz", "grid_stress", "reasons"], "/forecast");
   const fair = await s.get("/fairshare?supply_w=9000");
   has(fair, ["directorate", "fair"], "/fairshare");
   has(fair.fair, ["policy", "supply_w", "blocks", "dark_blocks", "equity_index"], "/fairshare policy");
@@ -48,7 +48,7 @@ test("the original endpoints and fields kept their shape", async () => {
   const truth = await s.get("/truth");
   has(truth, ["window_h", "residents_total", "official_total", "blocks"], "/truth");
   has(truth.blocks[0], ["block", "residents", "official", "gap"], "/truth block");
-  has((await s.post("/ingest", s.R("relay", b, "power", { battery_pct: 61 }))).body, ["added", "dupes", "errors"], "/ingest reply");
+  has((await s.post("/ingest", s.R("relay", b, "power", { battery_wh: 400, draw_w: 96, supply_w: 40 }))).body, ["added", "dupes", "errors"], "/ingest reply");
   has((await s.post("/dispatch", { responder: "rover-01" })).body, ["assigned"], "/dispatch reply");
   assert.deepStrictEqual((await s.post("/family", { group: "g", devices: ["watch-0001"] })).body, { ok: true });
   has((await s.get("/family?group=g"))[0], ["device", "last_ok", "block"], "/family");
@@ -86,8 +86,8 @@ test("the guides cover what each lane was promised", () => {
 
 test("README numbers match what the server returns (fair share example)", async () => {
   const readme = read("README.md");
-  const supply = Number(/GET \/fairshare\?supply_w=(\d+)/.exec(readme)[1]); // the README's own example request
-  const fair = await s.get(`/fairshare?supply_w=${supply}`);
+  assert.ok(readme.includes("GET /fairshare?supply_pct=60"), "the README shows this example request");
+  const fair = await s.get("/fairshare?supply_pct=60&measured=0"); // the README shows a sector with no power readings yet
   const deep = fair.fair.blocks.find((x) => x.block === "l8-bore-bend");
   assert.ok(readme.includes(`"served_w": ${deep.served_w}, "served_pct": ${deep.served_pct}`), `README should show ${deep.served_w} W / ${deep.served_pct}%`);
   assert.ok(readme.includes(`"demand_total_w": ${fair.fair.demand_total_w}`), `README should show the sector demand ${fair.fair.demand_total_w}`);

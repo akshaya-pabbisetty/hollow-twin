@@ -70,10 +70,10 @@ test("air: stale warning at the Health Canada limit, danger at the OSHA limit", 
 test("flood and grid: alerts name their limit and source", async () => {
   const b = "l7-chalk-cut", nominal = limits.grid_nominal_hz.value, band = limits.grid_band_hz.value;
   await s.post("/ingest", s.R("sensor", b, "flood", { depth_cm: limits.flood_depth_closed_cm.value - 1 }));
-  await s.post("/ingest", s.R("relay", b, "power", { battery_pct: 100, grid_hz: +(nominal - band / 2).toFixed(3) }));
+  await s.post("/ingest", s.R("relay", b, "power", { battery_wh: 5000, draw_w: 100, supply_w: 100, grid_hz: +(nominal - band / 2).toFixed(3) }));
   assert.strictEqual((await s.get(`/history?kind=alert&block=${b}`)).length, 0, "inside both limits: silent");
   await s.post("/ingest", s.R("sensor", b, "flood", { depth_cm: limits.flood_depth_closed_cm.value + 5 }));
-  await s.post("/ingest", s.R("relay", b, "power", { battery_pct: 100, grid_hz: +(nominal - band * 2).toFixed(3) }));
+  await s.post("/ingest", s.R("relay", b, "power", { battery_wh: 5000, draw_w: 100, supply_w: 100, grid_hz: +(nominal - band * 2).toFixed(3) }));
   const al = await s.get(`/history?kind=alert&block=${b}`);
   const flood = al.find((a) => /Flooding/.test(a.values.text)), grid = al.find((a) => /power cut likely/.test(a.values.text));
   assert.match(flood.values.limit.source, /National Weather Service/);
@@ -84,13 +84,17 @@ test("flood and grid: alerts name their limit and source", async () => {
   assert.match(f.reasons[0], /NERC/);
 });
 
-test("battery warning: design-choice limit is named as one, with its reason", async () => {
+test("battery warning and alarm: the contract's levels (24 h and 8 h) are named as design choices, with their reason", async () => {
   const b = "l6-flint-face", H = 3600e3, now = Date.now();
-  await s.post("/ingest", [0, 1, 2, 3].map((i) => s.R("relay", b, "power", { battery_pct: 60 - 15 * i }, now - (3 - i) * H)));
-  const a = (await s.get(`/history?kind=alert&block=${b}`)).find((x) => x.values.hours_left !== undefined);
-  assert.strictEqual(a.values.limit.key, "battery_warn_hours");
-  assert.strictEqual(a.values.limit.type, "design choice");
-  assert.match(a.values.why, /is below 8 h \(design choice: /);
+  assert.deepStrictEqual([limits.battery_warn_hours.value, limits.battery_alarm_hours.value], [24, 8], "CONTRACT.md section 6");
+  // 2000 Wh draining at 100 W = 20 h (warning), then 600 Wh = 6 h (alarm)
+  await s.post("/ingest", s.R("relay", b, "power", { battery_wh: 2000, draw_w: 100, supply_w: 0 }, now - 14 * H));
+  await s.post("/ingest", s.R("relay", b, "power", { battery_wh: 600, draw_w: 100, supply_w: 0 }, now));
+  const [warn, alarm] = (await s.get(`/history?kind=alert&block=${b}`)).filter((x) => x.values.hours_left !== undefined);
+  assert.deepStrictEqual([warn.values.level, warn.values.limit.key, warn.values.limit.type], ["warn", "battery_warn_hours", "design choice"]);
+  assert.match(warn.values.why, /battery forecast 20 h is below 24 h \(design choice: CONTRACT\.md section 6/);
+  assert.deepStrictEqual([alarm.values.level, alarm.values.limit.key, alarm.values.limit.type], ["danger", "battery_alarm_hours", "design choice"]);
+  assert.match(alarm.values.why, /battery forecast 6 h is below 8 h \(design choice: CONTRACT\.md section 6/);
 });
 
 test("triage: NEWS2 bands drive the score and each point is explained", async () => {

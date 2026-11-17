@@ -44,40 +44,51 @@ test("format: valid readings stored, bad ones rejected with a reason", async () 
   assert.strictEqual((await post("/ingest", [null])).status, 400);
 });
 
-test("shot 3, warning: battery drain gives hours left and a watch warning under 8 h", async () => {
-  const now = Date.now() - 3 * H, b = "l6-flint-face"; // timeline ends at the real "now": readings from the future are rejected
-  // 80% -> 70% over the last 2 hours = 5%/h, so 70/5 = 14 h left: no warning yet
-  await post("/ingest", [0, 1, 2].map((i) => R("relay", b, "power", { battery_pct: 80 - 5 * i, draw_w: 40 }, now - (2 - i) * H)));
-  let f = (await get(`/forecast?block=${b}`))[0];
-  assert.ok(Math.abs(f.hours_left - 14) < 0.5, `expected ~14 h, got ${f.hours_left}`);
-  // drain speeds up: 70 -> 40 in 3 more hours
-  await post("/ingest", [1, 2, 3].map((i) => R("relay", b, "power", { battery_pct: 70 - 10 * i, draw_w: 80 }, now + i * H)));
-  f = (await get(`/forecast?block=${b}`))[0];
-  assert.ok(f.hours_left < 8, `expected under 8 h, got ${f.hours_left}`);
+test("shot 3, warning: hours left = battery_wh / (draw_w - supply_w); one warning under 24 h, one alarm under 8 h", async () => {
+  const now = Date.now() - 20 * H, b = "l6-flint-face"; // the timeline ends at the real "now"
+  const power = (battery_wh, draw_w, supply_w, hoursIn) => post("/ingest", R("relay", b, "power", { battery_wh, draw_w, supply_w }, now + hoursIn * H));
+  const hours = async () => (await get(`/forecast?block=${b}`))[0];
+  // mains still cover the block: nothing to forecast
+  await power(3000, 100, 100, 0);
+  let f = await hours();
+  assert.deepStrictEqual([f.hours_left, f.level, f.method, f.net_drain_w], [null, "ok", "net drain", 0]);
+  // supply drops to 40 W: 3000 Wh / (100 - 40) W = 50 h left
+  await power(3000, 100, 40, 1);
+  f = await hours();
+  assert.deepStrictEqual([f.hours_left, f.level, f.battery_wh, f.draw_w, f.supply_w, f.net_drain_w], [50, "ok", 3000, 100, 40, 60]);
+  assert.match(f.reasons[0], /battery 3000 Wh with draw 100 W and supply 40 W: net drain 60 W gives 50 h left/);
+  // supply fails completely, and the battery runs down: 2300/100 = 23 h (warning), 2000/100 = 20 h, 700/100 = 7 h (alarm), 500/100 = 5 h
+  for (const [wh, h] of [[2300, 8], [2000, 11], [700, 18], [500, 20]]) await power(wh, 100, 0, h);
+  f = await hours();
+  assert.deepStrictEqual([f.hours_left, f.level], [5, "alarm"]);
   const alerts = (await get(`/history?kind=alert&block=${b}`)).filter((a) => a.values.hours_left !== undefined);
-  assert.strictEqual(alerts.length, 1, "warns once, not on every reading");
-  assert.match(alerts[0].values.text, /h of battery left/);
+  assert.deepStrictEqual(alerts.map((a) => [a.values.level, a.values.hours_left, a.values.text]),
+    [["warn", 23, `${b} has about 23 h of battery left`], ["danger", 7, `${b} has about 7 h of battery left`]],
+    "one warning under 24 h and one alarm under 8 h, not one on every reading");
+  assert.deepStrictEqual(alerts.map((a) => a.values.limit.key), ["battery_warn_hours", "battery_alarm_hours"]);
 });
 
 test("hum upgrade: grid frequency sag warns BEFORE any battery is used", async () => {
-  const b = "l5-rail-face";
-  await post("/ingest", R("relay", b, "power", { battery_pct: 100, draw_w: 0, grid_hz: 60.01 }));
+  const b = "l5-rail-face", steady = { battery_wh: 5000, draw_w: 120, supply_w: 120 };
+  await post("/ingest", R("relay", b, "power", { ...steady, grid_hz: 60.01 }));
   assert.strictEqual((await get(`/history?kind=alert&block=${b}`)).length, 0, "normal hum: no alert");
-  await post("/ingest", R("relay", b, "power", { battery_pct: 100, draw_w: 0, grid_hz: 59.71 }));
+  await post("/ingest", R("relay", b, "power", { ...steady, grid_hz: 59.71 }));
   const a = await get(`/history?kind=alert&block=${b}`);
   assert.strictEqual(a.length, 1);
   assert.match(a[0].values.text, /power cut likely soon/);
-  assert.strictEqual((await get(`/forecast?block=${b}`))[0].battery_pct, 100, "battery still full when the warning fires");
+  const f = (await get(`/forecast?block=${b}`))[0];
+  assert.deepStrictEqual([f.battery_wh, f.hours_left, f.level, f.grid_stress], [5000, null, "ok", true], "battery still full and not draining when the warning fires");
 });
 
 test("shot 4, fair share across all 70 contract blocks: Directorate darkens deep levels, fair share darkens none", async () => {
   // what the sector needs comes from the people in contract/blocks.json: 100 W each, 45 W of it critical
+  // (measured=0: this server already holds power readings from the tests above; tests/logic.test.js covers those)
   const blocks = JSON.parse(fs.readFileSync(path.join(__dirname, "../../contract/blocks.json"), "utf8")).blocks;
   const people = blocks.reduce((s, b) => s + b.people, 0);
-  const totals = (await get("/fairshare?supply_w=0")).fair;
+  const totals = (await get("/fairshare?supply_w=0&measured=0")).fair;
   assert.deepStrictEqual([totals.blocks.length, totals.demand_total_w, totals.critical_total_w], [70, people * 100, people * 45]);
   const supply = Math.round(totals.demand_total_w * 0.6); // only 60% of what the sector needs is available
-  const r = await get(`/fairshare?supply_w=${supply}`);
+  const r = await get(`/fairshare?supply_w=${supply}&measured=0`);
   assert.deepStrictEqual(r.fair.blocks.map((b) => b.block), blocks.map((b) => b.id), "every contract block, in the file's order");
   assert.ok(r.directorate.dark_blocks.length >= 10, `Directorate dark: ${r.directorate.dark_blocks}`);
   assert.ok(r.directorate.dark_blocks.every((b) => L.levelOf(b) >= 7), "only the deepest levels go dark");
@@ -91,7 +102,7 @@ test("shot 4, fair share across all 70 contract blocks: Directorate darkens deep
 });
 
 test("fair share edge cases: below critical, above demand, zero", () => {
-  const S = L.sector();
+  const S = L.sector(); // no readings: every block is sized from its people
   const crit = S.reduce((s, b) => s + b.critical_w, 0), demand = S.reduce((s, b) => s + b.demand_w, 0);
   const low = L.allocate(S, crit / 2, "fair");            // less than the critical load
   assert.ok(low.blocks.every((b) => b.served_w > 0), "everyone gets a share of what exists");
@@ -115,14 +126,14 @@ test("shot 5, network dies: relay backlog arrives late and out of order, copies 
   assert.strictEqual(hist[0].time, held[0].time, "original reading times kept");
 });
 
-test("shot 5, families: 'I'm OK' from L1 reaches family on L7 only", async () => {
-  await post("/family", { group: "rao", devices: ["watch-0011", "watch-0071"] });
-  await post("/ingest", R("watch-0011", "l1-winch-gallery", "button", { button: "ok", family: "rao" }));
+test("shot 5, families: an \"I'm OK\" check-in from L1 reaches family on L7 only", async () => {
+  await post("/family", { group: "fam-0011", devices: ["watch-0011", "watch-0071"] });
+  await post("/ingest", R("watch-0011", "l1-winch-gallery", "checkin", { status: "ok", family: "fam-0011", to: [] }));
   const inbox = await get("/inbox?device=watch-0071");
   assert.ok(inbox.some((a) => /watch-0011 is OK/.test(a.values.text)));
   const stranger = await get("/inbox?device=watch-0099");
   assert.ok(!stranger.some((a) => /is OK/.test(a.values.text)), "not delivered to strangers");
-  const fam = await get("/family?group=rao");
+  const fam = await get("/family?group=fam-0011");
   assert.ok(fam.find((m) => m.device === "watch-0011").last_ok);
 });
 
@@ -199,7 +210,7 @@ test("restart: readings, families, official counts and dispatches survive a cras
   const before = (await get("/history")).length;
   await stopServer(); await startServer();
   assert.strictEqual((await get("/history")).length, before);
-  assert.ok((await get("/family?group=rao")).length === 2);
+  assert.ok((await get("/family?group=fam-0011")).length === 2);
   assert.strictEqual((await get("/truth")).blocks.find((r) => r.block === "l8-bore-bend").official, 2);
   assert.ok(!(await get("/queue")).some((x) => x.device === "watch-0042"), "dispatched stays dispatched");
   const old = (await get("/history?kind=air"))[0]; // a reading stored before the restart

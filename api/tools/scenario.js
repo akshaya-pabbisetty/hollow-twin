@@ -47,19 +47,23 @@ const pad = (s, n) => String(s).padEnd(n);
 // ---------------------------------------------------------------------------------------------------------------
 const shots = {};
 
-// Shot: the mains hum sags, the warning fires before any battery is used, then the battery forecast drops under 8 h.
+// Shot: the mains hum sags and the warning fires before any battery is used; then the mains fail and the forecast
+// (battery_wh / (draw_w - supply_w)) counts down through the 24 h warning and the 8 h alarm.
 shots.blackout = async () => {
   title("blackout: the grid warns us before the lights go out");
-  const block = "l6-flint-face", dev = "relay-06", t0 = Date.now() - 4 * H;
-  say(`Relay ${dev} in ${block} measures the mains frequency and its battery.`);
-  say("(Time is compressed: the last 4 hours of relay data are replayed, ending now.)");
+  // l6-flint-face: 723,000 people. The block draws 72.3 MW and its battery bank holds 1,800 MWh when full.
+  const block = "l6-flint-face", dev = `relay-${block}`, DRAW = 72.3e6, FULL = 1800e6;
+  const t0 = Date.now() - 18.5 * H, fail = t0 + 30 * MIN; // the story ends now; the mains fail half an hour in
+  const MWh = (wh) => `${Math.round(wh / 1e6).toLocaleString("en-US")} MWh`;
+  say(`Relay ${dev} reports the block's battery, draw and supply, and listens to the mains frequency.`);
+  say("(Time is compressed: the last 18 hours of relay data are replayed, ending now.)");
   if ((await get(`/history?block=${block}&kind=power`)).length)
     say("NOTE: this server already holds power data for this block, so the forecast will mix two takes.\n    For a clean take, stop the server, delete its data file and start it again (see README, 'Reset between takes').");
 
-  step("1. A normal day: the grid hums at 60 Hz");
+  step("1. A normal day: the mains cover the block and the grid hums at 60 Hz");
   for (const [i, hz] of [60.0, 59.99, 60.01].entries()) {
-    await send(R(dev, block, "power", { battery_pct: 100, draw_w: 0, grid_hz: hz }, t0 + i * 5 * MIN));
-    say(`grid ${hz.toFixed(2)} Hz, battery 100%`);
+    await send(R(dev, block, "power", { battery_wh: FULL, draw_w: DRAW, supply_w: DRAW, grid_hz: hz }, t0 + i * 5 * MIN));
+    say(`grid ${hz.toFixed(2)} Hz, battery ${MWh(FULL)} (full), supply covers the draw`);
     await beat(1.2);
   }
   check((await alertsFor(block)).length === 0, "no alert while the grid is inside its normal band");
@@ -67,37 +71,45 @@ shots.blackout = async () => {
 
   step("2. The frequency sags: power plants are struggling");
   for (const [i, hz] of [59.95, 59.9].entries()) {
-    await send(R(dev, block, "power", { battery_pct: 100, draw_w: 0, grid_hz: hz }, t0 + (15 + i * 5) * MIN));
-    say(`grid ${hz.toFixed(2)} Hz, battery 100%`);
+    await send(R(dev, block, "power", { battery_wh: FULL, draw_w: DRAW, supply_w: DRAW, grid_hz: hz }, t0 + (15 + i * 5) * MIN));
+    say(`grid ${hz.toFixed(2)} Hz, battery ${MWh(FULL)} (full), supply covers the draw`);
     await beat(1.2);
   }
   const grid = (await alertsFor(block)).find((a) => /power cut likely/.test(a.values.text));
   if (grid) { say(`ALERT (${grid.values.level}): ${grid.values.text}`); say(`why: ${grid.values.why}`); }
-  check(!!grid, "the warning fired while the battery was still at 100%");
+  check(!!grid, "the grid warning fired while the battery was still full and not draining");
   await beat();
 
-  step("3. The mains fail. The block runs on its battery");
+  step("3. The mains fail. The block runs on its battery: hours left = battery / (draw - supply)");
   let f;
-  for (const [i, pct] of [97, 90, 78, 62].entries()) {
-    await send(R(dev, block, "power", { battery_pct: pct, draw_w: 80 + i * 15 }, t0 + (i + 1) * H));
+  const told = new Set();
+  for (const hour of [0, 1, 6, 12, 17, 18]) {
+    const left = FULL - hour * DRAW;
+    await send(R(dev, block, "power", { battery_wh: left, draw_w: DRAW, supply_w: 0 }, fail + hour * H));
     f = (await get(`/forecast?block=${block}`))[0];
-    say(`hour ${i + 1}: battery ${pct}%  ->  forecast: ${f.hours_left === null ? "steady" : f.hours_left + " h left"}`);
+    say(`${pad(`hour ${hour} on battery:`, 20)}${pad(MWh(left), 11)} left, drawing ${DRAW / 1e6} MW  ->  ${f.hours_left} h left  (${f.level})`);
+    for (const a of (await alertsFor(block)).filter((x) => x.values.hours_left !== undefined && !told.has(x.id))) {
+      told.add(a.id);
+      say(`ALERT (${a.values.level}) to every watch in the block: ${a.values.text}`);
+      say(`why: ${a.values.why}`);
+    }
     await beat(1.8);
   }
-  const fc = (await alertsFor(block)).find((a) => a.values.hours_left !== undefined);
-  if (fc) { say(`ALERT (${fc.values.level}) to every watch in the block: ${fc.values.text}`); say(`why: ${fc.values.why}`); }
-  check(f.hours_left !== null && f.hours_left < 8, `battery forecast is under 8 h (${f.hours_left} h)`);
-  check(!!fc, "the under-8-hours warning reached the block");
-  check(!!grid && !!fc && grid.seq < fc.seq, "the grid warning came first, before the battery warning");
+  const battery = (await alertsFor(block)).filter((a) => a.values.hours_left !== undefined);
+  const warn = battery.find((a) => a.values.level === "warn"), alarm = battery.find((a) => a.values.level === "danger");
+  check(!!warn && warn.values.hours_left < 24, `the warning went out with about a day to go (${warn ? warn.values.hours_left : "?"} h left)`);
+  check(!!alarm && alarm.values.hours_left < 8, `the alarm went out under 8 h (${alarm ? alarm.values.hours_left : "?"} h left)`);
+  check(battery.length === 2, "one warning and one alarm, not one on every reading");
+  check(f.method === "net drain" && f.level === "alarm" && f.hours_left < 8, `the forecast is ${f.hours_left} h, from battery_wh / (draw_w - supply_w)`);
+  check(!!grid && !!warn && !!alarm && grid.seq < warn.seq && warn.seq < alarm.seq, "the grid warning came first, then the battery warning, then the alarm");
 };
 
 // Shot: the same supply, shared two ways.
 shots.fairshare = async () => {
   title("fairshare: the same power, shared two ways");
   const MW = (w) => `${Math.round(w / 1e6).toLocaleString("en-US")} MW`;
-  const need = (await get("/fairshare?supply_w=0")).fair; // what the whole sector needs, from the people in contract/blocks.json
-  const supply = Math.round(need.demand_total_w * 0.6);
-  const r = await get(`/fairshare?supply_w=${supply}`);
+  // measured=0: size every block from its people, so the comparison does not depend on which relays have reported
+  const r = await get("/fairshare?supply_pct=60&measured=0"), need = r.fair, supply = r.fair.supply_w;
   say(`The sector's ${r.fair.blocks.length} blocks need ${MW(need.demand_total_w)}. Only ${MW(supply)} is available (60%). Who gets it?`);
   say(need.basis);
   step("1. The Directorate's rule");

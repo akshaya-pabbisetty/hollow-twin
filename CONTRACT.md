@@ -84,6 +84,7 @@ Everything in this table is optional. The rows above are unchanged.
 
 | Kind | Addition |
 | --- | --- |
+| `power` | Optional `grid_hz`: the mains frequency the relay hears, in Hz. When it is present the API warns of a likely power cut as soon as it leaves the normal band around 60 Hz, before any battery is used. Optional `battery_pct`: battery charge in percent, for a relay that cannot report `battery_wh`; the forecast then falls back to fitting the level over time. |
 | `button` | `button` may also be `volunteer`: the wearer offers to join the first wave to the surface (`GET /firstwave`). |
 | `surface` | Optional `o2_pct` (oxygen, % by volume) and `pm25_ugm3` (fine dust, µg/m3). Every surface value is optional per message: send what you measure. The surface verdict needs all five readings (`co2_ppm`, `temp_c`, `radiation_usv_h`, `o2_pct`, `pm25_ugm3`); until a scout has sent each one at least once the verdict is `not enough data`. |
 | `alert` | A new kind written only by the API (`device` is `backend`), never accepted on `/ingest`. It is how warnings travel back down to watches and to the twin. `values`: `level` (`info`, `warn` or `danger`), `text` (one line for a watch screen), `why` (the reading, the limit it crossed and the limit's source), `cause` (the `id` of the message that triggered it), and `to` (a list of watch IDs) when it is addressed to particular watches. |
@@ -142,3 +143,5 @@ Additions only. Nothing above was renamed or removed. Each row says where the ad
 | 2026-11-16 | 2.1 | `surface` optional values `o2_pct` and `pm25_ugm3`. |
 | 2026-11-16 | 2.1 | Kind `alert`, written only by the API. |
 | 2026-11-16 | 1.3 | Rules: a `block` that is not in `contract/blocks.json` (and is not `surface`) is rejected; a `device` id that does not match section 3 is accepted with a warning. |
+| 2026-11-16 | 2.1 | `power` optional value `grid_hz` (mains frequency, the early blackout warning). |
+| 2026-11-16 | 2.1 | `power` optional value `battery_pct` (for a relay that cannot report `battery_wh`). |

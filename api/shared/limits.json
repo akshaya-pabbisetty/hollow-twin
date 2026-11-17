@@ -214,24 +214,32 @@
       "reason": "Life support (air fans and scrubbers, water pumps, medical) is taken as 45% of demand, the same floor the twin's own fair-share rule protects. It is never shed."
     },
     "battery_warn_hours": {
+      "value": 24, "unit": "h", "op": "<", "type": "design choice",
+      "reason": "CONTRACT.md section 6, the twin's warning level: a full day to plan around. No published limit exists for battery hours."
+    },
+    "battery_alarm_hours": {
       "value": 8, "unit": "h", "op": "<", "type": "design choice",
-      "reason": "One sleep or work shift: enough warning to charge watches, fill water and move people before the block goes dark."
+      "reason": "CONTRACT.md section 6, the twin's alarm level: one sleep or work shift, the last chance to charge watches, fill water and move people."
     },
     "battery_rearm_margin_hours": {
       "value": 2, "unit": "h", "type": "design choice",
-      "reason": "The warning can fire again only after the forecast recovers to battery_warn_hours + this margin, so watches are not spammed when the forecast hovers at the line."
+      "reason": "A battery warning or alarm can fire again only after the forecast recovers to its level + this margin (or the battery stops draining), so watches are not spammed when the forecast hovers at the line."
     },
     "forecast_points": {
       "value": 30, "unit": "readings", "type": "design choice",
-      "reason": "The battery slope is fitted over the latest 30 power readings: long enough to smooth noise, short enough to follow a change in drain."
+      "reason": "Slope fallback only: the battery level is fitted over the latest 30 power readings, long enough to smooth noise, short enough to follow a change in drain."
     },
     "forecast_grid_avg_points": {
       "value": 5, "unit": "readings", "type": "design choice",
       "reason": "Grid frequency in /forecast is the mean of the latest 5 readings so one noisy sample does not flip grid_stress."
     },
+    "forecast_min_net_drain_w": {
+      "value": 0.01, "unit": "W", "type": "design choice",
+      "reason": "A net drain (draw_w - supply_w) at or below this counts as 'not draining', so hours_left is null instead of a huge meaningless number. Also the flat-slope cut-off when the fallback fits battery_wh (Wh per hour is watts)."
+    },
     "forecast_min_drain_pct_per_h": {
       "value": 0.01, "unit": "%/h", "type": "design choice",
-      "reason": "A slope flatter than this counts as 'not draining', so hours_left is null instead of a huge meaningless number."
+      "reason": "Slope fallback on the optional battery_pct: a slope flatter than this counts as 'not draining', so hours_left is null instead of a huge meaningless number."
     },
     "triage_base_points": {
       "value": 50, "unit": "points", "type": "design choice",

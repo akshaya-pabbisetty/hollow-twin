@@ -187,3 +187,35 @@ sections below replace it.
 - `level` in responses is the contract's code (`"L8"`), as in `contract/blocks.json`. It used to be a number.
 - The people register (`shared/people.json`) uses `watch-<4 digits>` ids (`watch-0051` to `watch-0060`).
 - The demo scenarios got the minimum change needed to run against real block ids; their full update is task 7.
+
+## Task 3: logic on contract data
+
+- **Forecast.** Main method: `hours_left = battery_wh / (draw_w - supply_w)` from the latest `power` message, while
+  the net drain is above 0. A missing `supply_w` counts as 0 (running on the battery alone). Supply at or above
+  draw gives `hours_left: null` ("not draining"), never a fallback guess. The slope method is used only when the
+  latest message cannot give a net drain (no `draw_w`, or only `battery_pct`); on `battery_wh` the fitted slope
+  is itself a net drain in watts.
+- **Levels** are CONTRACT.md section 6: warning under 24 h, alarm under 8 h or dark. My old single warning at 8 h
+  was a design choice, not a sourced limit, so the contract's numbers replace it (`battery_warn_hours` 24,
+  `battery_alarm_hours` 8, both marked design choices that cite the contract).
+- **Dark** means: battery at 0 and supply below draw. **Brownout** (the twin's other warning case) cannot be told
+  from a `power` message, which carries no demand figure; `/fairshare` shows it instead (`served_pct` under 100).
+- One warning and one alarm per slide down. A level re-arms when the forecast is back above it by 2 h, or the
+  battery stops draining. A block that starts under 8 h gets the alarm only. This state is in memory, as before:
+  after a restart the next power message can repeat an alert.
+- `/forecast` rows now carry `battery_wh`, `draw_w`, `supply_w`, `net_drain_w`, `method`, `level`, `dark`.
+  `battery_pct` and `drain_pct_per_h` appear only for a relay that sends percent.
+- **`battery_pct` was added to CONTRACT.md as optional**, next to the requested `grid_hz`. It keeps the old
+  percent-based forecast working and makes `battery_pct` a contract name rather than a hidden alias.
+- **Fair share, measured draw.** A block with a `power` message uses its latest `draw_w` as demand; its critical
+  load keeps the 45% share. Live and simulated readings both count (the row says which, in `demand_reading`).
+  Caution for the demo: a desk relay reporting 96 W replaces a 77 MW estimate for its block, so that block looks
+  almost free to serve. `?measured=0` gives the people-only table, and the fair-share demo shot uses it.
+- `/fairshare` also takes `supply_pct` (percent of sector demand), because absolute watts for 70 blocks are
+  unwieldy and the twin's own supply is not in watts.
+- **Check-ins.** A `checkin` goes to the watches in `to` plus everyone in its `family` group, minus the sender. A
+  family group is the watches registered with `POST /family` plus every watch that has itself checked in naming the
+  group (rebuilt from stored messages on restart), so relatives find each other without a setup step. The alert
+  carries `hops` and `via` so the twin can draw the relayed route. A check-in with nobody to tell is stored and
+  raises no alert.
+- The blackout demo shot was rewritten on contract power values at block scale (72.3 MW draw, 1,800 MWh battery).

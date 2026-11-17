@@ -15,40 +15,103 @@ function gridWhy(hz) {
   return `grid frequency ${hz} Hz is ${gridDev(hz)} Hz from ${LIM.val("grid_nominal_hz")} Hz, outside the normal +/- ${band.value} Hz band (${band.source})`;
 }
 
-// 1. Blackout forecast: battery slope per block -> hours left. Grid frequency gives the early warning.
+const isNum = (x) => typeof x === "number" && !Number.isNaN(x);
+const isAmount = (x) => isNum(x) && x >= 0; // a measured quantity that cannot be negative
+const byTime = (a, b) => t(a) - t(b);
+
+// Least-squares slope of y against time, per hour. Negative = falling.
+function slopePerHour(pts, y) {
+  const x0 = t(pts[0]);
+  const xs = pts.map((p) => (t(p) - x0) / HOUR), ys = pts.map(y);
+  const mx = xs.reduce((a, b) => a + b, 0) / xs.length, my = ys.reduce((a, b) => a + b, 0) / ys.length;
+  let num = 0, den = 0;
+  xs.forEach((x, i) => { num += (x - mx) * (ys[i] - my); den += (x - mx) ** 2; });
+  return den ? num / den : 0;
+}
+
+// 1. Blackout forecast, per block, from `power` messages (CONTRACT.md: battery_wh, draw_w, supply_w).
+//
+//    Main method ("net drain"): the latest reading says how much is in the battery and how fast it is going:
+//        hours_left = battery_wh / (draw_w - supply_w)        while draw_w is above supply_w
+//    Fallback ("slope"): when the latest reading cannot give that (no draw_w, or only the optional battery_pct),
+//    the battery level is fitted over the latest readings and extended to zero.
+//
+//    level: "ok", "warn" (under battery_warn_hours), "alarm" (under battery_alarm_hours, or dark), or "unknown"
+//    (no usable battery reading yet). The two levels are CONTRACT.md section 6. Grid frequency (optional grid_hz)
+//    gives the early warning before any battery is used.
 function forecast(readings, block) {
-  const pts = readings.filter((r) => r.block === block && r.kind === "power" && r.values.battery_pct !== undefined)
-    .sort((a, b) => t(a) - t(b)).slice(-LIM.val("forecast_points"));
-  const last = pts[pts.length - 1];
-  const hz = readings.filter((r) => r.block === block && r.kind === "power" && r.values.grid_hz !== undefined)
-    .sort((a, b) => t(a) - t(b)).slice(-LIM.val("forecast_grid_avg_points")).map((r) => r.values.grid_hz);
+  const power = readings.filter((r) => r.block === block && r.kind === "power").sort(byTime);
+  const hz = power.filter((r) => isNum(r.values.grid_hz)).slice(-LIM.val("forecast_grid_avg_points")).map((r) => r.values.grid_hz);
   const grid_hz = hz.length ? +(hz.reduce((a, b) => a + b, 0) / hz.length).toFixed(3) : null;
   const grid_stress = grid_hz !== null && gridOff(grid_hz);
   const reasons = [];
   if (grid_stress) reasons.push(gridWhy(grid_hz));
-  if (pts.length < 2) return { block, battery_pct: last ? last.values.battery_pct : null, hours_left: null, grid_hz, grid_stress, reasons };
-  // least-squares slope of battery % per hour
-  const x0 = t(pts[0]);
-  const xs = pts.map((p) => (t(p) - x0) / HOUR), ys = pts.map((p) => p.values.battery_pct);
-  const mx = xs.reduce((a, b) => a + b, 0) / xs.length, my = ys.reduce((a, b) => a + b, 0) / ys.length;
-  let num = 0, den = 0;
-  xs.forEach((x, i) => { num += (x - mx) * (ys[i] - my); den += (x - mx) ** 2; });
-  const slope = den ? num / den : 0; // % per hour
-  const hours_left = slope < -LIM.val("forecast_min_drain_pct_per_h") ? +(last.values.battery_pct / -slope).toFixed(1) : null;
-  if (hours_left !== null) {
-    reasons.push(`battery ${last.values.battery_pct}% falling ${(-slope).toFixed(2)} %/h gives ${hours_left} h left`);
-    if (LIM.crossed("battery_warn_hours", hours_left)) reasons.push(LIM.why("forecast", hours_left, "battery_warn_hours"));
+  const out = { block, battery_wh: null, draw_w: null, supply_w: null, net_drain_w: null, hours_left: null, method: null,
+    level: "unknown", dark: false, grid_hz, grid_stress, reasons, time: null, source: null };
+  const last = power[power.length - 1];
+  if (!last) return out;
+  const v = last.values, minDrain = LIM.val("forecast_min_net_drain_w");
+  out.time = last.time; out.source = last.source;
+  for (const f of ["battery_wh", "draw_w", "supply_w"]) if (isNum(v[f])) out[f] = v[f];
+  if (isNum(v.battery_pct)) out.battery_pct = v.battery_pct; // optional extra, only shown when a relay sends it
+
+  if (isNum(v.battery_wh) && isNum(v.draw_w)) {
+    const supply = isNum(v.supply_w) ? v.supply_w : 0; // a relay that reports no supply is running on its battery alone
+    const net = +(v.draw_w - supply).toFixed(3), left = Math.max(0, v.battery_wh);
+    out.method = "net drain"; out.net_drain_w = net;
+    if (net > minDrain) {
+      out.hours_left = +(left / net).toFixed(1);
+      out.dark = left === 0;
+      reasons.push(out.dark
+        ? `battery empty and supply ${supply} W is below the draw of ${v.draw_w} W: the block is dark`
+        : `battery ${v.battery_wh} Wh with draw ${v.draw_w} W and supply ${supply} W: net drain ${net} W gives ${out.hours_left} h left`);
+    } else reasons.push(`supply ${supply} W covers the draw of ${v.draw_w} W: the battery is not draining`);
+  } else {
+    // slope fallback, on whichever battery level the relay reports: Wh (contract) or the optional percent
+    const key = ["battery_wh", "battery_pct"].find((k) => isNum(v[k])) || ["battery_wh", "battery_pct"].find((k) => power.some((r) => isNum(r.values[k])));
+    const pts = key ? power.filter((r) => isNum(r.values[key])).slice(-LIM.val("forecast_points")) : [];
+    if (pts.length) {
+      const level = pts[pts.length - 1].values[key], unit = key === "battery_wh" ? "Wh" : "%";
+      out[key] = level;
+      if (level <= 0) { out.method = "slope"; out.dark = true; out.hours_left = 0; reasons.push(`battery at ${level} ${unit}: the block is dark`); }
+      else if (pts.length >= 2) {
+        const slope = slopePerHour(pts, (p) => p.values[key]); // Wh per hour (= watts) or % per hour
+        const flat = key === "battery_wh" ? minDrain : LIM.val("forecast_min_drain_pct_per_h");
+        out.method = "slope";
+        if (key === "battery_wh") out.net_drain_w = +(-slope).toFixed(3); else out.drain_pct_per_h = +slope.toFixed(2);
+        if (slope < -flat) {
+          out.hours_left = +(level / -slope).toFixed(1);
+          reasons.push(`battery ${level} ${unit} falling ${(-slope).toFixed(2)} ${unit}/h over the last ${pts.length} readings gives ${out.hours_left} h left`);
+        } else reasons.push(`battery level is steady over the last ${pts.length} readings: not draining`);
+      } else reasons.push("one battery reading without draw_w: not enough to forecast yet");
+    }
   }
-  return { block, battery_pct: last.values.battery_pct, drain_pct_per_h: +slope.toFixed(2), hours_left, grid_hz, grid_stress, reasons };
+  if (out.method) {
+    const alarm = out.dark || LIM.crossed("battery_alarm_hours", out.hours_left), warn = LIM.crossed("battery_warn_hours", out.hours_left);
+    out.level = alarm ? "alarm" : warn ? "warn" : "ok";
+    if (!out.dark && (alarm || warn)) reasons.push(LIM.why("forecast", out.hours_left, alarm ? "battery_alarm_hours" : "battery_warn_hours"));
+  }
+  return out;
 }
 
 // 2. Fair share vs Directorate priority for a given supply (watts), across every block in contract/blocks.json.
 // What a block needs is worked out from how many people live there. Both figures are design choices in limits.json:
 //   demand_w   = people x fairshare_demand_w_per_person     everything the block runs
 //   critical_w = people x fairshare_critical_w_per_person   air, pumps, medical: never shed
-function sector(blocks = B.list) {
+// A block that has sent a `power` message is no longer an estimate: its latest measured draw_w is its demand, and its
+// critical load keeps the same share of it. Pass measured = false to ignore readings and use people only.
+function sector(readings = [], measured = true, blocks = B.list) {
   const demand = LIM.val("fairshare_demand_w_per_person"), critical = LIM.val("fairshare_critical_w_per_person");
-  return blocks.map((b) => ({ ...b, demand_w: b.people * demand, critical_w: b.people * critical, demand_source: "people" }));
+  const latest = {}; // block -> its newest power reading that carries a usable draw_w
+  if (measured)
+    for (const r of readings)
+      if (r.kind === "power" && isAmount(r.values.draw_w) && (!latest[r.block] || t(r) >= t(latest[r.block]))) latest[r.block] = r;
+  return blocks.map((b) => {
+    const p = latest[b.block];
+    if (!p) return { ...b, demand_w: b.people * demand, critical_w: b.people * critical, demand_source: "people" };
+    return { ...b, demand_w: p.values.draw_w, critical_w: (p.values.draw_w * critical) / demand, demand_source: "power reading",
+      demand_reading: { id: p.id, device: p.device, time: p.time, source: p.source } };
+  });
 }
 
 // Directorate: serve upper levels fully first; deep levels get what is left.
@@ -92,9 +155,11 @@ function allocate(blocks, supply_w, policy) {
     rule: policy === "directorate"
       ? "Directorate: upper levels are served in full first; deeper levels get whatever is left."
       : "Fair share: every block's critical load (air, pumps, medical) first, then the rest split per person.",
-    basis: `A block's demand is ${LIM.val("fairshare_demand_w_per_person")} W per person and its critical load ${LIM.val("fairshare_critical_w_per_person")} W per person (design choices, see /limits), from the people in contract/blocks.json.`,
-    blocks: out.map(({ block, name, level, people, demand_w, critical_w, demand_source, served_w, served_pct, dark }) =>
-      ({ block, name, level, people, demand_w: Math.round(demand_w), critical_w: Math.round(critical_w), demand_source, served_w, served_pct, dark })),
+    basis: `A block's demand is ${LIM.val("fairshare_demand_w_per_person")} W per person and its critical load ${LIM.val("fairshare_critical_w_per_person")} W per person (design choices, see /limits), from the people in contract/blocks.json. A block that has sent a power message uses its measured draw_w instead (demand_source: "power reading").`,
+    measured_blocks: out.filter((b) => b.demand_source !== "people").map((b) => b.block),
+    blocks: out.map(({ block, name, level, people, demand_w, critical_w, demand_source, demand_reading, served_w, served_pct, dark }) =>
+      ({ block, name, level, people, demand_w: Math.round(demand_w), critical_w: Math.round(critical_w), demand_source,
+        ...(demand_reading ? { demand_reading } : {}), served_w, served_pct, dark })),
     dark_blocks: out.filter((b) => b.dark).map((b) => b.block),
     equity_index: per.length && Math.max(...per) > 0 ? +(Math.min(...per) / Math.max(...per)).toFixed(2) : 0,
   };

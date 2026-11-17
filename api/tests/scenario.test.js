@@ -24,17 +24,18 @@ const clean = (r) => {
   assert.match(r.out, /All checks passed\./);
 };
 
-test("blackout: grid warning first, then the battery forecast drops under 8 h", async () => {
+test("blackout: grid warning first, then the battery forecast counts down through the 24 h warning and the 8 h alarm", async () => {
   const r = await run("blackout"); clean(r);
   const b = "l6-flint-face";
   const f = (await r.s.get(`/forecast?block=${b}`))[0];
-  assert.ok(f.hours_left < 8, `forecast ${f.hours_left}`);
+  assert.deepStrictEqual([f.hours_left, f.level, f.method], [6.9, "alarm", "net drain"]);
   const alerts = await r.s.get(`/history?kind=alert&block=${b}`);
-  const grid = alerts.find((a) => /power cut likely/.test(a.values.text)), fc = alerts.find((a) => a.values.hours_left !== undefined);
-  assert.ok(grid && fc && grid.seq < fc.seq, "grid warning is stored before the battery warning");
-  assert.strictEqual(alerts.filter((a) => a.values.hours_left !== undefined).length, 1, "the battery warning fired once");
-  const battAtWarning = (await r.s.get(`/history?kind=power&block=${b}`)).find((p) => p.id === grid.values.cause).values.battery_pct;
-  assert.strictEqual(battAtWarning, 100, "battery was still full when the grid warning fired");
+  const grid = alerts.find((a) => /power cut likely/.test(a.values.text)), battery = alerts.filter((a) => a.values.hours_left !== undefined);
+  assert.deepStrictEqual(battery.map((a) => [a.values.level, a.values.hours_left]), [["warn", 23.9], ["danger", 7.9]], "one warning and one alarm");
+  assert.ok(grid && grid.seq < battery[0].seq, "grid warning is stored before the battery warning");
+  const atWarning = (await r.s.get(`/history?kind=power&block=${b}`)).find((p) => p.id === grid.values.cause).values;
+  assert.deepStrictEqual([atWarning.battery_wh, atWarning.supply_w], [1800e6, atWarning.draw_w], "battery full and supply covering the draw when the grid warning fired");
+  assert.ok((await r.s.get(`/history?kind=power&block=${b}`)).every((p) => p.device === `relay-${b}` && !p.warnings), "contract device id, no warnings");
 });
 
 test("fairshare: Directorate vs fair numbers for the same supply", async () => {

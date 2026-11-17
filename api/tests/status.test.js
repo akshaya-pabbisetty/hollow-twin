@@ -30,7 +30,7 @@ test("a fresh, empty server: every section is present and empty, nothing throws"
 test("one poll shows forecast, alerts, queue, truth, surface, live vs simulated and verified counts", async () => {
   const now = Date.now(), deep = "l8-bore-bend", market = "l2-chalk-gallery";
   // deepwell: a real relay, signed and live, draining 15 %/h with the grid sagging
-  const power = [0, 1, 2, 3].map((i) => s.R("relay", deep, "power", { battery_pct: 60 - 15 * i, grid_hz: 59.9 }, now - (3 - i) * H, { source: "live" }));
+  const power = [0, 1, 2, 3].map((i) => s.R("relay", deep, "power", { battery_wh: 600 - 150 * i, draw_w: 150, supply_w: 0, grid_hz: 59.9 }, now - (3 - i) * H, { source: "live" }));
   await s.post("/ingest", power.map((r) => ({ ...r, sig: S.sign(r, "status-test-key") })));
   // market: scripted (simulated, unsigned) air and a sick resident asking for help
   await s.post("/ingest", s.R("sensor", market, "air", { co2_ppm: 1500 }));

@@ -52,7 +52,8 @@ const clients = new Set();
 const dispatched = new Set();
 const families = {};   // group -> [devices]
 const official = {};   // block -> count
-const forecastWarned = new Set();
+const forecastTold = new Map(); // block -> the worst battery level its residents have been told about (1 = warn, 2 = alarm)
+const learned = {};             // family group -> Set of watches that have checked in naming it
 let surfaceVerdict = null; // the last verdict written to the public record
 let lastSeq = 0;       // every stored record gets the next number; it is the SSE event id and is saved with the record
 
@@ -73,7 +74,7 @@ function load() {
     // lines written before the contract: rename their values so everything served uses contract names
     if (r.kind !== "alert" && r.values && typeof r.values === "object") r.values = C.normalise(r.kind, r.values).values;
     r.seq = lastSeq = Math.max(lastSeq + 1, r.seq || 0); // older files have no seq: number them in file order
-    readings.push(r); seen.add(r.id);
+    readings.push(r); seen.add(r.id); learn(r);
     if (r.kind === "alert" && r.values && r.values.surface_verdict) surfaceVerdict = r.values.surface_verdict;
   }
 }
@@ -83,6 +84,16 @@ function applyMeta(m) {
   if (m.official) official[m.official.block] = m.official.count;
 }
 function saveMeta(m) { applyMeta(m); fs.appendFileSync(DATA, JSON.stringify({ _meta: m }) + "\n"); }
+
+// A family group is the watches registered for it (POST /family) plus every watch that has itself checked in
+// naming that group. So two relatives who both press "I'm OK" for fam-0007 find each other with no setup step.
+function learn(r) {
+  const family = r.values && typeof r.values.family === "string" && r.values.family;
+  if (family && (r.kind === "checkin" || r.kind === "button")) (learned[family] ||= new Set()).add(r.device);
+}
+const familyOf = (group) => [...new Set([...(families[group] || []), ...(learned[group] || [])])];
+// the newest "I'm OK" from a watch, whichever way it was sent
+const isOk = (r) => (r.kind === "checkin" && (r.values.status === undefined || r.values.status === "ok")) || (r.kind === "button" && r.values.button === "ok");
 
 // Turns what a device sent into the record we store ({ rec }), or the reasons for refusing it ({ id, problems }).
 // The record uses contract names only: legacy value names are renamed here, on the way in.
@@ -141,13 +152,23 @@ function rules(r) {
     if (typeof v.grid_hz === "number" && L.gridOff(v.grid_hz))
       out.push(alert(r, "danger", `Grid frequency ${v.grid_hz} Hz: power cut likely soon in ${r.block}`,
         { why: L.gridWhy(v.grid_hz), limit: LIM.ref("grid_band_hz"), limits: [LIM.ref("grid_band_hz"), LIM.ref("grid_nominal_hz")] }, "grid"));
-    const f = L.forecast(readings, r.block);
-    const low = LIM.hits([["battery_warn_hours", f.hours_left, "battery forecast"]]);
-    if (low.length && !forecastWarned.has(r.block)) {
-      forecastWarned.add(r.block);
-      out.push(alert(r, "warn", `${r.block} has about ${Math.round(f.hours_left)} h of battery left`, { hours_left: f.hours_left, ...LIM.because(low) }, "fc"));
+    // Battery: one warning (CONTRACT.md section 6: under 24 h) and one alarm (under 8 h, or dark) per slide down.
+    const f = L.forecast(readings, r.block), now = f.level === "alarm" ? 2 : f.level === "warn" ? 1 : 0, told = forecastTold.get(r.block) || 0;
+    if (now > told) {
+      forecastTold.set(r.block, now);
+      const key = now === 2 ? "battery_alarm_hours" : "battery_warn_hours";
+      const whole = Math.round(f.hours_left), left = whole ? `about ${whole} h` : "less than 1 h";
+      out.push(alert(r, now === 2 ? "danger" : "warn",
+        f.dark ? `${r.block} is dark: its battery is empty` : `${r.block} has ${left} of battery left`,
+        { hours_left: f.hours_left, forecast_level: f.level, method: f.method, dark: f.dark,
+          ...(f.dark ? { why: f.reasons[f.reasons.length - 1], limit: LIM.ref(key), limits: [LIM.ref(key)] } : LIM.because(LIM.hits([[key, f.hours_left, "battery forecast"]]))) }, "fc"));
+    } else if (now < told && f.method && !f.dark) {
+      // Re-arm a level only once the forecast is clearly back above it (or the battery stopped draining),
+      // so a forecast hovering at a line does not buzz every watch on every reading.
+      const margin = LIM.val("battery_rearm_margin_hours");
+      const clear = (key) => f.hours_left === null || f.hours_left >= LIM.val(key) + margin;
+      forecastTold.set(r.block, Math.max(now, clear("battery_warn_hours") ? 0 : clear("battery_alarm_hours") ? 1 : told));
     }
-    if (f.hours_left !== null && f.hours_left >= LIM.val("battery_warn_hours") + LIM.val("battery_rearm_margin_hours")) forecastWarned.delete(r.block);
   }
   if (r.kind === "water") {
     const h = LIM.hits([["water_tds_max_ppm", v.tds_ppm, "TDS"], ["water_turbidity_max_ntu", v.turbidity_ntu, "turbidity"]]);
@@ -187,9 +208,17 @@ function rules(r) {
   }
   if (r.kind === "button" && v.button === "help")
     out.push(alert(r, "danger", `Help requested by ${r.device} in ${r.block}`, { why: `${r.device} pressed the help button` }));
-  if (r.kind === "button" && v.button === "ok" && v.family && families[v.family]) {
-    const to = families[v.family].filter((d) => d !== r.device);
-    out.push(alert(r, "info", `${r.device} is OK (${r.block})`, { to, family: v.family, sent: r.time, why: `${r.device} pressed OK for family group ${v.family}` }));
+  // "I'm OK": a contract `checkin` (or, before the contract, an ok button press naming a family group).
+  // It goes to the watches listed in `to` and to everyone in its family group, never to strangers.
+  if (r.kind === "checkin" || (r.kind === "button" && v.button === "ok" && v.family)) {
+    const family = typeof v.family === "string" && v.family ? v.family : null;
+    const direct = Array.isArray(v.to) ? v.to : [];
+    const to = [...new Set([...direct, ...(family ? familyOf(family) : [])])].filter((d) => d !== r.device);
+    const ok = r.kind === "button" || v.status === undefined || v.status === "ok";
+    const relayed = r.hops > 0 ? `, relayed over ${r.hops} hop${r.hops === 1 ? "" : "s"} (${r.via.join(" > ")})` : "";
+    if (to.length) out.push(alert(r, "info", ok ? `${r.device} is OK (${r.block})` : `${r.device} checked in: ${v.status} (${r.block})`,
+      { to, ...(family ? { family } : {}), status: ok ? "ok" : v.status, sent: r.time, hops: r.hops, via: r.via,
+        why: `${r.device} checked in${family ? ` for family group ${family}` : ""}${direct.length ? `, to ${direct.join(", ")}` : ""}${relayed}` }));
   }
   return out;
 }
@@ -220,7 +249,7 @@ function store(r) {
   if (seen.has(r.id)) return false;
   seen.add(r.id);
   r.seq = ++lastSeq;
-  readings.push(r);
+  readings.push(r); learn(r);
   fs.appendFileSync(DATA, JSON.stringify(r) + "\n");
   const msg = sse(r);
   for (const c of clients) c.write(msg);
@@ -343,9 +372,13 @@ function route(req, res) {
     return send(res, 200, blocks.map((b) => L.forecast(readings, b)));
   }
   if (p === "/fairshare") {
-    const supply = Number(q.supply_w);
-    if (!(supply >= 0)) return send(res, 400, { error: "supply_w required" });
-    const sector = L.sector();
+    // demand per block: its people, or its measured draw_w once it has sent a power message (?measured=0 = people only)
+    const sector = L.sector(readings, !["0", "false", "off", "no"].includes(q.measured));
+    // the supply, in watts (supply_w) or as a share of what the sector needs (supply_pct)
+    const supply = q.supply_pct !== undefined && q.supply_w === undefined
+      ? Math.round((sector.reduce((s, b) => s + b.demand_w, 0) * Number(q.supply_pct)) / 100) : Number(q.supply_w);
+    if (!(supply >= 0)) return send(res, 400, { error: "supply_w (watts) or supply_pct (percent of sector demand) required" });
+    if (q.policy && !["directorate", "fair"].includes(q.policy)) return send(res, 400, { error: "policy must be directorate or fair" });
     if (q.policy) return send(res, 200, L.allocate(sector, supply, q.policy));
     return send(res, 200, { directorate: L.allocate(sector, supply, "directorate"), fair: L.allocate(sector, supply, "fair") });
   }
@@ -366,12 +399,11 @@ function route(req, res) {
     send(res, 200, { ok: true });
   });
   if (p === "/family") {
-    const devs = families[q.group];
-    if (!devs) return send(res, 404, { error: "unknown group" });
+    const devs = familyOf(q.group ?? q.family); // ?group= (the original name) or ?family= (the contract's word)
+    if (!devs.length) return send(res, 404, { error: "unknown group" });
     return send(res, 200, devs.map((d) => {
-      const last = readings.filter((r) => r.device === d && r.kind === "button" && r.values.button === "ok")
-        .sort((a, b) => Date.parse(b.time) - Date.parse(a.time))[0];
-      return { device: d, last_ok: last ? last.time : null, block: last ? last.block : null };
+      const last = readings.filter((r) => r.device === d && isOk(r)).sort((a, b) => Date.parse(b.time) - Date.parse(a.time))[0];
+      return { device: d, last_ok: last ? last.time : null, block: last ? last.block : null, hops: last ? last.hops : null, via: last ? last.via : null };
     }));
   }
   if (p === "/inbox") {
