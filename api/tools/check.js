@@ -1,6 +1,6 @@
-// Checks a running backend (local or deployed), without storing anything.
+// Checks a running API (local or deployed), without storing anything.
 //   node tools/check.js [apiUrl]
-// 1. GET /status answers. 2. GET /feed starts streaming straight away (a proxy that buffers would hold it back).
+// 1. GET /status answers. 2. GET /live starts streaming straight away (a proxy that buffers would hold it back).
 const API = (process.argv[2] || "http://localhost:8787").replace(/\/$/, "");
 
 async function main() {
@@ -13,14 +13,14 @@ async function main() {
   const timer = setTimeout(() => ctrl.abort(), 8000);
   const t1 = Date.now();
   try {
-    const res = await fetch(API + "/feed", { signal: ctrl.signal });
+    const res = await fetch(API + "/live", { signal: ctrl.signal });
     const first = await res.body.getReader().read();
     const text = new TextDecoder().decode(first.value);
-    console.log(`feed:   first bytes after ${Date.now() - t1} ms (${JSON.stringify(text.split("\n")[0])}), X-Accel-Buffering: ${res.headers.get("x-accel-buffering")}`);
-    if (!text.includes("connected")) { ok = false; console.log("feed:   unexpected first bytes"); }
+    console.log(`live:   first bytes after ${Date.now() - t1} ms (${JSON.stringify(text.split("\n")[0])}), X-Accel-Buffering: ${res.headers.get("x-accel-buffering")}`);
+    if (!text.includes("connected")) { ok = false; console.log("live:   unexpected first bytes"); }
   } catch (e) {
     ok = false;
-    console.log("feed:   NOTHING arrived within 8 s. A proxy in front of the backend is buffering the stream (see docs/DEPLOY.md, 'Making the live feed work').");
+    console.log("live:   NOTHING arrived within 8 s. A proxy in front of the API is buffering the stream (see docs/DEPLOY.md, 'Making the live stream work').");
   }
   clearTimeout(timer); ctrl.abort();
   console.log(ok ? "All good." : "Problems found.");

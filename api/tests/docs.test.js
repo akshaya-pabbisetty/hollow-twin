@@ -1,4 +1,4 @@
-// Task 10: the docs teammates rely on stay true to the code.
+// Task 8: the docs teammates rely on stay true to the code, and are written in contract terms.
 const { test, before, after } = require("node:test");
 const assert = require("node:assert");
 const fs = require("fs");
@@ -82,8 +82,21 @@ test("CONTRACT.md: every field, kind and value the team agreed is still there; l
 
 test("the guides cover what each lane was promised", () => {
   const fw = read("docs/FIRMWARE.md"), tw = read("docs/TWIN.md");
-  for (const w of ['"source": "live"', "ONE array", "mbedtls_md_hmac_starts", "/inbox?device=", "Before 2020-01-01", "time_estimated"]) assert.ok(fw.includes(w), `FIRMWARE.md: ${w}`);
-  for (const w of ["new EventSource(", "lastEventId", "Last-Event-ID", "SIMULATED", "/surface/history", "/truth", "/firstwave", "broadcast page"]) assert.ok(tw.includes(w), `TWIN.md: ${w}`);
+  for (const w of ['"source": "live"', "ONE array", "mbedtls_md_hmac_starts", "/inbox?device=", "Before 2020-01-01", "time_estimated",
+    "CONTRACT.md", '"accepted": 1, "duplicates": 0', "422", "hops", "via", "hr_bpm", "spo2_pct", "battery_wh", "humidity_pct", "from_block",
+    "relay-<block id>", "contract/blocks.json", "tools/catcher.mjs", "/help?status=assigned&to=rover-01", "o2_pct"]) assert.ok(fw.includes(w), `FIRMWARE.md: ${w}`);
+  for (const w of ["new EventSource(", "lastEventId", "Last-Event-ID", "SIMULATED", "/surface/history", "/truth", "/firstwave", "broadcast page",
+    'addEventListener("reading"', 'addEventListener("alert"', "/live", "/blocks/<block id>/latest", "/help/<message id>/assign", "/broadcast",
+    "page.photo", "page.text", "page.history", "supply_pct", "hops", "via", "not enough data", "section 6.1"]) assert.ok(tw.includes(w), `TWIN.md: ${w}`);
+  // nothing in the guides still teaches the names from before the contract
+  for (const [f, doc] of [["README.md", read("README.md")], ["FIRMWARE.md", fw], ["TWIN.md", tw], ["DEPLOY.md", read("docs/DEPLOY.md")], ["post_reading.ino", read("docs/examples/post_reading.ino")]])
+    for (const old of ["L8-deepwell", "relay-07", "sensor-01", "scout-01", '"hr":', '"spo2":', '"added"', '"dupes"', "FORMAT.md", "sector.json"])
+      assert.ok(!doc.includes(old), `${f} still mentions ${old}`);
+  const ino = read("docs/examples/post_reading.ino");
+  for (const w of ["sensor-l7-chalk-cut", "l7-chalk-cut", '\\"hops\\":0,\\"via\\":[]', "tds_ppm", "turbidity_ntu"]) assert.ok(ino.includes(w), `post_reading.ino: ${w}`);
+  const readme = read("README.md");
+  assert.ok(/- \[x\] `POST \/ingest`/.test(readme) && /- \[x\] `GET \/live`/.test(readme) && /- \[ \] Deploy/.test(readme), "the lane 1 checklist is in the README, ticked where done");
+  for (const cmd of ["npm start", "npm test", "npm run scenario -- all --fast", "node tools/replay.mjs http://localhost:8787/ingest 1 3", "az webapp up"]) assert.ok(readme.includes(cmd), `README: ${cmd}`);
 });
 
 test("README numbers match what the server returns (fair share example)", async () => {

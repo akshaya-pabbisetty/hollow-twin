@@ -37,7 +37,7 @@ test("tools/check.js passes against a running server and stores nothing", async 
   const before = (await s.get("/status")).seq;
   const r = await new Promise((res) => execFile(process.execPath, [path.join(ROOT, "tools/check.js"), s.api], (err, out) => res({ code: err ? err.code : 0, out })));
   assert.strictEqual(r.code, 0, r.out);
-  assert.match(r.out, /status: ok/); assert.match(r.out, /feed: {3}first bytes after \d+ ms/); assert.match(r.out, /All good\./);
+  assert.match(r.out, /status: ok/); assert.match(r.out, /live: {3}first bytes after \d+ ms/); assert.match(r.out, /All good\./);
   assert.strictEqual((await s.get("/status")).seq, before);
 });
 

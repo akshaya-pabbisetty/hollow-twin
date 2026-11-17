@@ -1,20 +1,35 @@
-// Hollow Twin backend. No dependencies: `node server.js` (from the api folder)
-// POST /ingest            one reading or an array (relay backlogs). Duplicates by id are dropped.
+// Hollow Twin API (lane 1). No dependencies: `npm start` in the api folder, or `node api/server.js` from the repository root.
+// It speaks CONTRACT.md (one level up): the message format, the 70 blocks of contract/blocks.json, and these endpoints.
+//
+// The contract's endpoints (CONTRACT.md section 4):
+// POST /ingest            one message or an array (relay backlogs). Duplicates by id are dropped.
+//                         Replies { accepted, duplicates, rejected: [{ id, problems }], warnings: [{ id, warnings }] }.
 //                         Limits: 5 MB body, 20 single posts per device per second (an array is one request, never dropped),
 //                         a time before 2020 or more than 5 min ahead is replaced by the receive time (time_estimated).
-//                         Messages use the CONTRACT.md format; the old value names (hr, spo2, button type) are accepted as aliases.
+//                         An unknown block is rejected; a device id that does not fit section 3 is a warning.
+//                         The old value names (hr, spo2, button type) are accepted as aliases and renamed.
 //                         If the INGEST_KEY env var is set, every POST needs the header x-api-key.
 //                         Optional "sig" (HMAC-SHA256, see sign.js): valid = stored verified:true, wrong = rejected,
 //                         none = stored verified:false.
-// GET  /feed              server-sent events: every new reading and alert, live. Each event has an id (the record's seq);
-//                         reconnect with the Last-Event-ID header or ?lastEventId= to get everything missed, in order
-// GET  /history           ?block=&kind=&since=&after_seq=  stored readings in time order (replays a network gap)
-// GET  /blocks            latest reading per block and kind
-// GET  /forecast          ?block=  battery hours left + grid frequency stress, per block
-// GET  /fairshare         ?supply_w=&policy=directorate|fair  who gets power
-// GET  /queue             open help requests ranked by triage score
+// GET  /live              server-sent events: `event: reading` per accepted message, `event: alert` per alert. Each event
+//                         has an id (the record's seq); reconnect with the Last-Event-ID header or ?lastEventId= to get
+//                         everything missed, in order
+// GET  /blocks/<id>/latest  the latest message of each kind for one block
+// GET  /help              open help requests, highest priority first (?status=assigned|all, &to=rover-01)
+// POST /help/<id>/assign  { to: "rover-01" }  marks a help request as assigned and tells the resident
+// GET  /broadcast         for the public page: latest surface readings against their limits, the verdict text, the
+//                         newest photo, and a link to the history
+//
+// Everything else:
+// GET  /feed              the same stream as /live with unnamed events (the name used before the contract)
+// GET  /history           ?block=&kind=&since=&after_seq=  stored messages in time order (replays a network gap)
+// GET  /blocks            latest message per block and kind, for every block
+// GET  /forecast          ?block=  battery hours left = battery_wh / (draw_w - supply_w), + grid frequency stress
+// GET  /fairshare         ?supply_w= or ?supply_pct=  &policy=directorate|fair  &measured=0   who gets power, all 70 blocks
+// GET  /queue             the same list as /help (its earlier name)
 // POST /dispatch          {responder, block}  sends the responder to the top request
 // POST /family            {group, devices:[...]}  links watches into a family group
+// GET  /family            ?family= (or ?group=)  who in the group has checked in, from where, by what route
 // GET  /inbox             ?device=&after_seq=  alerts addressed to this watch (relays fetch these for watches)
 // POST /official          {block, count}  the Directorate's published case count
 // GET  /truth             residents' count vs official count, per block

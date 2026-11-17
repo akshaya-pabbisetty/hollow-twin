@@ -313,3 +313,29 @@ contract carries the same table for the team.
   counts twelve new people. Two takes that happen to start a multiple of 8,000 seconds apart would reuse numbers.
 - `tools/replay.js` (my endless fake devices) was rewritten on contract ids and values. The team's
   `tools/replay.mjs` at the top of the repository is untouched and does a different job (fixed samples).
+
+## Task 8: docs
+
+- `api/README.md` keeps the lane 1 checklist from the team's original file. Two boxes are left open on purpose:
+  **deploy** (I was told not to deploy) and the **outbreak model**, which I split out of the original one-line
+  item. The API has the residents-against-official count (`/truth`); the twin's simulation of how an outbreak
+  spreads between blocks was not moved.
+- `docs/FIRMWARE.md` (lanes 2 and 3) and `docs/TWIN.md` (lane 4: twin and broadcast) are written in contract terms
+  and against each lane's own README task list. `docs/DEPLOY.md` covers Azure, Render and Docker.
+- The firmware example moved to `api/docs/examples/post_reading.ino`, because `firmware/` belongs to lanes 2 and 3.
+- The guides ask firmware to add `"source": "live"`. It is optional in the contract, but without it real hardware
+  shows as SIMULATED in the twin.
+- `twin/README.md` suggests port 8787 for a local static server, which is also the API's default. Noted in
+  `docs/TWIN.md`; the twin's README is not mine to edit.
+- Deploy instructions are still unverified (no Azure or Render account, no Docker on this machine). New since the
+  move: hosts need the whole repository (for `contract/blocks.json`), and the Docker ignore file is
+  `api/Dockerfile.dockerignore`.
+- `tools/check.js` now checks `/live` instead of `/feed`.
+
+## Things for the team to agree (carried into the final report)
+
+1. The thresholds in CONTRACT.md section 6.1 and the water cut-offs in 6.2.
+2. Firmware adds `"source": "live"`.
+3. The surface verdict needs `o2_pct` and `pm25_ugm3` as well as the contract's three readings.
+4. "Sealed outposts" has no level of its own in the API's verdicts.
+5. A desk relay's real `draw_w` replaces a megawatt estimate in `/fairshare` (`measured=0` avoids it).

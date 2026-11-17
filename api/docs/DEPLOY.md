@@ -1,13 +1,14 @@
-# Deploying the backend
+# Deploying the API (lane 1)
 
-Nothing here has been deployed yet: these are instructions and files only. The backend is one Node process with
+Nothing here has been deployed yet: these are instructions and files only. The API is one Node process with
 no packages to install, so any host that can run `node api/server.js` works.
 
 Every command is on its own line and works in Windows PowerShell and in macOS/Linux shells unless marked.
 
-The backend lives in the `api` folder of the team repository. Hosts are given the whole repository and start it with
-`node api/server.js`. The `az`, `docker` and Render steps run from the repository root; the `node tools/...` helper
-commands run from the `api` folder.
+**Where to run what.** The API lives in the `api` folder of the team repository, and it reads the block list from
+`contract/blocks.json` next to it. So a host is given the whole repository and starts the API with
+`node api/server.js`. The `az`, `docker` and Render steps below run from the top of the repository. The
+`node tools/...` helper commands run from the `api` folder.
 
 ## Settings (environment variables)
 
@@ -16,8 +17,9 @@ commands run from the `api` folder.
 | `PORT` | `8787` | Port to listen on. Azure and Render set this for you: do not set it there. |
 | `DATA` | `api/readings.jsonl` (next to `server.js`) | The append-only data file (every reading, alert, family group, official count). The folder is created if missing. **This file is the whole database.** |
 | `INGEST_KEY` | (unset) | When set, every POST needs the header `x-api-key: <value>`. GET endpoints stay open so the twin and the public broadcast page need no key. Set it on any public deployment. |
-| `DEVICE_KEYS` | (unset) | Device signing secrets as a JSON string, e.g. `{"relay-07":"long-random-secret"}`. Use this on hosts where you cannot place the private file `api/shared/keys.json`. |
+| `DEVICE_KEYS` | (unset) | Device signing secrets as a JSON string, e.g. `{"relay-l8-bore-bend":"long-random-secret"}`. Use this on hosts where you cannot place the private file `api/shared/keys.json`. |
 | `RATE_LIMIT` | `20` | Single posts per device per second. |
+| `BLOCKS` | `contract/blocks.json` in the repository | The block list. Only needed on a host that was given the `api` folder without the rest of the repository: point it at a copy of the file. |
 
 `api/shared/keys.json` is gitignored and is not copied into the Docker image, so on a host use `DEVICE_KEYS`.
 
@@ -37,7 +39,7 @@ az login
 az webapp list-runtimes --os linux
 ```
 
-3. From the project folder, create and deploy in one step. Replace `hollow-twin-api` with a name nobody else has
+3. From the top of the repository, create and deploy in one step. Replace `hollow-twin-api` with a name nobody else has
    used (it becomes `https://<name>.azurewebsites.net`), and use the runtime string exactly as step 2 printed it:
 
 ```
@@ -45,7 +47,7 @@ az webapp up --name hollow-twin-api --resource-group hollow-twin-rg --runtime "N
 ```
 
    `B1` (Basic) is the smallest tier with Always On. `F1` (free) also runs, but it sleeps when idle, which drops
-   every `/feed` connection.
+   every `/live` connection.
 
 4. Tell App Service how to start the server:
 
@@ -65,7 +67,7 @@ az webapp config set --name hollow-twin-api --resource-group hollow-twin-rg --al
 az webapp config appsettings set --name hollow-twin-api --resource-group hollow-twin-rg --settings DATA=/home/data/readings.jsonl INGEST_KEY=choose-a-long-key
 ```
 
-7. Check it (this stores nothing):
+7. Check it, from the `api` folder (this stores nothing):
 
 ```
 node tools/check.js https://hollow-twin-api.azurewebsites.net
@@ -77,7 +79,10 @@ node tools/check.js https://hollow-twin-api.azurewebsites.net
 az webapp log tail --name hollow-twin-api --resource-group hollow-twin-rg
 ```
 
-To deploy a new version later, run the step 3 command again from the project folder.
+To deploy a new version later, run the step 3 command again from the top of the repository.
+
+Then give the address to the team: devices post to `https://hollow-twin-api.azurewebsites.net/ingest` with the
+header `x-api-key`, and the twin reads `https://hollow-twin-api.azurewebsites.net/live` with no key.
 
 To delete everything when the hackathon is over:
 
@@ -87,7 +92,7 @@ az group delete --name hollow-twin-rg
 
 ### Azure with the Dockerfile instead (optional)
 
-App Service can also run the included `Dockerfile` as a custom container. Then set the app setting
+App Service can also run `api/Dockerfile` as a custom container. Then set the app setting
 `WEBSITES_PORT=8787`, set `WEBSITES_ENABLE_APP_SERVICE_STORAGE=true` so `/home` persists, and set
 `DATA=/home/data/readings.jsonl`. The code deploy above is simpler and is the recommended path.
 
@@ -97,11 +102,12 @@ App Service can also run the included `Dockerfile` as a custom container. Then s
 2. On https://dashboard.render.com choose **New > Web Service** and pick the repository.
 3. Settings:
    - Language: **Node**
+   - Root directory: leave empty (the top of the repository, so `contract/` is included)
    - Build command: `npm install` (there is nothing to install; it finishes at once)
    - Start command: `node api/server.js`
    - Instance type: Free works for a demo; see the warnings below.
 4. Under **Environment** add `INGEST_KEY` (and `DEVICE_KEYS` if devices sign). Do not set `PORT`: Render provides it.
-5. Deploy, then check it:
+5. Deploy, then check it from the `api` folder:
 
 ```
 node tools/check.js https://your-service.onrender.com
@@ -114,6 +120,8 @@ A persistent disk can only be attached to a paid instance; if you pay for one, m
 
 ## Option C: any machine with Docker
 
+Build from the top of the repository, so the image gets both `api/` and `contract/`:
+
 ```
 docker build -f api/Dockerfile -t hollow-twin-api .
 ```
@@ -124,7 +132,7 @@ docker run -d --name hollow-twin-api -p 8787:8787 -v hollow-twin-data:/data -e I
 
 The named volume `hollow-twin-data` keeps the data file across container restarts.
 
-## Making the live feed (`/feed`, server-sent events) work behind a proxy
+## Making the live stream (`/live`, server-sent events) work behind a proxy
 
 Azure and Render both put a reverse proxy in front of the app. Three things keep the stream alive, and the
 server already does all of them:
@@ -139,17 +147,17 @@ What you must do:
 
 - Run **one instance only** (do not scale out). The data file and the event numbering live in that one process.
 - On Azure keep **Always On** enabled (step 5), otherwise the app is unloaded when idle.
-- Do not put a CDN or a caching layer in front of `/feed`.
-- After deploying, run `node tools/check.js <url>`. It reports how quickly the first bytes of `/feed` arrive. If
+- Do not put a CDN or a caching layer in front of `/live`.
+- After deploying, run `node tools/check.js <url>`. It reports how quickly the first bytes of `/live` arrive. If
   nothing arrives within 8 seconds, something in front of the app is buffering.
 
 If a proxy you cannot control still buffers, the twin can fall back to polling `GET /status` every few seconds and
-`GET /history?after_seq=<last seq>` for the events in between: both give the same data as the feed.
+`GET /history?after_seq=<last seq>` for the events in between: both give the same data as the stream.
 
 ## Free-tier disks can reset: how to handle it
 
 The data file is the only state. If the host wipes it (Render free tier on every spin-down; Azure if `DATA` is not
-under `/home`), the backend starts empty and event ids restart at 1. A twin that reconnects with a higher
+under `/home`), the API starts empty and event ids restart at 1. A twin that reconnects with a higher
 `Last-Event-ID` is sent `event: reset`, so it knows to clear and reload.
 
 Pick one:
@@ -168,7 +176,7 @@ $env:INGEST_KEY = "choose-a-long-key"
 node tools/scenario.js all https://hollow-twin-api.azurewebsites.net --fast
 ```
 
-3. **Record against a laptop.** `node api/server.js` on the same WiFi as the devices never resets and has no proxy.
+3. **Record against a laptop.** `npm start` in the `api` folder on the same WiFi as the devices never resets and has no proxy.
 
 Back up the data at any time (it is plain JSON):
 
@@ -180,5 +188,6 @@ node -e "fetch(process.argv[1]+'/history').then(r=>r.text()).then(t=>require('fs
 
 These instructions were written without an Azure or Render account and without Docker on the machine, so none of
 the three paths has been run end to end. The parts most worth checking on first deploy: the exact runtime string
-from step 2, that `/home/data` survives a restart (the `seq` check above), and the `/feed` timing from
-`tools/check.js`.
+from step 2, that `/home/data` survives a restart (the `seq` check above), the `/live` timing from
+`tools/check.js`, and that the Docker build picks up `api/Dockerfile.dockerignore` (it keeps the data file and
+`api/shared/keys.json` out of the image; this needs BuildKit, which current Docker uses by default).
