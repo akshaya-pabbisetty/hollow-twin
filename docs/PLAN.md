@@ -32,6 +32,8 @@ We stopped claiming the rest. The outbreak simulator, the water and flood layers
 
 Update, Nov 17 afternoon: the help loop is closed end to end. A help press on the Arduino goes through the Pi relay to the API, shows in the twin's help list, "Send the rover" assigns it, and on arrival the API marks it delivered (`POST /help/<id>/delivered`) and the watch beeps "rover-01 reached watch-0012: med kit". Tested on the stand-in watch, not yet on the boards. Both watches have an "I feel sick" button that feeds `/truth`. The public broadcast page is built.
 
+Update, Nov 17 evening: relay to relay is real software now (`relay.py --peer / --listen`, CONTRACT.md section 5), tested with two relays on one computer; the Pi and the laptop are next. The phone watch shows its block's power and its help call. The twin's Lung layer tags blocks with residents' own sickness reports against the official count and ranks where med kits go; `/research` exports that data with identities removed. The story's rover caption no longer says "delivered" before the rover leaves.
+
 - Done: the twin reads the API (live stream, forecasts, allocation, check-ins, alerts), uses the API's limits, tags where every number comes from, and has a 75-second guided story for someone who opens the link cold.
 - Done: the API (merged as PR #1), with scenario scripts that play each video beat through the real pipeline.
 - Not done: the API is not hosted. The public link therefore runs on the twin's built-in simulation and says so.

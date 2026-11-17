@@ -6,7 +6,7 @@ Patriot HackFest Fall 2026, Life Underground track.
 
 **Try it: https://hollow-twin.vercel.app** and press **Play the 75-second story**.
 
-![Under the Directorate's rule, all ten blocks of Deepwell are dark by hour 30](docs/img/directorate-rule.jpg)
+![Under the Directorate's rule, 12 deep blocks are dark by hour 30](docs/img/directorate-rule.jpg)
 
 ## The problem we picked
 
@@ -16,7 +16,7 @@ Five problems from the track, because they are one event seen from five sides: a
 | --- | --- |
 | 1. Blackouts last for days and nobody knows when the next one hits | Forecasts every block's battery, hours ahead, and warns the blocks that will run dry before their lights go out. The warning reaches every watch in that block, and the watch shows its block's hours of power left |
 | 2. The Directorate decides who keeps the lights, and the deep levels always lose | Replaces "upper levels first" with a rule anyone can check: every block's air, pumps and medical load first, then the rest per person |
-| 7. The Directorate can shut the network down whenever it wants | Relay boxes in each block store messages and pass them block to block, then upload the backlog when any relay gets through |
+| 7. The Directorate can shut the network down whenever it wants | Relay boxes in each block store messages and pass them block to block, to the first relay that still has a line out, or upload the backlog when the network returns. Each message carries the route it took |
 | 8. Families split across levels cannot tell if each other are OK | One "I'm OK" press travels over those relays to the family's watches, with the route it took |
 | 10. Medicine runs out first in the deep levels, far from any clinic | **The scout rover** rides the lift and drives the tunnels to a block that asked for help, with a med kit, a battery pack or water filters. It carries a relay box, so it also collects the messages a cut-off block is holding and brings them back into range. On the way it checks that the tunnel is passable (problem 5) |
 
@@ -70,7 +70,8 @@ We would rather tell you than have you find out.
 | Sensor readings, populations, the failure scenario | Simulated. The screen tags every reading as twin simulation, scripted data through the API, or a device |
 | The family watch on a phone | Real: a web page on a real phone, sending to the API. I'm OK, help (two taps), I feel sick, family status, walkie-talkie presets and Morse; it shows its block's power forecast and its help call from queued to delivered. Its relay hops during a cut are drawn, not radioed ([`firmware/watch/`](firmware/watch/)) |
 | One watch and one relay box | Real: an Arduino with I'm OK, help and I feel sick buttons and a buzzer, and a Raspberry Pi that signs its messages, holds them while the network is down and uploads them when it returns ([`docs/HARDWARE.md`](docs/HARDWARE.md)). The family member upstairs is scripted |
-| The other 69 relays, the radio links between relays, sensor nodes | Simulated. One real relay talks to the API directly; relay-to-relay radio is not built |
+| Relay to relay | Real software: a cut-off relay hands its held messages to the next block's relay, which uploads them (two relays, the Pi and a laptop). Their link is the local network, standing in for radio; radio hardware is not built |
+| The other 68 relays, sensor nodes, vitals sensors | Simulated or scripted. The twin draws the other relays' hops and says so |
 
 ## Run it yourself
 
@@ -92,7 +93,7 @@ Other scenarios: `blackout`, `fairshare`, `water`, `outbreak`, `care`, `surface`
 
 ## Also in the prototype
 
-Built while exploring the track, and working, but not part of the claim above: an outbreak simulator that spreads a disease along tunnels, lifts and water lines and lets you quarantine blocks; water and flood layers; a count of sickness reported by residents (the "I feel sick" button on either watch) against the Directorate's number; and a surface-safety verdict with a public, read-only [surface broadcast page](https://hollow-twin.vercel.app/broadcast/) that shows every reading against its published limit.
+Built while exploring the track, and working, but not part of the claim above: an outbreak simulator that spreads a disease along tunnels, lifts and water lines and lets you quarantine blocks; water and flood layers; a map of sickness reported by residents (the "I feel sick" button on either watch) against the Directorate's number, ranking where the rover should take med kits first, with the data downloadable for researchers with identities removed ([`/research`](https://hollow-twin.vercel.app/research/)); and a surface-safety verdict with a public, read-only [surface broadcast page](https://hollow-twin.vercel.app/broadcast/) that shows every reading against its published limit.
 
 ## Team
 

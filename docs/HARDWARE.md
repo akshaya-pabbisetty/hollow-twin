@@ -6,11 +6,13 @@ One real watch and one real relay, built from an Arduino and a Raspberry Pi. Tog
 | --- | --- | --- |
 | Watch | Any Arduino with a USB port, one button (or a jumper wire) | [`firmware/watch/watch.ino`](../firmware/watch/watch.ino) |
 | Relay box | A Raspberry Pi with Python 3. Nothing to install | [`firmware/relay/relay.py`](../firmware/relay/relay.py) |
+| The next block's relay | The same program on the laptop, with no watch on it | the same file, with `--no-watch --listen 8788` |
 
 The Arduino has no Wi-Fi and no clock. It sends button presses down the USB cable. The Pi adds the time, signs the message, and carries it to the API, or holds it in a file while the API cannot be reached.
 
 ## What has been tested
 
+- Relay to relay (Nov 17): Flint Face's relay was cut off from the API, and a neighbouring relay for Damp Court still reached it. An "I'm OK" and a help press each went watch, Flint Face relay, Damp Court relay, API. They were stored with `hops: 2` and `via: [relay-l6-flint-face, relay-l6-damp-court]`, still verified, because relays never touch the signed fields. With the neighbour stopped, the press was held and uploaded when the API came back. Run on one computer with the `--cut-file` rehearsal, not yet across the Pi and the laptop.
 - The sketch compiles for the Uno, Nano, Mega and Leonardo (11% of an Uno's memory).
 - The relay was run against the real API with a stand-in watch ([`firmware/relay/fake_watch.py`](../firmware/relay/fake_watch.py)) and a real network cut (the API was stopped and started again): one press delivered at once, two presses held, both uploaded in one request when the API came back, with their original times, as signed device messages that crossed one relay. Alerts came back down to the watch.
 - **Not yet run on the physical boards.** The steps below are the first real test. Budget half an hour.
@@ -80,6 +82,30 @@ The header turns green: "API connected, N device readings". Flint Face gets a "V
 1. **A warning before the dark.** Press the button once (so the API knows where the watch is), then on the laptop run `cd api && npm run scenario -- blackout`. The scenario is scripted, the delivery is real: the buzzer sounds and the LED flickers when "Flint Face has about 24 h of battery left" reaches the watch.
 2. **The network cut.** Cut the network between the Pi and the laptop (below). The LED starts to blink slowly. Press "I'm OK". The relay prints `HELD (1 waiting)`. Nothing appears in the twin.
 3. **Delivery.** Bring the network back. The relay prints `Uploaded 1 held message(s) in one request`, the LED goes solid, and the twin draws the check-in travelling to the family's level, "N s after it was sent".
+4. **Block to block (optional, the strongest shot).** Start the next block's relay on the laptop (below) and cut only the Pi's route to the API. Press "I'm OK". The Pi prints `passed to the next block's relay`, the laptop's relay prints `Took 1 message(s) from a neighbouring relay (relay-l6-flint-face -> relay-l6-damp-court)`, and the twin's family panel says "over 2 relays" at once, with no wait for the network to come back.
+
+### The next block's relay
+
+On the laptop, next to the API:
+
+```sh
+python3 firmware/relay/relay.py --api http://localhost:8787 --block l6-damp-court --no-watch --listen 8788 --queue relay-b-queue.jsonl
+```
+
+On the Pi, start the watch's relay with the laptop as its neighbour:
+
+```sh
+python3 relay.py --api http://LAPTOP:8787 --key pick-a-long-secret --peer http://LAPTOP:8788
+```
+
+To cut the Pi's route to the API while the link between the two relays stays up (this is a real cut, made with the Pi's firewall):
+
+```sh
+sudo iptables -I OUTPUT -p tcp --dport 8787 -j REJECT     # cut
+sudo iptables -D OUTPUT -p tcp --dport 8787 -j REJECT     # restore
+```
+
+Say on camera: "the two relays talk over the local network here, standing in for the radio a real relay box would carry".
 
 ### Cutting the network
 
