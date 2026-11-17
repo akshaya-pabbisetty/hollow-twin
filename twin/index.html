@@ -72,7 +72,7 @@
 
   #view { position: relative; overflow: hidden; background: var(--scene); }
   #view canvas { display: block; }
-  #labels { position: absolute; inset: 0; pointer-events: none; }
+  #labels { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
   .corner { position: absolute; color: #9a9c98; font-size: 11px; pointer-events: none; }
   .corner.tl { bottom: 10px; left: 12px; } .corner.br { bottom: 10px; right: 12px; text-align: right; }
 
@@ -140,6 +140,34 @@
   .slider b { color: var(--ink); float: right; }
   .slider input { width: 100%; accent-color: var(--sel); }
   #o-ob h3, #o-mesh h3 { margin-top: 18px; }
+  #feed { position: absolute; top: 10px; left: 12px; z-index: 4; display: none; background: rgba(20,22,24,.84); color: #e9eae6; font-size: 11px; line-height: 1.5; padding: 6px 10px; border-radius: 2px; max-width: 560px; pointer-events: none; }
+  #feed b { display: block; font-weight: 600; color: #b9bbb6; }
+  #feed div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #feed i { font-style: normal; color: #9a9c98; }
+  #feed .live i { color: #7fd6a2; }
+  .pill.live { color: #fff; background: #1f7a4d; border: 1px solid #1f7a4d; }
+  #api-url { font: inherit; font-size: 12px; flex: 1; min-width: 0; padding: 4px 6px; border: 1px solid var(--line-2); background: var(--well); border-radius: 2px; color: var(--ink); }
+  .lbl-src { font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 2px; background: rgba(20,22,24,.82); color: #e9eae6; white-space: nowrap; }
+  .lbl-src.dev { background: #1f7a4d; color: #fff; }
+  .lbl-courier { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: #fff; color: var(--ink); white-space: nowrap; transform: translateY(-18px); box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+  .ck { padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+  .ck b { font-weight: 600; }
+  footer .ln .msg i.src { font-style: normal; color: var(--faint); }
+  #intro { position: absolute; inset: 0; z-index: 8; display: flex; align-items: center; justify-content: center; background: rgba(15,16,17,.5); }
+  #intro .card { background: var(--panel); border: 1px solid var(--line-2); width: min(540px, calc(100% - 32px)); padding: 22px 24px 16px; border-radius: 3px; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+  #intro h1 { margin: 0 0 8px; font-size: 22px; font-weight: 600; }
+  #intro p { margin: 0 0 14px; font-size: 14px; line-height: 1.5; }
+  #intro p.small { margin: 12px 0 0; font-size: 12px; color: var(--dim); }
+  #intro button { padding: 9px 12px; font-size: 13px; }
+  button.primary { background: var(--sel); color: #fff; border-color: var(--sel); }
+  #story { position: fixed; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 20; width: min(1000px, calc(100% - 24px)); background: var(--panel); border: 1px solid var(--line-2); border-radius: 3px; padding: 10px 14px 12px; box-shadow: 0 8px 30px rgba(0,0,0,.45); display: none; }
+  #story .head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  #story .ttl { font-size: 15px; font-weight: 600; flex: 1; }
+  #story .step { font-size: 12px; color: var(--dim); }
+  #story .cap { font-size: 14px; line-height: 1.5; min-height: 42px; }
+  #story .bar { height: 2px; background: var(--line); margin-top: 8px; }
+  #story .bar span { display: block; height: 100%; width: 0; background: var(--sel); }
+  #story-btn { position: absolute; right: 12px; top: 10px; z-index: 6; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
   #ob-pick.on { background: var(--alarm); border-color: var(--alarm); }
   @media (max-width: 960px) {
     body { overflow: auto; }
@@ -164,6 +192,7 @@
     <div class="hstat">Geothermal <b id="h-plant">--</b></div>
     <div class="hstat">Supply / demand <b id="h-sd">--</b></div>
     <div class="spacer"></div>
+    <div class="hstat">Data <span id="h-api" class="pill ok">Twin simulation</span></div>
     <input id="find" list="blocklist" placeholder="Find a block, e.g. Rivet Gallery" autocomplete="off" aria-label="Find a block"><datalist id="blocklist"></datalist>
     <div class="hstat">Directorate net <span id="h-net" class="pill ok">Online</span></div>
   </header>
@@ -188,7 +217,7 @@
       <div><small>Upper L0-L4 served</small><span class="big" id="f-upper">--</span></div>
       <div><small>Deep L5-L8 served</small><span class="big" id="f-deep">--</span></div>
     </div>
-    <div class="note">Equity index <b id="f-jain">--</b> (1.00 = everyone gets the same share)</div>
+    <div class="note" id="f-note"></div>
 
     <h3>Network</h3>
     <div class="row"><button id="btn-net" class="danger">Cut Directorate network</button></div>
@@ -210,11 +239,30 @@
 
     <h3>Levels <span id="lv-all" style="cursor:pointer;color:var(--ink);text-decoration:underline">Show all</span></h3>
     <div id="levels"></div>
+
+    <h3>Data source</h3>
+    <div class="row"><input id="api-url" placeholder="API address, e.g. http://localhost:8787" aria-label="API address"><button id="api-go" style="flex:0 0 auto">Connect</button></div>
+    <div class="note" id="api-note"></div>
   </aside>
 
   <main id="view">
     <div id="labels"></div>
-    <div class="corner tl">Drag to orbit, scroll to zoom. Click a block to step inside. Esc steps back, arrows move between blocks, / to search.</div>
+    <div id="feed"></div>
+    <button id="story-btn">Play the 60-second story</button>
+    <div id="intro">
+      <div class="card">
+        <h1>Hollow Twin</h1>
+        <p>A working model of one sector of the Hollow. It warns blocks before they go dark, shares power fairly when there is not enough, and gets a family's "I'm OK" through when the Directorate cuts the network.</p>
+        <div class="row"><button id="intro-play" class="primary">Play the 60-second story</button><button id="intro-explore">Explore on my own</button></div>
+        <p class="small">Everything shown is simulated unless it is tagged as coming from a device.</p>
+      </div>
+    </div>
+    <div id="story">
+      <div class="head"><span class="ttl" id="story-title"></span><span class="step" id="story-step"></span><button id="story-back">Back</button><button id="story-next">Next</button><button id="story-exit">Exit</button></div>
+      <div class="cap" id="story-cap"></div>
+      <div class="bar"><span id="story-bar"></span></div>
+    </div>
+    <div class="corner tl">Drag to orbit, scroll to zoom, click a block to step inside. Esc steps back.</div>
     <div class="corner br" id="corner-br"></div>
   </main>
 
@@ -973,15 +1021,44 @@ const START = Date.UTC(2124, 2, 14, 0, 0);
 const sim = {};
 let simRng;
 
+// One limit table for the twin and the API. The defaults are the values in api/shared/limits.json, each from a
+// published source; when the API is connected they are refreshed from GET /limits, so a number on this screen
+// and an alert from the API never disagree about the same reading.
+const LIM = { batteryWarnH: 24, batteryAlarmH: 8, co2Warn: 1000, co2Alarm: 5000, heatWarn: 39.4, heatAlarm: 51.7, floodClosed: 15, tdsMax: 1000, ntuMax: 5 };
+const co2Base = lv => 560 + lv * 45;
+// Water: the simulated recycler state is shown in the two units a real probe reports. A block with a real water
+// probe (n.api.water) shows only what that probe sent.
+const tdsOf = n => n.api && n.api.water ? (n.ov && n.ov.tds) || 0 : 250 + 15 * n.water;
+const ntuOf = n => n.api && n.api.water ? (n.ov && n.ov.ntu) || 0 : 0.4 + 0.092 * n.water;
+const waterLevel = n => { const t = tdsOf(n), u = ntuOf(n); return t > LIM.tdsMax || u > LIM.ntuMax ? 2 : t > 0.8 * LIM.tdsMax || u > 0.8 * LIM.ntuMax ? 1 : 0; };
+// US National Weather Service heat index (the same equation as api/heat.js): how hot the air feels at a humidity.
+function feelsLike(tc, rh) {
+  const tF = tc * 9 / 5 + 32;
+  if (typeof rh !== 'number' || tF < 80) return { c: tc, index: false };
+  const r = clamp(rh, 0, 100);
+  const f = -42.379 + 2.04901523 * tF + 10.14333127 * r - 0.22475541 * tF * r - 0.00683783 * tF * tF - 0.05481717 * r * r + 0.00122874 * tF * tF * r + 0.00085282 * tF * r * r - 0.00000199 * tF * tF * r * r;
+  return { c: Math.max(tc, +(((f - 32) * 5 / 9).toFixed(1))), index: true };
+}
+
 const LAYERS = {
-  power: { name: 'Power', lo: 'Warning: under 24 h of battery, or brownout', hi: 'Alarm: dark, or under 8 h of battery', desc: 'Power reaching each block, and how long its battery lasts at the current drain.' },
-  air: { name: 'Air', lo: 'Warning: CO2 over 2,000 ppm', hi: 'Alarm: CO2 over 4,000 ppm', desc: 'CO2 from block sensors. Scrubbers stop when the power does.' },
-  heat: { name: 'Heat', lo: 'Warning: over 39°C', hi: 'Alarm: over 43°C', desc: 'Air temperature. Deep rock is hotter and the fans need power.' },
-  water: { name: 'Water', lo: 'Warning: contamination index over 25', hi: 'Alarm: over 50, do not drink', desc: 'Tap-line sensors after each water recycler.' },
-  flood: { name: 'Flood', lo: 'Warning: over 25 cm', hi: 'Alarm: over 45 cm, tunnel closed', desc: 'Sewage and water level in the tunnels.' },
+  power: { name: 'Power', desc: 'Power reaching each block, and how long its battery lasts at the current drain.' },
+  air: { name: 'Air', desc: 'CO2 from block sensors. Scrubbers stop when the power does.' },
+  heat: { name: 'Heat', desc: 'Air temperature. When a sensor also reports humidity, the heat index (how hot it feels) is compared instead.' },
+  water: { name: 'Water', desc: 'Tap-line probes after each water recycler: dissolved solids and cloudiness.' },
+  flood: { name: 'Flood', desc: 'Sewage and water depth in the tunnels.' },
   lung: { name: 'Lung', lo: 'Warning: over 18 cases per 1,000', hi: 'Alarm: over 28 per 1,000', desc: 'Lung sickness counted by residents, not the Directorate.' },
   outbreak: { name: 'Outbreak', lo: 'Warning: over 3 sick per 1,000', hi: 'Alarm: over 30 sick per 1,000', desc: 'People sick right now from the outbreak you started. Pick a disease below and click a block to start one.' },
 };
+function legend(k) {
+  switch (k) {
+    case 'power': return [`Warning: under ${LIM.batteryWarnH} h of battery, or brownout`, `Alarm: dark, or under ${LIM.batteryAlarmH} h of battery`];
+    case 'air': return [`Warning: CO2 over ${fmtInt(LIM.co2Warn)} ppm (Health Canada long-term limit)`, `Alarm: CO2 over ${fmtInt(LIM.co2Alarm)} ppm (OSHA 8-hour limit)`];
+    case 'heat': return [`Warning: ${LIM.heatWarn}°C or more (US Weather Service: Danger)`, `Alarm: ${LIM.heatAlarm}°C or more (Extreme Danger)`];
+    case 'water': return ['Warning: within 20% of a limit', `Alarm, do not drink: over ${fmtInt(LIM.tdsMax)} ppm dissolved solids (WHO) or ${LIM.ntuMax} NTU cloudiness (US EPA)`];
+    case 'flood': return [`Warning: over ${LIM.floodClosed / 2} cm`, `Alarm: over ${LIM.floodClosed} cm, tunnel closed (US Weather Service)`];
+    default: return [LAYERS[k].lo, LAYERS[k].hi];
+  }
+}
 let layer = 'power';
 let selected = null;
 let focus = null;
@@ -990,7 +1067,7 @@ let speed = 1;
 const SCRIPT = [
   { t: 4, run() { sim.plant = 0.78; log('crit', 'Geothermal unit 3 tripped. Plant output down to 78%.'); } },
   { t: 10, run() { const n = pickBig(7); n.waterRate = 7; n.waterUntil = sim.t + 9; } },
-  { t: 16, run() { const n = pickBig(6); n.floodRate = 7; n.floodUntil = sim.t + 10; } },
+  { t: 16, run() { const n = pickBig(6); n.floodRate = 6.5; n.floodUntil = sim.t + 10; } },
   { t: 24, run() { if (!sim.netCut) setNet(true, true); } },
   { t: 36, run() { sim.plant = 0.92; log('ok', 'Unit 3 is partly back. Plant at 92%.'); } },
   { t: 44, run() { sim.aging += 1.2; log('warn', 'Deep rock is 1.2°C warmer this cycle. The plant is aging.'); } },
@@ -1007,9 +1084,9 @@ function initSim() {
     n.cap = n.demand * n.capH;
     n.B = n.cap * (0.55 + n.r[0] * 0.35);
     n.alloc = n.demand; n.served = 1; n.blackout = false; n.drain = 0; n.hoursLeft = Infinity;
-    n.co2 = 650 + lv * 120 + n.r[1] * 120;
+    n.co2 = co2Base(lv) + n.r[1] * 60;
     n.water = n.r[2] * 6; n.waterRate = 0; n.waterUntil = 0;
-    n.flood = n.r[3] * 6; n.floodRate = 0; n.floodUntil = 0;
+    n.flood = n.r[3] * 5; n.floodRate = 0; n.floodUntil = 0;
     n.lungObs = 2 + lv * 2.4 + n.r[1] * 4; n.lungOff = n.lungObs * officialFactor(lv);
     n.checkin = 1; n.meshBatt = 40; n.isolated = false;
     n.prev = {}; n.fWarned = false; n.hist = []; n.prioUntil = 0; n.crewAt = 0; n.ob = null; n.quar = false; n.medUntil = 0;
@@ -1019,6 +1096,7 @@ function initSim() {
   document.getElementById('log').innerHTML = '';
   log('info', `Twin running. ${NBHDS.length} blocks across 9 levels, about ${fmtPop(NBHDS.reduce((s, n) => s + n.pop, 0))} people. Sensor data is simulated.`);
   setNet(false, false);
+  if (api.on) pinAll();
   computeDerived();
 }
 function officialFactor(lv) { return lv >= 5 ? 0.14 : lv >= 3 ? 0.5 : 0.9; }
@@ -1026,6 +1104,23 @@ function demandOf(n) { return n.pop * (1 + 0.03 * Math.max(0, n.temp - 30)); }
 
 function allocate(S) {
   for (const n of NBHDS) { n.demand = demandOf(n); n.req = n.demand + Math.min(n.cap - n.B, 0.15 * n.demand); n.alloc = 0; }
+  // Connected: the API decides who gets power (GET /fairshare). The twin passes the supply as a share of demand.
+  if (api.on) {
+    const D = NBHDS.reduce((s, n) => s + n.demand, 0), t = fairTable(clamp(Math.round(100 * S / D), 0, 150));
+    if (t) {
+      const share = t[sim.policy].byBlock;
+      for (const n of NBHDS) n.alloc = n.demand * (share[n.bid] ?? 100) / 100;
+      // supply left once every block is served recharges batteries: block physics, not an allocation rule
+      const spare = S - NBHDS.reduce((s, n) => s + n.alloc, 0);
+      if (spare > 0) {
+        const need = n => Math.min(n.cap - n.B, 0.15 * n.demand), R = NBHDS.reduce((s, n) => s + need(n), 0);
+        if (R > 0) for (const n of NBHDS) n.alloc += Math.min(need(n), spare * need(n) / R);
+      }
+      sim.allocBy = 'api'; sim.fairT = t;
+      return;
+    }
+  }
+  sim.allocBy = 'twin';
   if (sim.policy === 'directorate') {
     let rem = S;
     const order = NBHDS.slice().sort((a, b) => a.level - b.level || b.pop - a.pop);
@@ -1041,7 +1136,7 @@ function allocate(S) {
   for (const n of NBHDS) n.alloc = FLOOR * n.demand;
   let open = NBHDS.slice();
   for (let pass = 0; pass < 4 && rem > 1e-6 && open.length; pass++) {
-    const w = n => (1 + (n.temp > 40 ? 0.35 : 0) + (n.co2 > 2000 ? 0.35 : 0) + (n.flood > 25 ? 0.25 : 0) + (n.prioUntil > sim.t ? 1.5 : 0)) * n.demand;
+    const w = n => (1 + (n.temp >= LIM.heatWarn ? 0.35 : 0) + (n.co2 > LIM.co2Warn ? 0.35 : 0) + (n.flood > LIM.floodClosed ? 0.25 : 0) + (n.prioUntil > sim.t ? 1.5 : 0)) * n.demand;
     const W = open.reduce((s, n) => s + w(n), 0);
     const share = rem;
     const next = [];
@@ -1080,16 +1175,16 @@ function step() {
     n.hoursLeft = n.willDark && n.drain > 0.02 * n.demand ? n.B / n.drain : Infinity;
 
     const eff = n.served;
-    const co2Base = 650 + lv * 120;
-    if (eff >= 0.7) n.co2 += (co2Base - n.co2) * 0.35;
-    else n.co2 = Math.min(9000, n.co2 + 460 * (1 - eff) - (n.co2 - co2Base) * 0.04 * eff);
+    const base = co2Base(lv);
+    if (eff >= 0.7) n.co2 += (base - n.co2) * 0.35;
+    else n.co2 = Math.min(9000, n.co2 + 460 * (1 - eff) - (n.co2 - base) * 0.04 * eff);
     const tBase = 23 + lv * 2.1 + n.heatBias + sim.aging;
-    if (eff >= 0.7) n.temp += (tBase - n.temp) * 0.3; else n.temp = Math.min(tBase + 7, n.temp + 0.6 * (1 - eff));
+    if (eff >= 0.7) n.temp += (tBase - n.temp) * 0.3; else n.temp = Math.min(tBase + 14, n.temp + 0.8 * (1 - eff));
 
     if (n.waterRate && sim.t >= n.waterUntil) n.waterRate = 0;
     n.water = clamp(n.water + n.waterRate + (n.blackout ? 0.9 : 0) - (n.waterRate ? 0 : n.water * 0.08), 0, 100);
     if (n.floodRate && sim.t >= n.floodUntil) n.floodRate = 0;
-    n.flood = clamp(n.flood + n.floodRate + (n.blackout ? 0.9 : -2.2), 0, 140);
+    n.flood = clamp(n.flood + n.floodRate + (n.blackout ? 0.6 : -3.5), 0, 80);
 
     n.lungObs += Math.max(0, n.co2 - 900) / 1000 * 0.06 + (lv >= 5 ? 0.012 : 0.002);
     if (!(sim.netCut && lv >= 5)) n.lungOff = n.lungObs * officialFactor(lv);
@@ -1106,12 +1201,14 @@ function step() {
     n.hist.push({ s: n.served, b: n.B / n.demand, co2: n.co2, temp: n.temp, water: n.water, flood: n.flood, lung: n.lungObs, ob: n.ob ? n.ob.I * 1000 : 0 }); if (n.hist.length > 48) n.hist.shift();
   }
   // floods close tunnels; find isolated blocks
-  for (const e of EDGES) if (e.kind !== 'shaft') e.blocked = e.a.flood > 45 || e.b.flood > 45;
+  // a tunnel a scout has reported on (e.api) follows that report; the rest close on flood depth
+  for (const e of EDGES) if (e.kind !== 'shaft') e.blocked = e.api ? e.api.status === 'closed' : e.a.flood > LIM.floodClosed || e.b.flood > LIM.floodClosed;
   for (const L of LEVELS) {
     const seen = new Set([HUBS[L.i]]); const q = [HUBS[L.i]];
     while (q.length) { const v = q.shift(); for (const e of v.adj) { if (e.blocked || e.kind === 'shaft') continue; const o = e.a === v ? e.b : e.a; if (!seen.has(o)) { seen.add(o); q.push(o); } } }
     for (const n of L.nbhds) n.isolatedNow = !seen.has(n);
   }
+  if (api.on) pinAll(); // what the API knows about a block wins over the simulation
   stepOutbreak();
   detectEvents();
   computeDerived();
@@ -1121,7 +1218,7 @@ function randomIncident() {
   const deep = NBHDS.filter(n => n.level >= 4);
   const n = deep[Math.floor(simRng() * deep.length)];
   if (simRng() < 0.5) { n.waterRate = 5 + simRng() * 4; n.waterUntil = sim.t + 8; }
-  else { n.floodRate = 5 + simRng() * 3; n.floodUntil = sim.t + 9; }
+  else { n.floodRate = 5 + simRng() * 2.5; n.floodUntil = sim.t + 9; }
 }
 
 function where(n) { return `${n.name} (${LEVELS[n.level].name})`; }
@@ -1141,18 +1238,20 @@ function detectEvents() {
         `Early warning sent to ${n.name}. Expect a blackout in about ${h} h.`], n), n);
     }
     if (n.hoursLeft > 24 && !n.blackout) n.fWarned = false;
-    if (n.water > 25 && !(p.water > 25)) {
-      const clean = LEVELS[n.level].nbhds.filter(o => o !== n && o.water < 10).sort((a, b) => Math.hypot(a.x - n.x, a.z - n.z) - Math.hypot(b.x - n.x, b.z - n.z))[0];
+    const wl = waterLevel(n), tds = fmtInt(Math.round(tdsOf(n) / 10) * 10), ntu = ntuOf(n).toFixed(1);
+    if (wl > (p.wl || 0)) {
+      const clean = LEVELS[n.level].nbhds.filter(o => o !== n && waterLevel(o) === 0 && tdsOf(o) < 500).sort((a, b) => Math.hypot(a.x - n.x, a.z - n.z) - Math.hypot(b.x - n.x, b.z - n.z))[0];
       const tail = clean ? ` Clean water at ${clean.name}.` : '';
-      log('crit', say([
-        `Tap sensors at ${n.name} picked up contamination. Do-not-drink went out before it reached unsafe levels.${tail}`,
-        `Bad water coming through at ${n.name}. Residents told not to drink it.${tail}`], n), n);
+      if (wl === 2) log('crit', `Water at ${n.name} is past the limit (${tds} ppm dissolved solids, ${ntu} NTU). Do not drink.${tail}`, n);
+      else log('warn', say([
+        `Tap probes at ${n.name} read ${tds} ppm and rising (limit ${fmtInt(LIM.tdsMax)}). Households told to stop drinking it before it crosses.${tail}`,
+        `Water at ${n.name} is nearing the limit: ${tds} ppm, ${ntu} NTU. Early do-not-drink sent.${tail}`], n), n);
     }
-    if (n.co2 > 4000 && !(p.co2 > 4000)) log('crit', say([`Air at ${n.name} passed 4,000 ppm. Moving people up a level.`, `CO2 is unsafe at ${n.name}. Sending residents toward the lift.`], n), n);
-    if (n.flood > 45 && !(p.flood > 45)) log('crit', say([`Water over 45 cm at ${n.name}. Tunnels into the block are closed.`, `${n.name} is flooding. Tunnel closed and carts stopped.`], n), n);
+    if (n.co2 > LIM.co2Alarm && !(p.co2 > LIM.co2Alarm)) log('crit', say([`Air at ${n.name} passed ${fmtInt(LIM.co2Alarm)} ppm. Moving people up a level.`, `CO2 is unsafe at ${n.name}. Sending residents toward the lift.`], n), n);
+    if (n.flood > LIM.floodClosed && !(p.flood > LIM.floodClosed)) log('crit', say([`Water over ${LIM.floodClosed} cm at ${n.name}. Tunnels into the block are closed.`, `${n.name} is flooding. Tunnel closed and carts stopped.`], n), n);
     if (n.isolatedNow && !n.isolated) log('warn', say([`${n.name} is cut off by the flooding. Supplies go around through the relays.`, `No dry route to ${n.name}. Rerouting food and water.`], n), n);
     n.isolated = n.isolatedNow;
-    n.prev = { blackout: n.blackout, water: n.water, co2: n.co2, flood: n.flood };
+    n.prev = { blackout: n.blackout, wl, co2: n.co2, flood: n.flood };
   }
   const list = ns => ns.length <= 3 ? ns.map(n => n.name).join(', ').replace(/, ([^,]*)$/, ' and $1') : `${ns.slice(0, 2).map(n => n.name).join(', ')} and ${ns.length - 2} more`;
   if (wentDark.length === 1) {
@@ -1169,17 +1268,19 @@ function detectEvents() {
 function metric(n, key) {
   switch (key) {
     case 'power': {
+      const f = n.ov && n.ov.power; // this block's relay reports through the API: show the API's forecast, not the twin's
+      if (f) { const h = f.hours_left; return { t: 0, s: f.dark || f.level === 'alarm' ? 2 : f.level === 'warn' ? 1 : 0, label: f.dark ? 'Dark' : h == null ? 'Not draining' : `${Math.max(1, Math.round(h))} h left` }; }
       if (n.blackout) return { t: 1, s: 2, label: 'Dark' };
       const h = n.hoursLeft; let s = 0;
-      if (h < Infinity) { if (h < 8) s = 2; else if (h < 24) s = 1; }
+      if (h < Infinity) { if (h < LIM.batteryAlarmH) s = 2; else if (h < LIM.batteryWarnH) s = 1; }
       if (n.served < 0.7) s = Math.max(s, 1);
       const pct = Math.round(n.served * 100);
       return { t: s / 2, s, label: h < 48 ? `${Math.max(1, Math.round(h))} h left` : n.served < 1 ? `Brownout, ${pct}%` : `${pct}%` };
     }
-    case 'air': { const v = n.co2; return { t: 0, s: v > 4000 ? 2 : v > 2000 ? 1 : 0, label: v >= 8000 ? 'Over 8,000 ppm' : `${fmtInt(Math.round(v / 50) * 50)} ppm` }; }
-    case 'heat': { const v = n.temp; return { t: 0, s: v > 43 ? 2 : v > 39 ? 1 : 0, label: `${Math.round(v)}°C` }; }
-    case 'water': { const v = n.water; return { t: 0, s: v > 50 ? 2 : v > 25 ? 1 : 0, label: v < 8 ? 'Clean' : `Index ${Math.round(v)}` }; }
-    case 'flood': { const v = n.flood; return { t: 0, s: v > 45 ? 2 : v > 25 ? 1 : 0, label: v < 3 ? 'Dry' : `${Math.round(v)} cm` }; }
+    case 'air': { const v = n.co2; return { t: 0, s: v > LIM.co2Alarm ? 2 : v > LIM.co2Warn ? 1 : 0, label: v >= 8000 ? 'Over 8,000 ppm' : `${fmtInt(Math.round(v / 10) * 10)} ppm` }; }
+    case 'heat': { const f = feelsLike(n.temp, n.ov ? n.ov.hum : undefined); return { t: 0, s: f.c >= LIM.heatAlarm ? 2 : f.c >= LIM.heatWarn ? 1 : 0, label: `${f.c.toFixed(1)}°C${f.index ? ' heat index' : ''}` }; }
+    case 'water': { const t = tdsOf(n), u = ntuOf(n), s = waterLevel(n); return { t: 0, s, label: s === 0 && t < 500 ? 'Clean' : `${fmtInt(Math.round(t / 10) * 10)} ppm, ${u.toFixed(1)} NTU` }; }
+    case 'flood': { const v = n.flood; return { t: 0, s: v > LIM.floodClosed ? 2 : v > LIM.floodClosed / 2 ? 1 : 0, label: v < 2 ? 'Dry' : `${Math.round(v)} cm` }; }
     case 'lung': { const v = n.lungObs; return { t: 0, s: v > 28 ? 2 : v > 18 ? 1 : 0, label: `${Math.round(v)} per 1k` }; }
     case 'outbreak': { if (!n.ob) return { t: 0, s: 0, label: 'None' }; const v = n.ob.I * 1000; return { t: 0, s: v > 30 ? 2 : v > 3 ? 1 : 0, label: v < 0.5 ? (n.ob.R + n.ob.D > 0.001 ? 'Over' : 'None') : `${Math.round(v)} sick per 1k` }; }
   }
@@ -1341,11 +1442,12 @@ function paint() {
     n.disc.visible = n.ring.visible = n.beacon.visible = show;
     if (show) { n.disc.material.color.copy(col); n.ring.material.color.copy(col); n.beacon.material.color.copy(col); }
     n.winMat.emissiveIntensity = n.blackout ? 0.02 : (n === selected ? 1.8 : 1.3) * Math.max(0.35, n.served);
-    n.puddle.visible = n.flood > 6;
-    n.puddle.scale.setScalar(1 + n.flood / 9);
+    n.puddle.visible = n.flood > 4;
+    n.puddle.scale.setScalar(1 + n.flood / 7);
     const showTag = show && focus === n.level;
     n.tag.visible = showTag;
     if (showTag) { n.tag.element.className = 'lbl-alert s' + m.s; n.tag.element.textContent = m.label; }
+    if (n.srcTag) n.srcTag.visible = fed(n) && (n.srcLive || focus === n.level || selected === n);
   }
   for (const e of EDGES) if (e.line) e.line.material = e.blocked ? trackBlock : (e.a.quar || e.b.quar) ? trackQuar : trackBed;
   for (const L of LEVELS) {
@@ -1376,10 +1478,12 @@ const TAGS = { crit: 'Alarm', warn: 'Warning', ok: 'Cleared', info: 'Note' };
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function clockStr(t) { const d = new Date(START + t * 3600e3); return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}, ${String(d.getUTCHours()).padStart(2, '0')}:00`; }
 const approx = v => v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e4 ? Math.round(v / 1000) + 'k' : fmtInt(Math.round(v / 10) * 10);
-function log(kind, msg, who) {
-  sim.logs.push({ t: sim.t, kind, msg, ids: who ? [].concat(who).map(n => n.id) : [] });
+const realClock = ms => new Date(ms).toLocaleTimeString([], { hour12: false });
+// `src` marks a line that came through the API: it carries the real time and says where it came from.
+function log(kind, msg, who, src) {
+  sim.logs.push({ t: sim.t, kind, msg, src, at: Date.now(), ids: who ? [].concat(who).map(n => n.id) : [] });
   if (sim.logs.length > 600) sim.logs.shift();
-  const ln = el('div', 'ln ' + kind, `<span class="t">${clockStr(sim.t)}</span><span class="tag">${TAGS[kind]}</span><span class="msg">${msg}</span>`);
+  const ln = el('div', 'ln ' + kind, `<span class="t">${src ? realClock(Date.now()) : clockStr(sim.t)}</span><span class="tag">${TAGS[kind]}</span><span class="msg">${msg}${src ? ` <i class="src">${src}</i>` : ''}</span>`);
   logEl.prepend(ln);
   while (logEl.children.length > 60) logEl.lastChild.remove();
 }
@@ -1392,8 +1496,9 @@ for (const [k, v] of Object.entries(LAYERS)) {
 function setLayer(k) {
   layer = k;
   for (const b of layersEl.children) b.classList.toggle('on', b.dataset.layer === k);
-  document.getElementById('lg-lo').textContent = LAYERS[k].lo;
-  document.getElementById('lg-hi').textContent = LAYERS[k].hi;
+  const [lo, hi] = legend(k);
+  document.getElementById('lg-lo').textContent = lo;
+  document.getElementById('lg-hi').textContent = hi;
   document.getElementById('lg-desc').textContent = LAYERS[k].desc;
   paint(); renderPanels();
 }
@@ -1426,9 +1531,6 @@ document.querySelectorAll('[data-policy]').forEach(b => b.onclick = () => setPol
 function setPolicy(p, announce) {
   sim.policy = p;
   document.querySelectorAll('[data-policy]').forEach(x => x.classList.toggle('on', x.dataset.policy === p));
-  document.getElementById('policy-note').textContent = p === 'directorate'
-    ? 'Top levels are served first. When supply runs short, the deep levels go dark.'
-    : 'Everyone gets life support first (45%). The rest is split evenly, with heat, air and flood emergencies weighted up.';
   if (announce) log('info', p === 'directorate' ? 'Policy set to Directorate priority. Upper levels are served first.' : 'Policy set to fair share. Every block keeps life support and the shortfall is split.');
 }
 document.getElementById('btn-overlay').onclick = e => { overlay = !overlay; e.currentTarget.classList.toggle('on', overlay); e.currentTarget.textContent = overlay ? 'Markers on' : 'Markers off'; paint(); };
@@ -1531,17 +1633,18 @@ function nearest(n, test) { // breadth-first over tunnels and the lift
 }
 
 // ---------- right panel: built once, values patched in place ----------
-let rightMode = null, tab = 'now', alertKeys = '';
+let rightMode = null, tab = 'now', alertKeys = '', apiHtml = null;
 const $ = id => document.getElementById(id);
 
 function buildOverview() {
-  rightMode = 'overview'; alertKeys = '';
+  rightMode = 'overview'; alertKeys = ''; apiHtml = null;
   right.innerHTML = `<div class="fade-in">
     <h3>Sector now</h3>
     <div class="compare">
       <div><small>Blocks dark</small><span class="big" id="o-dark"></span> <span id="o-darkp"></span></div>
       <div><small>Dark within 12 h</small><span class="big" id="o-soon"></span> <span id="o-soonp"></span></div>
     </div>
+    <div id="o-api"></div>
     <h3>Lung sickness cases</h3>
     <div class="compare">
       <div><small>Directorate says</small><span class="big" id="o-off"></span></div>
@@ -1569,6 +1672,11 @@ function updateOverview() {
   $('o-gap').textContent = `The official number is about ${Math.round(obs / off)} times lower. The gap is widest below L5.`;
   $('o-mesh').innerHTML = sim.netCut ? `<h3>Block relays</h3><div class="kv"><div class="k">Relays up</div><div>${NBHDS.filter(n => n.meshBatt > 0).length} of ${NBHDS.length}</div><div class="k">Check-ins</div><div class="${checkin < 0.7 ? 's1' : ''}">${Math.round(checkin * 100)}% of families heard from</div></div>` : '';
   $('o-ob').innerHTML = obOverview();
+  const ah = apiOverview();
+  if (ah !== apiHtml) {
+    apiHtml = ah; $('o-api').innerHTML = ah;
+    $('o-api').querySelectorAll('[data-bid]').forEach(r => { const o = BYID[r.dataset.bid]; if (o) { r.style.cursor = 'pointer'; r.onclick = () => select(o); } });
+  }
   $('o-n').textContent = sim.alerts.length;
   const top = sim.alerts.slice(0, 60), keys = top.map(a => a.n.id + a.k).join('|'), list = $('alerts');
   if (keys !== alertKeys) {
@@ -1606,6 +1714,7 @@ function buildCard(n) {
     </div>
     <div data-pane="now">
       ${Object.keys(LAYERS).map(k => `<div class="rd" data-k="${k}"><span class="k">${LAYERS[k].name}</span><span class="v"></span><svg viewBox="0 0 64 18" preserveAspectRatio="none"></svg></div>`).join('')}
+      <div class="note" id="c-src" style="margin-top:8px"></div>
       <div class="kv" style="margin-top:10px">
         <div class="k">Supply</div><div id="c-supply"></div>
         <div class="k">Battery</div><div id="c-batt"></div>
@@ -1666,9 +1775,11 @@ function showTab() {
 }
 function updateCard() {
   const n = selected; if (rightMode !== n.id) buildCard(n);
-  const airH = Math.max(1, Math.round((4000 - n.co2) / 460));
+  const airH = Math.max(1, Math.round((LIM.co2Alarm - n.co2) / 460));
   let st = '';
-  if (n.blackout) st = `<div class="callout crit">Dark now. ${n.co2 < 4000 ? `Without scrubbers the air turns unsafe in about ${airH} h.` : 'The air is already unsafe. Move people to the nearest lit block.'}</div>`;
+  const fp = n.ov && n.ov.power;
+  if (fp) st = `<div class="callout ${fp.dark || fp.level === 'alarm' ? 'crit' : fp.level === 'warn' ? '' : 'plain'}">This block's relay reports ${fmtPow(fp.battery_wh, 'Wh')} of battery, drawing ${fmtPow(fp.draw_w, 'W')} and receiving ${fmtPow(fp.supply_w, 'W')}. ${fp.dark ? 'It is dark.' : fp.hours_left == null ? 'It is not draining.' : `At this drain it lasts about <b>${Math.max(1, Math.round(fp.hours_left))} h</b>.`} <span class="note">Forecast by the API.</span></div>`;
+  else if (n.blackout) st = `<div class="callout crit">Dark now. ${n.co2 < LIM.co2Alarm ? `Without scrubbers the air turns unsafe in about ${airH} h.` : 'The air is already unsafe. Move people to the nearest lit block.'}</div>`;
   else if (n.hoursLeft < 48) st = `<div class="callout ${n.hoursLeft < 8 ? 'crit' : ''}">At this drain the battery lasts about <b>${Math.max(1, Math.round(n.hoursLeft))} h</b>. Without scrubbers the air turns unsafe about ${airH} h after that.</div>`;
   else if (n.alloc < n.demand * 0.98) { const ratio = Math.round(n.alloc / n.demand * 100); st = `<div class="callout plain">Getting ${ratio}% of the power it needs. ${n.B > 0 ? `The battery covers the gap for about ${Math.max(1, Math.round(n.B / Math.max(n.drain, 1e-6)))} h, then` : 'For now'} it runs on reduced power. Life support stays on.</div>`; }
   else st = `<div class="callout plain">Running normally.</div>`;
@@ -1678,14 +1789,20 @@ function updateCard() {
     v.textContent = m.label; v.className = 'v s' + m.s;
     r.querySelector('svg').innerHTML = miniSpark(n, k);
   });
-  $('c-supply').textContent = `${Math.round(clamp(n.alloc / n.demand, 0, 1) * 100)}% of demand`;
-  $('c-batt').textContent = `${Math.round(n.B / n.demand)} h at full load`;
+  $('c-supply').textContent = fp ? (fp.draw_w > 0 && isNum(fp.supply_w) ? `${Math.min(100, Math.round(100 * fp.supply_w / fp.draw_w))}% of what it draws` : 'Unknown') : `${Math.round(clamp(n.alloc / n.demand, 0, 1) * 100)}% of demand`;
+  $('c-batt').textContent = fp ? fmtPow(fp.battery_wh, 'Wh') : `${Math.round(n.B / n.demand)} h at full load`;
+  const from = ['power', 'air', 'water', 'flood'].filter(k => n.api[k]);
+  $('c-src').innerHTML = from.length
+    ? from.map(k => `${k === 'air' ? 'Air and heat' : KINDS[k]}: ${prov(n.api[k])}, ${n.api[k].device}, ${ago(n.api[k].time)}.`).join('<br>') + '<br>Everything else here is the twin simulation.'
+    : api.on ? 'The API has no data for this block. These readings are the twin simulation.' : 'These readings are the twin simulation.';
   $('c-access').textContent = n.isolated ? 'Cut off by flood' : 'Tunnels open'; $('c-access').className = n.isolated ? 's2' : '';
   $('c-check').textContent = sim.netCut ? `${Math.round(n.checkin * 100)}% of families heard from` : 'Network up';
   $('c-lung').innerHTML = `${Math.round(n.lungOff)} per 1k <span class="note">(residents count ${Math.round(n.lungObs)})</span>`;
-  const prio = n.prioUntil > sim.t, fault = n.water > 25 || n.flood > 25;
-  $('a-prio').textContent = prio ? `First for power, ${n.prioUntil - sim.t} h left. Click to lift.` : 'Put this block first for power';
-  $('a-prio').classList.toggle('on', prio);
+  const prio = n.prioUntil > sim.t, fault = waterLevel(n) > 0 || n.flood > LIM.floodClosed / 2;
+  const apiAlloc = sim.allocBy === 'api';
+  $('a-prio').disabled = apiAlloc;
+  $('a-prio').textContent = apiAlloc ? 'Put this block first (off: the API decides allocation)' : prio ? `First for power, ${n.prioUntil - sim.t} h left. Click to lift.` : 'Put this block first for power';
+  $('a-prio').classList.toggle('on', prio && !apiAlloc);
   $('a-crew').disabled = !fault || !!n.crewAt;
   $('a-crew').textContent = n.crewAt ? `Repair crew arriving in about ${Math.max(1, n.crewAt - sim.t)} h` : fault ? 'Send a repair crew' : 'Send a repair crew (no fault right now)';
   if (n.ob) { const p = people(n); $('c-ob').innerHTML = `${fmtInt(Math.round(n.ob.I * p))} sick, ${fmtInt(Math.round(n.ob.R * p))} recovered, <span class="${n.ob.D * p >= 1 ? 's2' : ''}">${fmtInt(Math.round(n.ob.D * p))} died</span>${n.quar ? ', quarantined' : ''}`; }
@@ -1694,7 +1811,7 @@ function updateCard() {
   const med = n.medUntil > sim.t; $('a-med').disabled = !sim.ob || med; $('a-med').textContent = med ? `Medicine on hand, ${n.medUntil - sim.t} h left` : 'Send medicine';
   $('a-ob').textContent = sim.ob && !sim.ob.done ? `Seed ${sim.ob.d.name.toLowerCase()} here too` : `Start ${DISEASES[obKind.value].name.toLowerCase()} here`;
   const evs = sim.logs.filter(l => l.ids.includes(n.id)).slice(-10).reverse();
-  $('c-hist').innerHTML = evs.length ? evs.map(l => `<div class="ev"><span class="t">${clockStr(l.t)}</span><span class="${l.kind === 'crit' ? 's2' : l.kind === 'warn' ? 's1' : ''}">${l.msg}</span></div>`).join('') : '<div class="note">Nothing logged for this block yet.</div>';
+  $('c-hist').innerHTML = evs.length ? evs.map(l => `<div class="ev"><span class="t">${l.src ? realClock(l.at) : clockStr(l.t)}</span><span class="${l.kind === 'crit' ? 's2' : l.kind === 'warn' ? 's1' : ''}">${l.msg}</span>${l.src ? ` <span class="note">${l.src}</span>` : ''}</div>`).join('') : '<div class="note">Nothing logged for this block yet.</div>';
 }
 
 // ---------- header, levels and the right panel ----------
@@ -1706,8 +1823,14 @@ function renderPanels() {
   $('f-upper').textContent = Math.round(sim.upper * 100) + '%';
   $('f-deep').textContent = Math.round(sim.deep * 100) + '%';
   $('f-deep').className = 'big ' + (sim.deep < 0.6 ? 's2' : sim.deep < 0.85 ? 's1' : '');
-  $('f-jain').textContent = sim.jain.toFixed(2);
-  $('corner-br').textContent = `${NBHDS.length} blocks, ${EDGES.length} tunnels. Showing ${LAYERS[layer].name.toLowerCase()}.`;
+  const viaApi = sim.allocBy === 'api' && sim.fairT;
+  $('policy-note').textContent = viaApi ? sim.fairT[sim.policy].rule
+    : sim.policy === 'directorate' ? 'Top levels are served first. When supply runs short, the deep levels go dark.'
+    : 'Everyone gets life support first (45%). The rest is split evenly, with heat, air and flood emergencies weighted up.';
+  $('f-note').innerHTML = viaApi
+    ? `Equity index <b>${sim.fairT[sim.policy].equity_index.toFixed(2)}</b> (lowest per-person share divided by the highest). Allocation computed by the API: 100 W per person, 45 W of it critical.`
+    : `Equity index <b>${sim.jain.toFixed(2)}</b> (1.00 = everyone gets the same share). Allocation computed in the browser${api.url ? '' : '; no API connected'}.`;
+  $('corner-br').textContent = `Showing ${LAYERS[layer].name.toLowerCase()}`;
   for (const L of LEVELS) {
     const pop = L.nbhds.reduce((s, n) => s + n.pop, 0);
     const alloc = L.nbhds.reduce((s, n) => s + clamp(n.alloc / n.demand, 0, 1) * n.pop, 0) / pop;
@@ -1775,13 +1898,390 @@ renderer.domElement.addEventListener('dblclick', e => { if (!hit(e)) { if (selec
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
   if (e.code === 'Space') { e.preventDefault(); document.querySelector(`[data-speed="${speed ? 0 : 1}"]`).click(); }
-  if (e.key === 'Escape') { if (obPick) setPick(false); else if (selected) select(null); else if (focus !== null) setFocus(null); }
+  if (e.key === 'Escape') { if (story.on) endStory(); else if (obPick) setPick(false); else if (selected) select(null); else if (focus !== null) setFocus(null); }
   if (selected && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
     const sib = LEVELS[selected.level].nbhds, i = sib.indexOf(selected);
     select(sib[(i + (e.key === 'ArrowRight' ? 1 : -1) + sib.length) % sib.length]);
   }
   if (e.key === '/') { e.preventDefault(); findEl.focus(); }
 });
+
+// ---------- the backend API (CONTRACT.md) ----------
+// With an API address set, the twin stops being a closed simulation: real messages override the simulated values
+// block by block, the API's power allocation and battery forecast replace the twin's own, and every number says
+// where it came from. With no API it runs on its built-in simulation and says so.
+const DEFAULT_API = ''; // the deployed API address, once lane 1 has one
+const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+for (const n of NBHDS) { n.bid = `${LEVELS[n.level].code.toLowerCase()}-${slug(n.name)}`; n.api = {}; n.ov = null; }
+const BYID = Object.fromEntries(NBHDS.map(n => [n.bid, n]));
+const api = { url: '', on: false, state: 'off', seq: 0, seen: new Set(), es: null, timer: null, status: null, forecast: {}, alerts: [], checkins: [], feed: [], fair: new Map(), fairBusy: new Set(), deviceBlock: {}, dirty: false, soon: 0 };
+const isNum = x => typeof x === 'number' && !Number.isNaN(x);
+const prov = m => m.source === 'live' ? (m.verified ? 'Device, verified' : 'Device, unverified') : 'API, simulated';
+const KINDS = { power: 'Power', air: 'Air', water: 'Water', flood: 'Flood', vitals: 'Vitals', button: 'Button press', checkin: 'Check-in', tunnel: 'Tunnel report', surface: 'Surface reading' };
+const blockName = id => id === 'surface' ? 'the surface' : BYID[id] ? BYID[id].name : id;
+const nice = text => String(text).replace(/\bl\d-[a-z]+(?:-[a-z]+)*\b/g, id => blockName(id)); // block ids to block names
+const getJSON = path => fetch(api.url + path).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+const ago = iso => { const s = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000)); return s < 90 ? `${s} s ago` : s < 5400 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`; };
+const fmtPow = (x, u) => !isNum(x) ? 'unknown' : x >= 1e9 ? `${(x / 1e9).toFixed(1)} G${u}` : x >= 1e6 ? `${(x / 1e6).toFixed(1)} M${u}` : x >= 1e3 ? `${(x / 1e3).toFixed(1)} k${u}` : `${Math.round(x)} ${u}`;
+
+// Write what the API knows about a block over the twin's simulated state for it.
+function pin(n) {
+  const a = n.api, ov = {};
+  if (a.air) { const v = a.air.values; if (isNum(v.co2_ppm)) n.co2 = v.co2_ppm; if (isNum(v.temp_c)) n.temp = v.temp_c; if (isNum(v.humidity_pct)) ov.hum = v.humidity_pct; }
+  if (a.water) { const v = a.water.values; if (isNum(v.tds_ppm)) ov.tds = v.tds_ppm; if (isNum(v.turbidity_ntu)) ov.ntu = v.turbidity_ntu; }
+  if (a.flood && isNum(a.flood.values.depth_cm)) n.flood = a.flood.values.depth_cm;
+  const f = a.power && api.forecast[n.bid];
+  if (f) { ov.power = f; n.blackout = !!f.dark; n.hoursLeft = f.hours_left == null ? Infinity : f.hours_left; if (f.dark) n.served = 0; }
+  n.ov = ov;
+}
+const fed = n => Object.keys(n.api).length > 0;
+const pinAll = () => { for (const n of NBHDS) if (fed(n)) pin(n); };
+
+function onReading(m, fresh) {
+  if (m.device) api.deviceBlock[m.device] = m.block;
+  const n = BYID[m.block];
+  if (n && (m.kind === 'power' || m.kind === 'air' || m.kind === 'water' || m.kind === 'flood')) {
+    const old = n.api[m.kind];
+    if (!old || Date.parse(m.time) >= Date.parse(old.time)) n.api[m.kind] = m; // newest by measurement time, as the API does
+    pin(n); srcTag(n);
+    if (m.kind === 'power') refreshSoon();
+  }
+  if (m.kind === 'tunnel') {
+    const a = BYID[m.values.from_block], b = BYID[m.values.to_block];
+    const e = a && b && EDGES.find(e => (e.a === a && e.b === b) || (e.a === b && e.b === a));
+    if (e) { e.api = { status: m.values.status, reason: m.values.reason, m }; e.blocked = m.values.status === 'closed'; }
+    if (fresh && a && b) log(m.values.status === 'closed' ? 'crit' : 'ok', `${m.device} checked the tunnel from ${a.name} to ${b.name}: ${m.values.status}${m.values.reason ? ', ' + m.values.reason : ''}.`, [a, b], prov(m));
+  }
+  if (m.kind === 'surface' || m.kind === 'button' || m.kind === 'vitals') refreshSoon();
+  if (fresh) { feedPush(m); if (n) flash(n); }
+  api.dirty = true;
+}
+
+function onAlert(a, fresh) {
+  if (api.alerts.some(x => x.id === a.id)) return;
+  api.alerts.unshift(a); if (api.alerts.length > 60) api.alerts.pop();
+  const v = a.values, n = BYID[a.block];
+  if (v.family && v.cause) { // a family check-in was delivered
+    const c = { id: a.id, from: (String(v.text).match(/^(\S+) is/) || [])[1] || 'A watch', block: a.block, to: v.to || [], family: v.family, hops: v.hops || 0, via: v.via || [], sent: v.sent, delivered: a.time, source: a.source, verified: v.cause_verified === true };
+    api.checkins.unshift(c); if (api.checkins.length > 12) api.checkins.pop();
+    if (fresh) announceCheckin(c);
+  } else if (fresh) log(v.level === 'danger' ? 'crit' : v.level === 'warn' ? 'warn' : 'info', nice(v.text) + '.', n ? [n] : null, a.source === 'live' ? 'API, from a device' : 'API, simulated');
+  if (fresh) feedPush(a);
+  api.dirty = true;
+}
+
+function announceCheckin(c) {
+  const src = BYID[c.block], dstId = c.to.map(w => api.deviceBlock[w]).find(Boolean), dst = dstId && BYID[dstId];
+  const late = c.sent ? Math.round((Date.parse(c.delivered) - Date.parse(c.sent)) / 1000) : 0;
+  const route = c.hops ? ` It crossed ${c.hops} relay${c.hops > 1 ? 's' : ''} (${c.via.map(r => blockName(r.replace(/^relay-/, ''))).join(' to ')})${late > 5 ? ` and arrived ${late} s after it was sent` : ''}.` : '';
+  log('ok', `${c.from} in ${blockName(c.block)} is OK. Delivered to ${c.to.join(', ') || 'the family group'}${dst ? ' in ' + dst.name : ''}.${route}`, [src, dst].filter(Boolean), c.source === 'live' ? (c.verified ? 'Device, verified' : 'Device, unverified') : 'API, simulated');
+  if (src && dst && src !== dst) courier(src, dst, "I'm OK"); else if (src) flash(src);
+}
+
+// the strip that shows messages arriving, so the path from a device to this screen is visible
+function feedPush(m) {
+  const line = m.kind === 'alert' ? `Alert: ${nice(m.values.text)}` : `${KINDS[m.kind] || m.kind} from ${blockName(m.block)} (${m.device})${m.hops ? `, over ${m.hops} relay${m.hops > 1 ? 's' : ''}` : ''}`;
+  api.feed.unshift({ line, src: m.kind === 'alert' ? 'API' : prov(m), at: Date.now(), live: m.source === 'live' });
+  if (api.feed.length > 5) api.feed.length = 5;
+  renderFeed();
+}
+function renderFeed() {
+  const rows = api.feed.filter(f => Date.now() - f.at < 15000), box = $('feed');
+  box.style.display = api.on && rows.length ? 'block' : 'none';
+  box.innerHTML = '<b>Arriving from the API</b>' + rows.map(f => `<div class="${f.live ? 'live' : ''}">${f.line} <i>${f.src}</i></div>`).join('');
+}
+
+// a small tag over a block that the API has data for
+function srcTag(n) {
+  if (!n.srcTag) n.srcTag = addLabel('', 'lbl-src', new THREE.Vector3(n.x, caveFloor(n.level) + n.h + 2.6, n.z));
+  const ms = Object.values(n.api), live = ms.filter(m => m.source === 'live');
+  n.srcLive = live.length > 0;
+  n.srcTag.element.textContent = live.some(m => m.verified) ? 'Verified device' : live.length ? 'Device, unverified' : 'API, simulated';
+  n.srcTag.element.className = 'lbl-src' + (live.length ? ' dev' : '');
+}
+
+function applyStatus(st, first) {
+  api.status = st;
+  api.forecast = Object.fromEntries((st.forecast || []).map(f => [f.block, f]));
+  if (first) for (const a of ((st.alerts && st.alerts.latest) || []).slice().reverse()) { api.seen.add(a.id); onAlert(a, false); }
+  pinAll(); api.dirty = true; apiPaint();
+}
+function refreshSoon() { clearTimeout(api.soon); api.soon = setTimeout(pollStatus, 350); }
+function pollStatus() { if (api.on) getJSON('/status').then(st => applyStatus(st, false)).catch(() => {}); }
+
+function adoptLimits(L) {
+  const map = { batteryWarnH: 'battery_warn_hours', batteryAlarmH: 'battery_alarm_hours', co2Warn: 'air_co2_stale_ppm', co2Alarm: 'air_co2_danger_ppm', heatWarn: 'air_heat_warn_c', heatAlarm: 'air_heat_danger_c', floodClosed: 'flood_depth_closed_cm', tdsMax: 'water_tds_max_ppm', ntuMax: 'water_turbidity_max_ntu' };
+  for (const [k, key] of Object.entries(map)) if (L[key] && isNum(L[key].value)) LIM[k] = L[key].value;
+}
+
+function openStream() {
+  const es = api.es = new EventSource(`${api.url}/live?lastEventId=${api.seq}`);
+  const take = e => { const m = JSON.parse(e.data); api.seq = Number(e.lastEventId) || m.seq || api.seq; if (api.seen.has(m.id)) return null; api.seen.add(m.id); return m; };
+  es.addEventListener('reading', e => { const m = take(e); if (m) onReading(m, true); });
+  es.addEventListener('alert', e => { const a = take(e); if (a) onAlert(a, true); });
+  es.addEventListener('reset', () => apiConnect(api.url)); // the API's data was wiped: start again
+  es.onopen = () => { if (api.es === es) { api.state = 'on'; apiPaint(); } };
+  es.onerror = () => {
+    if (api.es !== es) return;
+    api.state = 'retry'; apiPaint();
+    if (es.readyState === EventSource.CLOSED) setTimeout(() => { if (api.es === es) openStream(); }, 2000);
+  };
+}
+
+function apiDisconnect() {
+  if (api.es) { api.es.close(); api.es = null; }
+  clearInterval(api.timer); clearTimeout(api.soon);
+  for (const n of NBHDS) { n.api = {}; n.ov = null; if (n.srcTag) n.srcTag.visible = false; }
+  for (const e of EDGES) e.api = null;
+  Object.assign(api, { url: '', on: false, state: 'off', seq: 0, status: null, forecast: {}, alerts: [], checkins: [], feed: [] });
+  api.seen.clear(); api.fair.clear();
+  sim.allocBy = 'twin';
+  renderFeed(); apiPaint(); api.dirty = true;
+}
+
+async function apiConnect(url) {
+  apiDisconnect();
+  api.url = url.replace(/\/+$/, ''); api.state = 'connecting'; apiPaint();
+  try {
+    const [st, limits, blocks] = await Promise.all([getJSON('/status'), getJSON('/limits').catch(() => null), getJSON('/blocks').catch(() => [])]);
+    if (limits) adoptLimits(limits);
+    api.on = true; api.state = 'on'; api.seq = st.seq;
+    for (const m of blocks) { api.seen.add(m.id); onReading(m, false); }
+    applyStatus(st, true);
+    openStream();
+    api.timer = setInterval(() => { pollStatus(); renderFeed(); }, 5000);
+    for (let pct = 60; pct <= 104; pct++) fairTable(pct); // the allocation table for every supply level the scenario reaches
+    const r = st.readings || {};
+    log('info', `Connected to the API. It holds ${fmtInt(r.total || 0)} readings: ${fmtInt(r.live || 0)} from devices, ${fmtInt(r.simulated || 0)} scripted. Power allocation and forecasts now come from the API.`, null, 'API');
+    setLayer(layer);
+  } catch (e) {
+    api.on = false; api.state = 'error'; apiPaint();
+  }
+}
+
+// GET /fairshare for one supply level, cached. The table is the API's model: 100 W per person, 45 W of it critical.
+function fairTable(pct) {
+  const t = api.fair.get(pct);
+  if (t) return t;
+  if (api.on && !api.fairBusy.has(pct)) {
+    api.fairBusy.add(pct);
+    getJSON(`/fairshare?supply_pct=${pct}`).then(t => {
+      for (const p of ['directorate', 'fair']) t[p].byBlock = Object.fromEntries(t[p].blocks.map(b => [b.block, b.served_pct]));
+      api.fair.set(pct, t);
+    }).catch(() => {}).finally(() => api.fairBusy.delete(pct));
+  }
+  return null;
+}
+
+function apiPaint() {
+  const pill = $('h-api'), r = api.status && api.status.readings;
+  if (!api.url) { pill.textContent = 'Twin simulation'; pill.className = 'pill ok'; }
+  else if (api.state === 'on') { pill.textContent = r && r.live ? `API connected, ${fmtInt(r.live)} device reading${r.live > 1 ? 's' : ''}` : 'API connected'; pill.className = 'pill ' + (r && r.live ? 'live' : 'ok'); }
+  else if (api.state === 'error') { pill.textContent = 'API unreachable'; pill.className = 'pill ok'; }
+  else { pill.textContent = 'API connecting'; pill.className = 'pill ok'; }
+  $('api-note').textContent = !api.url ? 'No API connected. Every number is the twin\'s own simulation.'
+    : api.state === 'error' ? `Could not reach ${api.url}. Showing the twin's own simulation.`
+    : api.state !== 'on' || !r ? `Connecting to ${api.url}.`
+    : `Connected. ${fmtInt(r.total)} readings stored: ${fmtInt(r.live)} from devices (${fmtInt(r.verified)} with a verified signature), ${fmtInt(r.simulated)} scripted. Blocks without API data keep the twin's simulation.`;
+  $('api-go').textContent = api.url ? 'Reconnect' : 'Connect';
+}
+
+// the API section of the overview panel
+function apiOverview() {
+  if (!api.on || !api.status) return '';
+  const st = api.status, out = [];
+  if (api.checkins.length) {
+    out.push('<h3>Family check-ins</h3>');
+    for (const c of api.checkins.slice(0, 4)) {
+      const dstId = c.to.map(w => api.deviceBlock[w]).find(Boolean);
+      const late = c.sent ? Math.round((Date.parse(c.delivered) - Date.parse(c.sent)) / 1000) : 0;
+      out.push(`<div class="ck" data-bid="${c.block}"><b>${c.from} in ${blockName(c.block)} is OK.</b> Delivered to ${c.to.join(', ') || 'the family group'}${dstId ? ' in ' + blockName(dstId) : ''}${c.hops ? `, over ${c.hops} relay${c.hops > 1 ? 's' : ''}` : ''}${late > 5 ? `, ${late} s after it was sent` : ''}. <span class="note">${c.source === 'live' ? (c.verified ? 'Device, verified' : 'Device, unverified') : 'API, simulated'}</span></div>`);
+    }
+  }
+  const al = api.alerts.filter(a => !a.values.family).slice(0, 6);
+  if (al.length) {
+    out.push(`<h3>Alerts from the API <span>${st.alerts ? st.alerts.count : al.length} in the last hour</span></h3>`);
+    for (const a of al) {
+      const s = a.values.level === 'danger' ? 2 : a.values.level === 'warn' ? 1 : 0, lim = a.values.limit;
+      out.push(`<div class="ck" data-bid="${a.block}"><span class="s${s}">${nice(a.values.text)}.</span>${lim && lim.source ? ` <span class="note">Limit: ${lim.value} ${lim.unit || ''}, ${lim.source}.</span>` : ''}</div>`);
+    }
+  }
+  const bits = [];
+  if (st.queue && st.queue.length) bits.push(`<div class="k">Help requests</div><div>${st.queue.length} waiting. First: ${st.queue.top.device} in ${blockName(st.queue.top.block)}, score ${st.queue.top.score}.</div>`);
+  if (st.truth && (st.truth.residents_total || st.truth.official_total)) bits.push(`<div class="k">Symptom reports</div><div>Residents ${st.truth.residents_total}, Directorate ${st.truth.official_total}.</div>`);
+  if (st.surface && st.surface.verdict !== 'not enough data') bits.push(`<div class="k">Surface</div><div>${st.surface.verdict} <span class="note">(${st.surface.source === 'live' ? 'from devices' : st.surface.source === 'mixed' ? 'part device, part scripted' : 'scripted readings'})</span></div>`);
+  if (bits.length) out.push('<h3>Also from the API</h3><div class="kv">' + bits.join('') + '</div>');
+  return out.join('');
+}
+
+// 3D: a ring pulse on a block, and a courier that carries a message along the tunnels and the lift
+const flashes = [], couriers = [];
+const flashGeo = new THREE.RingGeometry(6.6, 7.5, 48).rotateX(-Math.PI / 2);
+function flash(n, color = '#ffffff') {
+  const m = new THREE.Mesh(flashGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false }));
+  m.position.set(n.x, caveFloor(n.level) + 0.14, n.z); scene.add(m); flashes.push({ m, t: 0 });
+}
+function pathBetween(a, b) {
+  const prev = new Map([[a, null]]), q = [a];
+  while (q.length) {
+    const v = q.shift();
+    if (v === b) { const out = []; for (let x = b; x; x = prev.get(x)) out.unshift(x); return out; }
+    for (const e of v.adj) { const o = e.a === v ? e.b : e.a; if (!prev.has(o)) { prev.set(o, v); q.push(o); } }
+  }
+  return null;
+}
+function courier(a, b, text) {
+  const nodes = pathBetween(a, b); if (!nodes || nodes.length < 2) return;
+  const pts = nodes.map(v => new THREE.Vector3(v.x, caveFloor(v.level) + 1.5, v.z));
+  const seg = pts.slice(1).map((p, i) => p.distanceTo(pts[i])), len = seg.reduce((s, d) => s + d, 0);
+  const m = new THREE.Mesh(new THREE.SphereGeometry(0.8, 16, 12), new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }));
+  const lbl = addLabel(text, 'lbl-courier', new THREE.Vector3(0, 0, 0), m);
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.7, depthTest: false, toneMapped: false }));
+  scene.add(m, line); flash(a);
+  couriers.push({ m, lbl, line, pts, seg, len, d: 0, v: len / clamp(len / 26, 3, 7), to: b });
+}
+function apiFrame(dt) {
+  for (const f of flashes) { f.t += dt / 1.4; f.m.scale.setScalar(1 + f.t * 0.9); f.m.material.opacity = 0.95 * (1 - f.t); }
+  for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].t >= 1) { scene.remove(flashes[i].m); flashes[i].m.material.dispose(); flashes.splice(i, 1); }
+  for (const c of couriers) {
+    c.d = Math.min(c.len, c.d + c.v * dt);
+    let d = c.d, i = 0; while (i < c.seg.length - 1 && d > c.seg[i]) d -= c.seg[i++];
+    c.m.position.lerpVectors(c.pts[i], c.pts[i + 1], c.seg[i] ? Math.min(1, d / c.seg[i]) : 1);
+  }
+  for (let i = couriers.length - 1; i >= 0; i--) if (couriers[i].d >= couriers[i].len) {
+    const c = couriers[i]; flash(c.to); c.m.remove(c.lbl); scene.remove(c.m, c.line); c.line.geometry.dispose(); couriers.splice(i, 1);
+  }
+  if (api.dirty) { api.dirty = false; computeDerived(); paint(); renderPanels(); }
+}
+
+$('api-go').onclick = () => {
+  const u = $('api-url').value.trim();
+  try { if (u) localStorage.setItem('hollow.api', u); else localStorage.removeItem('hollow.api'); } catch (e) { /* storage blocked: the address just is not remembered */ }
+  if (u) apiConnect(u); else apiDisconnect();
+};
+$('api-url').addEventListener('keydown', e => { if (e.key === 'Enter') $('api-go').click(); });
+function apiInit() {
+  const q = new URLSearchParams(location.search).get('api');
+  let url = DEFAULT_API;
+  try {
+    if (q === 'off') localStorage.removeItem('hollow.api');
+    else if (q) localStorage.setItem('hollow.api', q);
+    url = q === 'off' ? '' : q || localStorage.getItem('hollow.api') || DEFAULT_API;
+  } catch (e) { url = q && q !== 'off' ? q : DEFAULT_API; }
+  $('api-url').value = url;
+  if (url) apiConnect(url); else apiPaint();
+}
+
+// ---------- the guided story: the whole pitch in about a minute, for someone who opens this cold ----------
+const story = { on: false, i: 0, token: 0, until: null, done: null, tick: 0 };
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const mil = k => (k / 1000).toFixed(1); // populations are held in thousands
+const totalPop = NBHDS.reduce((s, n) => s + n.pop, 0);
+function setSpeed(v) { speed = v; document.querySelectorAll('[data-speed]').forEach(x => x.classList.toggle('on', +x.dataset.speed === v)); }
+function runTo(hour, rate) { return new Promise(res => { story.until = hour; story.done = res; setSpeed(rate); }); }
+function resetSim(policy) { selected = null; sim.policy = policy; initSim(); setPolicy(policy, false); drawnT = -1; }
+const darkNow = () => NBHDS.filter(n => n.blackout);
+const popOf = ns => mil(ns.reduce((s, n) => s + n.pop, 0));
+
+const BEATS = [
+  { title: 'The Hollow, 2124',
+    cap: () => `This is Sector 7 of the Hollow: nine levels, ${mil(totalPop)} million people, up to 2,560 m underground. The Directorate decides who gets power, air and news. The deep levels get the least.`,
+    dwell: 5500,
+    async run(ok) {
+      resetSim('directorate'); setSpeed(0); setLayer('power'); setFocus(null, false);
+      tween = null; controls.target.set(0, 14, 0); camera.position.set(60, 44, 92);
+      await wait(1200); if (!ok()) return;
+      flyTo(...levelView(null), 4); await wait(4000);
+    } },
+  { title: 'A warning before the dark',
+    cap: () => { const f = NBHDS.filter(n => metric(n, 'power').s > 0); return `A geothermal unit fails at hour 4. Hollow Twin forecasts every block's battery and warns the ones that will run dry before their lights go out. Hour ${sim.t}: ${f.length} blocks warned, ${popOf(f)} million people.`; },
+    dwell: 6500,
+    async run(ok) {
+      if (sim.policy !== 'directorate' || sim.t > 9) resetSim('directorate');
+      setLayer('power'); setFocus(8);
+      await runTo(9, 3);
+    } },
+  { title: "The Directorate's rule",
+    cap: () => { const d = darkNow(); return `Under the Directorate's rule the upper levels are served first. Hour ${sim.t}: ${d.length} deep blocks are dark and ${popOf(d)} million people have no fans or scrubbers. The upper levels are at ${Math.round(sim.upper * 100)}%.`; },
+    dwell: 6500,
+    async run(ok) {
+      if (sim.policy !== 'directorate' || sim.t > 30) resetSim('directorate');
+      setFocus(null);
+      await runTo(30, sim.t < 9 ? 11 : 7);
+    } },
+  { title: 'Fair share, same supply',
+    cap: () => { const d = darkNow().length; return `Same failure, same supply, a different rule: every block keeps life support first, then the rest is shared per person. Hour ${sim.t}: ${d === 0 ? 'no block is dark' : d + ' blocks are dark'}.`; },
+    dwell: 6500,
+    async run(ok) {
+      resetSim('fair'); setFocus(null, false);
+      await runTo(30, 10);
+    } },
+  { title: 'When the network is cut',
+    cap: () => `At hour 24 the Directorate shut the network down. Relay boxes in every block keep passing messages by radio, so a family on Crown still hears from Deepwell: "I'm OK." This run is simulated. With real relays the same message arrives through the backend.`,
+    dwell: 8500,
+    async run(ok) {
+      if (sim.t < 24) await runTo(30, 12);
+      if (!ok()) return;
+      if (!sim.netCut) setNet(true, false);
+      select(null, false); setFocus(null);
+      await wait(900); if (!ok()) return;
+      const a = BYID['l8-bore-bend'], b = BYID['l1-winch-gallery'];
+      courier(a, b, "I'm OK");
+      log('ok', `A check-in from ${a.name} reached family in ${b.name} over the block relays.`, [a, b]);
+      setTimeout(() => { if (ok()) courier(a, b, "I'm OK"); }, 4800);
+    } },
+  { title: 'Nothing hidden',
+    cap: () => 'Every number says where it comes from: the built-in simulation, scripted data through the backend, or a real device. Every safety limit cites a published standard. Click any block to step inside.',
+    dwell: 8000,
+    async run(ok) { select(BYID['l8-bore-bend']); await wait(1400); } },
+];
+
+function renderStory() {
+  const b = BEATS[story.i];
+  $('story-step').textContent = `${story.i + 1} of ${BEATS.length}`;
+  $('story-title').textContent = b.title;
+  $('story-cap').textContent = b.cap();
+  $('story-back').disabled = story.i === 0;
+  $('story-next').textContent = story.i === BEATS.length - 1 ? 'Finish' : 'Next';
+}
+async function playBeat(i) {
+  const tok = ++story.token, ok = () => story.on && story.token === tok, b = BEATS[i];
+  story.i = i; story.until = null; story.done = null;
+  const bar = $('story-bar'); bar.style.transition = 'none'; bar.style.width = '0';
+  renderStory();
+  await b.run(ok); if (!ok()) return;
+  renderStory();
+  bar.style.transition = `width ${b.dwell}ms linear`; bar.style.width = '100%';
+  await wait(b.dwell); if (!ok()) return;
+  if (i + 1 < BEATS.length) playBeat(i + 1); else endStory();
+}
+function startStory() {
+  $('intro').style.display = 'none'; $('story').style.display = 'block'; $('story-btn').style.display = 'none';
+  document.querySelectorAll('.corner').forEach(c => c.style.display = 'none');
+  story.on = true;
+  clearInterval(story.tick); story.tick = setInterval(() => { if (story.on) $('story-cap').textContent = BEATS[story.i].cap(); }, 300);
+  playBeat(0);
+}
+function endStory() {
+  story.on = false; story.token++; story.until = null; story.done = null; clearInterval(story.tick);
+  $('story').style.display = 'none'; $('story-btn').style.display = ''; $('story-btn').textContent = 'Replay the 60-second story';
+  document.querySelectorAll('.corner').forEach(c => c.style.display = '');
+  if (speed !== 1) setSpeed(1);
+}
+function closeIntro() { $('intro').style.display = 'none'; $('story-btn').style.display = ''; try { sessionStorage.setItem('hollow.seen', '1'); } catch (e) { /* storage blocked: the intro shows again next load */ } }
+$('intro-play').onclick = () => { closeIntro(); startStory(); };
+$('intro-explore').onclick = closeIntro;
+$('story-btn').onclick = startStory;
+$('story-next').onclick = () => { if (story.i + 1 < BEATS.length) playBeat(story.i + 1); else endStory(); };
+$('story-back').onclick = () => { if (story.i > 0) playBeat(story.i - 1); };
+$('story-exit').onclick = endStory;
+function storyInit() {
+  const q = new URLSearchParams(location.search);
+  let seen = false; try { seen = sessionStorage.getItem('hollow.seen') === '1'; } catch (e) { seen = false; }
+  if (q.get('story') === '1') { closeIntro(); startStory(); }
+  else if (q.get('intro') === '0' || seen) $('intro').style.display = 'none';
+  else $('story-btn').style.display = 'none'; // the intro card already offers it
+}
 
 // ---------- loop ----------
 function resize() {
@@ -1817,7 +2317,11 @@ function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
   if (speed > 0) {
     sim.acc += dt * speed;
-    while (sim.acc >= 1) { sim.acc -= 1; step(); }
+    while (sim.acc >= 1 && !(story.until != null && sim.t >= story.until)) { sim.acc -= 1; step(); }
+  }
+  if (story.until != null && sim.t >= story.until) { // the story asked the clock to stop at this hour
+    story.until = null; sim.acc = 0; setSpeed(0);
+    const done = story.done; story.done = null; if (done) done();
   }
   if (sim.t !== drawnT) { drawnT = sim.t; paint(); renderPanels(); }
   if (tween) {
@@ -1844,6 +2348,7 @@ function frame(now) {
   controls.update();
   updateMovers(dt, now);
   for (const L of LEVELS) for (const f of L.fans) f.rotation.z += dt * 9 * (L.lit ?? 1);
+  apiFrame(dt);
   grade.uniforms.time.value = now * 0.001;
   composer.render();
   labelRenderer.render(scene, camera);
@@ -1856,8 +2361,10 @@ setLayer('power');
 resize();
 setFocus(null);
 requestAnimationFrame(frame);
+apiInit();
+storyInit();
 window.__twin_select = n => select(n);
-window.__twin = { sim, NBHDS, LEVELS, camera, controls, step, flyTo, startOutbreak, clearOutbreak, setPolicy, setNet, setLayer, select, setFocus };
+window.__twin = { sim, NBHDS, LEVELS, camera, controls, step, flyTo, story, startStory, endStory, api, LIM, courier, flash, BYID, startOutbreak, clearOutbreak, setPolicy, setNet, setLayer, select, setFocus };
 </script>
 </body>
 </html>
