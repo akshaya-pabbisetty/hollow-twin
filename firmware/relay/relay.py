@@ -319,9 +319,9 @@ def main():
     p.add_argument("--api", default=os.environ.get("HOLLOW_API", "http://localhost:8787"), help="address of the API")
     p.add_argument("--port", help="serial port of the watch (found automatically if left out)")
     p.add_argument("--block", default="l6-flint-face", help="the block this relay serves, from contract/blocks.json")
-    p.add_argument("--watch", default="watch-0042", help="device id of the watch on the cable")
+    p.add_argument("--watch", default="watch-0012", help="device id of the watch on the cable (Dad, in the phone watch's family)")
     p.add_argument("--relay", help="device id of this relay (default: relay-<block>)")
-    p.add_argument("--family", default="fam-0042", help="family group the watch checks in for")
+    p.add_argument("--family", default="fam-0071", help="family group the watch checks in for (the phone watch's family)")
     p.add_argument("--to", action="append", default=None, help="watch id to deliver check-ins to (repeatable)")
     p.add_argument("--key", default=os.environ.get("HOLLOW_WATCH_KEY", ""), help="the watch's secret: messages are signed with it")
     p.add_argument("--ingest-key", default=os.environ.get("INGEST_KEY", ""), help="x-api-key, if the API needs one")
@@ -330,7 +330,7 @@ def main():
     p.add_argument("--timeout", type=float, default=3.0, help="seconds to wait for the API")
     p.add_argument("--stdin", action="store_true", help="no watch: type its lines here instead (BTN ok 1)")
     a = p.parse_args()
-    a.to = a.to or ["watch-0110"]
+    a.to = a.to or ["watch-0071", "watch-0011"]   # Maya on the phone watch, Mom upstairs
     try:
         Relay(a).loop()
     except (KeyboardInterrupt, EOFError):

@@ -37,7 +37,7 @@ Give the watch a secret so its messages count as verified. Any long random strin
 
 ```sh
 cd api
-DEVICE_KEYS='{"watch-0042":"pick-a-long-secret"}' npm start      # http://localhost:8787
+DEVICE_KEYS='{"watch-0012":"pick-a-long-secret"}' npm start      # http://localhost:8787
 ```
 
 Find your laptop's address on the Wi-Fi (`ipconfig getifaddr en0` on a Mac). Below it is `LAPTOP`.
@@ -51,19 +51,19 @@ cd relay
 python3 relay.py --api http://LAPTOP:8787 --key pick-a-long-secret
 ```
 
-It finds the Arduino by itself and prints what happens in plain words. Press the button: `watch-0042 pressed I'M OK  ->  sent to the API`. If it cannot open the port, add yourself to the serial group (`sudo usermod -aG dialout $USER`) and log in again.
+It finds the Arduino by itself and prints what happens in plain words. Press the button: `watch-0012 pressed I'M OK  ->  sent to the API`. If it cannot open the port, add yourself to the serial group (`sudo usermod -aG dialout $USER`) and log in again.
 
 The watch lives in the block Flint Face (L6 Undercroft) unless you pass `--block`. Block ids are in [`contract/blocks.json`](../contract/blocks.json).
 
-## 4. Give the watch a family
+## 4. The family
 
-There is one real watch, so the family member on the upper level is scripted, and tagged as scripted:
+The Arduino is Dad (watch-0012). He is in one family with Maya, who uses the phone watch (`/watch` next to the twin, L7 Chalk Cut), and Mom on L1, who is scripted and tagged as scripted:
 
 ```sh
 python3 upstairs.py --api http://LAPTOP:8787        # from the Pi or the laptop
 ```
 
-The real watch gets "watch-0110 is OK", and its own check-ins are now delivered to watch-0110 in Winch Gallery (L1 Crown).
+Dad's Arduino buzzes with "watch-0011 is OK". When Dad presses his button, Maya's phone shows "Dad · L6 Flint Face · radio, 1 hop · Safe" and Mom's watch is told too. Open the phone watch with `/watch/?api=http://LAPTOP:8787`; its defaults are Maya, Mom and Dad.
 
 ## 5. Open the twin
 
