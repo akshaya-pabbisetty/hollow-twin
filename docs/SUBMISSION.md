@@ -1,0 +1,54 @@
+# Submission draft
+
+Text to paste into the judging platform, and the video script. Check every field against what the platform actually asks for before using it. Numbers below come from the story's scenario on the public link; reread them off the screen before recording.
+
+## Title
+
+Hollow Twin
+
+## One line
+
+Warns the deep levels before the lights go out, shares the power that is left fairly, and gets a family's "I'm OK" through a network the Directorate switched off.
+
+## Description (about 170 words)
+
+In the Hollow, a power failure is not shared equally. The Directorate serves the upper levels first, the deep levels go dark for days, and when it shuts the network down, families on different levels cannot tell each other they are alive.
+
+Hollow Twin is a live model of one sector: nine levels, 70 blocks, 32 million people. It forecasts every block's battery and warns the ones that will run dry before their lights go out. It replaces "upper levels first" with a rule anyone can check: every block's air, pumps and medical load first, then the rest per person. In our scenario that turns 12 dark blocks into none, on the same supply. And when the network is cut, relay boxes store each message, pass it block to block, and deliver a family's "I'm OK" with the route it took.
+
+A Node API does the forecasting, allocation and delivery; the 3D twin shows it. Every alert cites a published safety limit, and every number on screen says whether it is simulated or measured.
+
+## Problems addressed
+
+1 (blackout warning), 2 (fair sharing), 7 (organizing when the network is shut down), 8 (reconnecting families).
+
+## What is real and what is simulated
+
+Real: the twin, the API (ingest, live stream, forecast, allocation, alerts, check-in delivery, replay after a cut), the shared message format. Simulated: all sensor data, the population, and the relay radio links. No hardware was built. The screen labels every reading with its source.
+
+## Links
+
+- Live: https://hollow-twin.vercel.app
+- Code: https://github.com/anudeep-bonagiri/hollow-twin (private until we know the platform's rule; make it public before submitting if a repo is required)
+- Video: to add
+
+## Video script: five beats, about 100 seconds
+
+Record at 1440 x 900 or larger. Run the API locally (or use the hosted one) and open the twin with `?api=<API address>&intro=0`. The guided story (`?story=1`) plays beats 1 to 3 by itself with the captions on screen; turn the captions into narration instead of reading them.
+
+| # | Seconds | On screen | Narration |
+| --- | --- | --- | --- |
+| 1 | 0 to 15 | The surface, then the descent to the full cutaway (story beat 1) | "This is one sector of the Hollow. Thirty-two million people on nine levels. The Directorate decides who gets power, air and news, and the deeper you live, the less you get." |
+| 2 | 15 to 35 | Deepwell, blocks tagged with hours left (story beat 2) | "A geothermal unit fails. Hollow Twin forecasts every block's battery and warns the ones that will run dry, hours before the lights go out." |
+| 3 | 35 to 60 | Hour 30 under the Directorate's rule, then the same hours under fair share (story beats 3 and 4) | "Under the Directorate's rule, the upper levels stay at a hundred percent and twelve deep blocks go dark. Same failure, same supply, one different rule: life support for every block first, then the rest per person. No block goes dark." |
+| 4 | 60 to 85 | Split screen: a terminal running `npm run scenario -- networkcut`, and the twin. The strip at the top left shows messages arriving; "I'm OK" travels up the lift; the right panel shows the delivery | "Then the Directorate cuts the network. Relay boxes hold every message and pass it block to block. This check-in was pressed during the cut. When a relay gets through, the backend delivers it to the family's level, with the route it took. The relays here are simulated; the store, forward and delivery are real." |
+| 5 | 85 to 100 | A block card: readings with their sources, an alert with its limit | "Every alert cites a published safety limit, and every number says where it came from. The same pieces matter after any disaster that takes out a city's grid and its phones." |
+
+If real ESP32 relays are working by Wednesday night, beat 4 shows them: a button press with the router unplugged, then the same arrival on screen, and the narration drops "simulated".
+
+## Before recording, check
+
+- [ ] The header says "API connected" (or the take is the story-only version and the narration never says "backend").
+- [ ] The numbers in the narration match the numbers on screen in that take.
+- [ ] Nothing on screen claims a device that does not exist.
+- [ ] Captions are readable at the size the platform plays video.
