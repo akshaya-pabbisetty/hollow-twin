@@ -11,7 +11,9 @@ const OPS = {
   ">=": [(x, v) => x >= v, "at or above"],
   "<": [(x, v) => x < v, "below"],
   "<=": [(x, v) => x <= v, "at or below"],
+  outside: [(x, v) => x < v[0] || x > v[1], "outside"], // value is [low, high]
 };
+const shown = (l) => (Array.isArray(l.value) ? `${l.value[0]} to ${l.value[1]}` : l.value);
 
 function ref(key) {
   const l = all[key];
@@ -30,7 +32,7 @@ function crossed(key, x) {
 // "TDS 1450 ppm is above 1000 ppm (WHO, ...)"
 function why(label, x, key) {
   const l = ref(key);
-  return `${label} ${x} ${l.unit} is ${OPS[l.op][1]} ${l.value} ${l.unit} (${sourceOf(l)})`;
+  return `${label} ${x} ${l.unit} is ${OPS[l.op][1]} ${shown(l)} ${l.unit} (${sourceOf(l)})`;
 }
 // [[key, reading, label], ...] -> the ones that crossed, each with its sourced limit and a sentence
 function hits(checks) {

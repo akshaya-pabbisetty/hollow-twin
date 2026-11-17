@@ -466,3 +466,43 @@ since that branch was cut, so task 4 brings it over as it was, adapted where tas
   `once()` helper, which marks ids as seen and would then skip the genuine message.
 - Not done: `GET /status` does not count forgeries. Not asked for; the twin gets them from `/live`, and
   `GET /forgeries` has the count.
+
+## Task 4: sensor checks from lane1-wip
+
+- **What lane1-wip had:** `sensors.js` with the three checks, `tests/sensors.test.js`, 38 design-choice limits
+  (19 `plausible_*` ranges, 12 `jump_*` steps plus `jump_max_gap_min`, 6 `drift_*` distances plus
+  `drift_readings`), an `outside` operator in `limits.js` for `[low, high]` ranges, and a `usable` list in
+  `server.js` that every forecast, verdict, queue and count reads instead of `readings`. Brought over: the limits
+  (values and reasons unchanged, written in main's compact layout; lane1-wip had reformatted the whole file),
+  `limits.js` as it was, the `usable` list and the ingest order (check, store, then rules only if usable), and
+  `surfaceHistory` marking sensor errors.
+- **Where it was incomplete against the brief:** only impossible values were stored `plausible: false` and left out.
+  Jumps and drift were "suspected sensor faults": the reading still counted and an info alert went out. The brief
+  says all three are stored `plausible: false` with a `sensor_error`, raise no alert, and are left out of all
+  logic, so they now are. The info alert ("Suspected sensor fault") is gone. Every error carries `sensor_flags`
+  (`range`, `jump` or `drift`, with the numbers) so the twin can still tag the sensor.
+- **Jumps need a confirmation rule once they are left out.** Measured only against the last usable reading, a real
+  step (a fire, a burst main, a scout walking into a hot spot) would be a "jump" forever, since the last usable
+  reading stays on the old side. So a step is a jump only when it is too far from the device's last usable
+  reading AND from its immediately previous reading. A one-off spike is caught; a second reading at the new level
+  confirms the change and counts. **Safety cost, accepted:** a real sudden danger (CO2 850 to 9,000 ppm) alerts one
+  reading late. The test "a fire is real" pins this down. Known gap: a sensor that falls off and reads the same
+  wrong value twice is confirmed as real; drift does not catch that either.
+- **Drift and backlogs:** the device's last readings and the other sensors' newest readings are taken at or before
+  the message's own time, so a backlog is judged as it was at the time, not against readings from after it.
+  A device's own drifting readings stay in its history (excluded only from logic), so a sensor that keeps
+  drifting keeps being caught.
+- **Speed:** lane1-wip scanned and sorted all readings for every incoming message; a 2,000-reading backlog took
+  about 4 s and failed the load test (3 s limit). `sensors.index()` keeps each device's messages sorted by time
+  (binary insertion) and the devices per kind and level, so a check only walks back the few readings it needs.
+  The backlog now takes about 1.0 to 1.2 s (main: about 0.85 s).
+- **Tests adapted:** the surface verdict tests (`surface.test.js`, the broadcast test in `endpoints.test.js`) step
+  one scout from 0.2 to 30 µSv/h within a second, which is now a jump. They are about the verdict, which takes the
+  latest value across all scouts, so each reading now comes from its own scout id. The CO2 threshold test in
+  `limits.test.js` posts its three readings two hours apart for the same reason. `status.test.js` has the new
+  `readings.implausible` count (lane1-wip's `flagged` count is gone with the info alerts).
+- **A lane1-wip test that could not fail:** `SENS.jumps(a, b)` takes (new reading, last good one); the wip test
+  passed them the other way round, so the "exactly the limit is not a jump" check returned nothing whatever the
+  limit. Fixed, with a second line that must find the jump one ppm above the limit.
+- The scenario tool's readings and the contract samples raise no sensor error (the scenario test asserts every
+  scenario message is stored with no warning at all).

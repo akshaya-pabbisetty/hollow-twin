@@ -107,6 +107,14 @@ uploads everything in a single POST whose body is a JSON array:
   stored last. So a relay backlog posted late, with its real older times, fills in history but never replaces a
   fresher reading, and a fast clock cannot hold "latest" either.
 
+**Sensor errors.** The API checks every reading before it uses it (CONTRACT.md section 1.3; every range and step is
+in `shared/limits.json` as `plausible_*`, `jump_*`, `drift_*`). A reading with an impossible value (SpO2 over
+100 %, a negative depth), a jump (a step bigger than the world allows, compared with your last two readings), or
+drift (your sensor walking away from the others of its kind on your level) is kept but marked
+`"plausible": false`, and the reply's `warnings` say `sensor error, stored but not used: ...` with the reason. It
+raises no alert and counts for nothing. If you see that warning on a bench test, check the wiring or the units
+before the demo. A real sudden change is fine: the next reading at the new level confirms it and counts.
+
 ## 4. Kinds and values, per device
 
 Exactly the contract's section 2, plus the optional additions of section 2.1.

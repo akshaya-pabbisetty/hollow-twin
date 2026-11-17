@@ -230,6 +230,7 @@ something the sender should fix comes back in `warnings`.
 | `INGEST_KEY` set and `x-api-key` missing or wrong | `401` |
 | `block` not in `contract/blocks.json` and not `surface` | rejected, with a hint when only the case is wrong |
 | `device` does not fit CONTRACT.md section 3 | stored, with a warning |
+| An impossible value, a jump or drift (sensor error, CONTRACT.md 1.3) | stored with `"plausible": false`, `sensor_error` and `sensor_flags`, with a warning; no alert, and left out of all logic |
 | `time` before 2020, or ahead of the moment the API receives it | stored; `time` becomes the receive time, plus `"time_estimated": true`, `"device_time"` and a warning |
 | `hops` / `via` missing | stored as `0` / `[]` |
 | `source` missing | stored as `"simulated"`. Real hardware sends `"live"` |
@@ -413,7 +414,7 @@ GET /status
   "truth": { "window_h": 24, "residents_total": 14, "official_total": 2, "gap": 12, "blocks": ["..."] },
   "surface": { "verdict": "sealed outposts needed", "reasons": ["radiation 2.1 µSv/h is above 1 µSv/h (IAEA, ...)"], "missing": [], "not_measured": [], "source": "simulated" },
   "blocks": { "l6-flint-face": { "source": "simulated", "latest_time": "...", "latest_device": "relay-l6-flint-face", "live_kinds": [], "simulated_kinds": ["power"] } },
-  "readings": { "total": 61, "verified": 0, "unverified": 61, "live": 0, "simulated": 61 },
+  "readings": { "total": 61, "verified": 0, "unverified": 61, "implausible": 0, "live": 0, "simulated": 61 },
   "feed_clients": 2 }
 ```
 

@@ -53,6 +53,7 @@ const HEAT = require("./heat");
 const L = require("./logic");
 const LIM = require("./limits");
 const O = require("./order");
+const SENS = require("./sensors");
 const SIGN = require("./sign");
 const SURF = require("./surface");
 
@@ -67,7 +68,9 @@ const KEYS = SIGN.loadKeys();                          // device -> secret, for 
 // Who people are: skills and whether someone depends on them alone. Used only by /firstwave.
 const PEOPLE = JSON.parse(fs.readFileSync(process.env.PEOPLE || path.join(__dirname, "shared/people.json"), "utf8"));
 
-const readings = [];
+const readings = [];   // everything stored, in order: what /history, /live and the public records serve
+const usable = [];     // the same minus sensor errors (plausible: false): what every forecast, verdict, queue and count uses
+const sensorIndex = SENS.index(); // device messages by device and kind, and by kind and level, for the bad-sensor checks
 const seen = new Set();
 const clients = new Map();  // open event streams -> true when the client asked for /live (named events), false for /feed
 const assigned = new Map(); // help request (message id) -> { to, time }: who was sent, and when
@@ -104,7 +107,7 @@ function load() {
     // lines written before the contract: rename their values so everything served uses contract names
     if (r.kind !== "alert" && r.values && typeof r.values === "object") r.values = C.normalise(r.kind, r.values).values;
     r.seq = lastSeq = Math.max(lastSeq + 1, r.seq || 0); // older files have no seq: number them in file order
-    readings.push(r); seen.add(r.id); learn(r);
+    readings.push(r); if (r.plausible !== false) usable.push(r); sensorIndex.add(r); seen.add(r.id); learn(r);
     if (r.kind === "alert" && r.values && r.values.surface_verdict) surfaceVerdict = r.values.surface_verdict;
   }
 }
@@ -152,7 +155,7 @@ function accept(r, now) {
   const warnings = [...route.warnings, ...B.deviceWarnings(r), ...B.messageWarnings({ ...r, values })];
   if (renamed.length) warnings.push(`old field names renamed to contract names: ${renamed.join(", ")}`);
   const rec = { ...r, values, hops: route.hops, via: route.via, source: r.source || "simulated" }; // honest default: only real hardware says "live"
-  for (const f of ["seq", "time_estimated", "device_time", "verified", "sig_unchecked", "warnings"]) delete rec[f]; // these are ours to set, never the sender's
+  for (const f of ["seq", "time_estimated", "device_time", "verified", "sig_unchecked", "warnings", "plausible", "sensor_error", "sensor_flags"]) delete rec[f]; // these are ours to set, never the sender's
   rec.verified = verified;
   if (sigUnchecked) rec.sig_unchecked = sigUnchecked;
   // A time we cannot trust never reaches the timeline: the reading is kept, stamped with the receive time and marked.
@@ -203,6 +206,18 @@ function publishForgery(f, now) {
   for (const [c, named] of clients) if (named) c.write(`event: forgery\ndata: ${JSON.stringify(f)}\n\n`);
 }
 
+// Bad-sensor checks (sensors.js), before a device message is stored, against what is stored so far: an impossible
+// value, a jump or a drift makes it a sensor error. It is still stored (and shown on /history and /live) with
+// plausible: false and the reason, the sender is told in the reply's warnings, and nothing else ever uses it.
+function inspect(r) {
+  const flags = SENS.check(r, sensorIndex);
+  if (!flags.length) return;
+  r.plausible = false;
+  r.sensor_error = flags.map((f) => f.reason).join("; ");
+  r.sensor_flags = flags;
+  r.warnings = [...(r.warnings || []), `sensor error, stored but not used: ${r.sensor_error}`];
+}
+
 function alert(r, level, text, extra = {}, suffix = "0") {
   // an alert is as real as the reading that caused it: it inherits live/simulated
   return { id: `alert-${r.id}-${suffix}`, device: "backend", block: r.block,
@@ -219,7 +234,7 @@ function rules(r) {
       out.push(alert(r, "danger", `Grid frequency ${v.grid_hz} Hz: power cut likely soon in ${r.block}`,
         { why: L.gridWhy(v.grid_hz), limit: LIM.ref("grid_band_hz"), limits: [LIM.ref("grid_band_hz"), LIM.ref("grid_nominal_hz")] }, "grid"));
     // Battery: one warning (CONTRACT.md section 6: under 24 h) and one alarm (under 8 h, or dark) per slide down.
-    const f = L.forecast(readings, r.block), now = f.level === "alarm" ? 2 : f.level === "warn" ? 1 : 0, told = forecastTold.get(r.block) || 0;
+    const f = L.forecast(usable, r.block), now = f.level === "alarm" ? 2 : f.level === "warn" ? 1 : 0, told = forecastTold.get(r.block) || 0;
     if (now > told) {
       forecastTold.set(r.block, now);
       const key = now === 2 ? "battery_alarm_hours" : "battery_warn_hours";
@@ -263,7 +278,7 @@ function rules(r) {
   }
   if (r.kind === "surface") {
     // every verdict change goes on the record (and out on the feed) with the reading that caused it
-    const sv = SURF.surface(readings);
+    const sv = SURF.surface(usable);
     if (sv.verdict !== surfaceVerdict) {
       const level = sv.verdict === SURF.STAY || sv.verdict === SURF.OUTPOSTS ? "danger" : sv.verdict === SURF.DOMES ? "warn" : "info";
       const crossed = sv.readings.filter((x) => x.status === sv.verdict).flatMap((x) => x.limits.filter((l) => LIM.crossed(l.key, x.value)));
@@ -304,14 +319,14 @@ function rules(r) {
 // Per block: is its newest device reading live hardware or simulated? (alerts are ignored: they only echo their cause)
 function blockSources() {
   const out = {};
-  for (const r of readings) {
+  for (const r of usable) {
     if (r.kind === "alert") continue;
     const b = (out[r.block] ||= { latest: null, source: r.source, latest_time: r.time, latest_device: r.device, live_kinds: new Set(), simulated_kinds: new Set() });
     if (O.newer(r, b.latest)) { b.latest = r; b.source = r.source; b.latest_time = r.time; b.latest_device = r.device; }
   }
   // a kind is live when that kind's newest reading in the block is live
   const newest = {};
-  for (const r of readings) {
+  for (const r of usable) {
     if (r.kind === "alert") continue;
     const k = `${r.block}|${r.kind}`;
     if (O.newer(r, newest[k])) newest[k] = r;
@@ -329,7 +344,7 @@ function store(r) {
   if (seen.has(r.id)) return false;
   seen.add(r.id);
   r.seq = ++lastSeq;
-  readings.push(r); learn(r);
+  readings.push(r); if (r.plausible !== false) usable.push(r); sensorIndex.add(r); learn(r);
   fs.appendFileSync(DATA, JSON.stringify(r) + "\n");
   for (const [c, named] of clients) c.write(sse(r, named));
   return true;
@@ -419,9 +434,11 @@ function route(req, res) {
     }
     recs.sort((a, b) => Date.parse(a.time) - Date.parse(b.time)); // stable: equal times keep the order they were sent in
     for (const r of recs) {
-      if (!store(r)) { duplicates++; continue; }
-      accepted++;
+      if (seen.has(r.id)) { duplicates++; continue; }
+      inspect(r);           // impossible values, jumps and drift, against what is stored so far
+      store(r); accepted++;
       if (r.warnings) warnings.push({ id: r.id, warnings: r.warnings });
+      if (r.plausible === false) continue; // a sensor error raises nothing and feeds nothing
       rules(r).forEach(store);
     }
     send(res, rejected.length && !accepted ? 422 : 200, { accepted, duplicates, rejected, warnings });
@@ -461,7 +478,7 @@ function route(req, res) {
     const id = decodeURIComponent(one[1]);
     if (!B.known(id)) return send(res, 404, { error: B.problem(id) });
     const latest = {};
-    for (const r of readings)
+    for (const r of usable)
       if (r.block === id && r.kind !== "alert" && O.newer(r, latest[r.kind])) latest[r.kind] = r;
     const info = B.get(id), src = blockSources()[id];
     return send(res, 200, { block: id, name: info ? info.name : "Surface", level: info ? info.level : null, people: info ? info.people : null,
@@ -470,7 +487,7 @@ function route(req, res) {
   }
   if (p === "/blocks") {
     const latest = {};
-    for (const r of readings) {
+    for (const r of usable) {
       const k = `${r.block}|${r.kind}`;
       if (O.newer(r, latest[k])) latest[k] = r;
     }
@@ -478,8 +495,8 @@ function route(req, res) {
     return send(res, 200, Object.values(latest).map((r) => ({ ...r, block_source: src[r.block] ? src[r.block].source : r.source })));
   }
   if (p === "/forecast") {
-    const blocks = q.block ? [q.block] : [...new Set(readings.filter((r) => r.kind === "power").map((r) => r.block))];
-    return send(res, 200, blocks.map((b) => L.forecast(readings, b)));
+    const blocks = q.block ? [q.block] : [...new Set(usable.filter((r) => r.kind === "power").map((r) => r.block))];
+    return send(res, 200, blocks.map((b) => L.forecast(usable, b)));
   }
   if (p === "/fairshare") {
     // The 70-block table is one model: every block sized from its people (megawatts). What real relays measure
@@ -490,7 +507,7 @@ function route(req, res) {
       ? Math.round((sector.reduce((s, b) => s + b.demand_w, 0) * Number(q.supply_pct)) / 100) : Number(q.supply_w);
     if (!(supply >= 0)) return send(res, 400, { error: "supply_w (watts) or supply_pct (percent of sector demand) required" });
     if (q.policy && !["directorate", "fair"].includes(q.policy)) return send(res, 400, { error: "policy must be directorate or fair" });
-    const measured = L.measured(readings);
+    const measured = L.measured(usable);
     if (q.policy) return send(res, 200, { ...L.allocate(sector, supply, q.policy), measured });
     return send(res, 200, { directorate: L.allocate(sector, supply, "directorate"), fair: L.allocate(sector, supply, "fair"), measured });
   }
@@ -499,7 +516,7 @@ function route(req, res) {
   if (p === "/help" || p === "/queue") {
     const status = q.status || "open";
     if (!["open", "assigned", "all"].includes(status)) return send(res, 400, { error: "status must be open, assigned or all" });
-    return send(res, 200, L.queue(readings, assigned, Date.now(), status).filter((x) => !q.to || x.assigned_to === q.to));
+    return send(res, 200, L.queue(usable, assigned, Date.now(), status).filter((x) => !q.to || x.assigned_to === q.to));
   }
   // CONTRACT.md section 4: POST /help/<message id>/assign with body { "to": "rover-01" }
   const help = /^\/help\/([^/]+)\/assign$/.exec(p);
@@ -507,7 +524,7 @@ function route(req, res) {
     if (e || !b || typeof b !== "object") return send(res, 400, { error: e || "need a JSON object" });
     if (typeof b.to !== "string" || !b.to) return send(res, 400, { error: 'body must be { "to": "<who is sent, for example rover-01>" }' });
     const id = decodeURIComponent(help[1]);
-    const item = L.queue(readings, assigned, Date.now(), "all").find((x) => x.id === id);
+    const item = L.queue(usable, assigned, Date.now(), "all").find((x) => x.id === id);
     if (!item) return send(res, 404, { error: `no help request with message id "${id}" (see GET /help)` });
     if (item.status === "assigned") return send(res, 409, { error: `already assigned${item.assigned_to ? ` to ${item.assigned_to}` : ""}`, assigned: item });
     send(res, 200, { assigned: assign(item, b.to) });
@@ -515,7 +532,7 @@ function route(req, res) {
   // The original way: send a responder to the top request (among equal scores, the one nearest the responder's level).
   if (req.method === "POST" && p === "/dispatch") return readBody(req, res, (e, b) => {
     if (e || !b || typeof b !== "object") return send(res, 400, { error: e || "need a JSON object" });
-    const pick = L.pickRequest(L.queue(readings, assigned), b.block);
+    const pick = L.pickRequest(L.queue(usable, assigned), b.block);
     if (!pick) return send(res, 200, { assigned: null });
     send(res, 200, { assigned: assign(pick, typeof b.responder === "string" && b.responder ? b.responder : "responder") });
   });
@@ -528,7 +545,7 @@ function route(req, res) {
     const devs = familyOf(q.group ?? q.family); // ?group= (the original name) or ?family= (the contract's word)
     if (!devs.length) return send(res, 404, { error: "unknown group" });
     return send(res, 200, devs.map((d) => {
-      const last = O.newest(readings.filter((r) => r.device === d && isOk(r)));
+      const last = O.newest(usable.filter((r) => r.device === d && isOk(r)));
       return { device: d, last_ok: last ? last.time : null, block: last ? last.block : null, hops: last ? last.hops : null, via: last ? last.via : null };
     }));
   }
@@ -545,33 +562,33 @@ function route(req, res) {
     send(res, 200, { ok: true });
   });
   // CONTRACT.md section 4: everything the public broadcast page shows, in one call
-  if (p === "/broadcast") return send(res, 200, SURF.broadcast(readings));
-  if (p === "/surface") return send(res, 200, SURF.surface(readings));
+  if (p === "/broadcast") return send(res, 200, SURF.broadcast(usable));
+  if (p === "/surface") return send(res, 200, SURF.surface(usable));
   if (p === "/surface/history") return send(res, 200, SURF.surfaceHistory(readings));
   if (p === "/firstwave") {
     const n = q.n === undefined ? LIM.val("firstwave_default_n") : Math.floor(Number(q.n));
     if (!(n >= 1)) return send(res, 400, { error: "n must be a whole number of 1 or more" });
-    const sv = SURF.surface(readings);
-    const openHelp = new Set(L.queue(readings, assigned).map((x) => x.device));
+    const sv = SURF.surface(usable);
+    const openHelp = new Set(L.queue(usable, assigned).map((x) => x.device));
     // the list is always ranked, but it is only a go when the surface verdict allows people up at all
     const cleared = sv.verdict === SURF.SUITS || sv.verdict === SURF.DOMES; // outposts are not a place to send a first wave
     return send(res, 200, { surface_verdict: sv.verdict, cleared,
       note: cleared ? `Surface verdict is "${sv.verdict}": this is the order people go up.`
         : `Surface verdict is "${sv.verdict}": nobody goes up yet. This is the order they would go.`,
-      ...SURF.firstwave(readings, openHelp, PEOPLE, n) });
+      ...SURF.firstwave(usable, openHelp, PEOPLE, n) });
   }
   if (p === "/status") {
     const now = Date.now(), windowMin = LIM.val("status_alert_window_min");
     const recent = readings.filter((r) => r.kind === "alert" && Date.parse(r.time) >= now - windowMin * 60e3);
-    const queue = L.queue(readings, assigned, now);
-    const truth = L.truth(readings, official, now);
-    const sv = SURF.surface(readings);
+    const queue = L.queue(usable, assigned, now);
+    const truth = L.truth(usable, official, now);
+    const sv = SURF.surface(usable);
     const data = readings.filter((r) => r.kind !== "alert"); // what devices sent; alerts are ours
     const count = (f) => data.filter(f).length;
     return send(res, 200, {
       time: new Date(now).toISOString(),
       seq: lastSeq, // the newest event id: pass it to /feed?lastEventId= or /history?after_seq= to continue from here
-      forecast: [...new Set(readings.filter((r) => r.kind === "power").map((r) => r.block))].sort().map((b) => L.forecast(readings, b)),
+      forecast: [...new Set(usable.filter((r) => r.kind === "power").map((r) => r.block))].sort().map((b) => L.forecast(usable, b)),
       alerts: { window_min: windowMin, count: recent.length,
         by_level: { info: 0, warn: 0, danger: 0, ...Object.fromEntries(["info", "warn", "danger"].map((l) => [l, recent.filter((a) => a.values.level === l).length])) },
         latest: recent.slice(-LIM.val("status_alert_max")).reverse() }, // newest first
@@ -581,6 +598,7 @@ function route(req, res) {
       surface: { verdict: sv.verdict, reasons: sv.reasons, missing: sv.missing, source: sv.source },
       blocks: blockSources(), // per block: is its newest data live hardware or simulated?
       readings: { total: data.length, verified: count((r) => r.verified === true), unverified: count((r) => r.verified !== true),
+        implausible: count((r) => r.plausible === false), // sensor errors: stored, used for nothing
         live: count((r) => r.source === "live"), simulated: count((r) => r.source !== "live") },
       feed_clients: clients.size,
     });
@@ -593,7 +611,7 @@ function route(req, res) {
       rule: `A message whose sig does not match the key on file for its device is refused and never stored as a reading. Each refusal is logged here and sent on GET /live as event: forgery, at most ${RATE_LIMIT} per device per second; the newest ${LIM.val("forgery_log_max")} are kept here.` });
   }
   if (p === "/limits") return send(res, 200, LIM.all);
-  if (p === "/truth") return send(res, 200, L.truth(readings, official, q.now ? Date.parse(q.now) : Date.now()));
+  if (p === "/truth") return send(res, 200, L.truth(usable, official, q.now ? Date.parse(q.now) : Date.now()));
   send(res, 404, { error: "not found" });
 }
 process.on("uncaughtException", (e) => console.error("uncaught error (server keeps running):", e));

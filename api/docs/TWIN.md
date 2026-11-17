@@ -118,6 +118,15 @@ data: {"time":"2026-11-17T20:03:11.402Z","device":"relay-l8-bore-bend","block":"
   in `GET /forgeries` as `rate_limited`.
 - `/feed` (the older stream with unnamed events) never carries forgeries.
 
+### Sensor errors: `plausible: false`
+
+A reading from a broken or misbehaving sensor (an impossible value, a jump, or drift away from the other sensors on
+its level; CONTRACT.md section 1.3) still arrives as `event: reading`, but carries `"plausible": false` and a
+`sensor_error` sentence. Do not move the block's numbers or colours with it: the API leaves it out of everything
+(`/blocks`, `/status`, forecasts, the surface verdict) and raises no alert for it. If you show it at all, show it
+as a sensor fault on the block (for example a grey "sensor fault" tag with `sensor_error` as the tooltip).
+`status.readings.implausible` counts them.
+
 ### The twin's four tasks, in API terms
 
 | Task in `twin/README.md` | How |
@@ -262,7 +271,7 @@ More panels for the broadcast page, all open GETs:
     "l6-flint-face": { "source": "simulated", "latest_time": "2026-11-18T20:04:58.000Z", "latest_device": "relay-l6-flint-face", "live_kinds": [], "simulated_kinds": ["power"] },
     "l3-ember-yard": { "source": "live", "latest_time": "2026-11-18T20:04:59.000Z", "latest_device": "sensor-l3-ember-yard", "live_kinds": ["water"], "simulated_kinds": ["vitals"] }
   },
-  "readings": { "total": 96, "verified": 12, "unverified": 84, "live": 20, "simulated": 76 },
+  "readings": { "total": 96, "verified": 12, "unverified": 84, "implausible": 0, "live": 20, "simulated": 76 },
   "feed_clients": 2
 }
 ```

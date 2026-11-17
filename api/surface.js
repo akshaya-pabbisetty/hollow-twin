@@ -94,7 +94,8 @@ function surface(readings) {
 // The public record: every surface reading and every verdict change, in the order the backend stored them.
 function surfaceHistory(readings) {
   return readings.filter((r) => r.kind === "surface" || (r.kind === "alert" && r.values.surface_verdict)).map((r) => r.kind === "surface"
-    ? { seq: r.seq, type: "reading", time: r.time, id: r.id, device: r.device, block: r.block, values: r.values, source: r.source, verified: r.verified === true }
+    ? { seq: r.seq, type: "reading", time: r.time, id: r.id, device: r.device, block: r.block, values: r.values, source: r.source, verified: r.verified === true,
+      ...(r.plausible === false ? { plausible: false, sensor_error: r.sensor_error } : {}) }
     : { seq: r.seq, type: "verdict", time: r.time, id: r.id, verdict: r.values.surface_verdict, previous: r.values.previous,
       reasons: r.values.reasons, cause: r.values.cause, source: r.source });
 }

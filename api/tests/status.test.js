@@ -23,7 +23,7 @@ test("a fresh, empty server: every section is present and empty, nothing throws"
   assert.deepStrictEqual([st.truth.residents_total, st.truth.official_total, st.truth.gap], [0, 0, 0]);
   assert.strictEqual(st.surface.verdict, "not enough data");
   assert.deepStrictEqual(st.blocks, {});
-  assert.deepStrictEqual(st.readings, { total: 0, verified: 0, unverified: 0, live: 0, simulated: 0 });
+  assert.deepStrictEqual(st.readings, { total: 0, verified: 0, unverified: 0, implausible: 0, live: 0, simulated: 0 });
   assert.strictEqual(st.seq, 0);
 });
 
@@ -69,7 +69,7 @@ test("one poll shows forecast, alerts, queue, truth, surface, live vs simulated 
   assert.deepStrictEqual(st.blocks[market].simulated_kinds, ["air", "button", "vitals"]);
   assert.strictEqual(st.blocks["surface"].source, "simulated");
   // verified vs unverified (alerts are not counted: they are the backend's own)
-  assert.deepStrictEqual(st.readings, { total: 11, verified: 4, unverified: 7, live: 4, simulated: 7 });
+  assert.deepStrictEqual(st.readings, { total: 11, verified: 4, unverified: 7, implausible: 0, live: 4, simulated: 7 });
   assert.strictEqual(st.seq, (await s.get("/history")).length, "seq is the newest event id");
 });
 
