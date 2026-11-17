@@ -164,6 +164,7 @@
   .lbl-src { font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 2px; background: rgba(20,22,24,.82); color: #e9eae6; white-space: nowrap; }
   .lbl-src.dev { background: #1f7a4d; color: #fff; }
   .lbl-rover { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 2px; white-space: nowrap; background: #D2A01E; color: #17181A; transform: translateY(-14px); }
+  .ck.hq .help-send { margin-top: 4px; padding: 3px 8px; }
   .lbl-flag { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 2px; white-space: nowrap; }
   .lbl-flag.bad { background: #C8102E; color: #fff; }
   .lbl-flag.fault { background: #6b6f73; color: #fff; }
@@ -207,6 +208,7 @@
   <header>
     <div class="brand">Hollow Twin<span>Sector 7, Old Kanawha workings</span></div>
     <a class="hlink" id="h-scout" href="scout/" target="hollow-scout" title="The tunnel scout rover: its CAD design, parts list and a mission down a tunnel. Design only, not built.">Scout rover</a>
+    <a class="hlink" href="broadcast/" target="hollow-broadcast" title="What the surface scouts measured, against published safety limits. Anyone can read it.">Surface broadcast</a>
     <div class="hstat">Clock <b id="h-clock">--</b></div>
     <div class="hstat">Geothermal <b id="h-plant">--</b></div>
     <div class="hstat">Supply / demand <b id="h-sd">--</b></div>
@@ -1698,6 +1700,7 @@ function updateOverview() {
   if (ah !== apiHtml) {
     apiHtml = ah; $('o-api').innerHTML = ah;
     $('o-api').querySelectorAll('[data-bid]').forEach(r => { const o = BYID[r.dataset.bid]; if (o) { r.style.cursor = 'pointer'; r.onclick = () => select(o); } });
+    $('o-api').querySelectorAll('[data-send]').forEach(b => { const o = BYID[b.dataset.send]; if (o) b.onclick = ev => { ev.stopPropagation(); sendRover(o); }; });
   }
   $('o-n').textContent = sim.alerts.length;
   const top = sim.alerts.slice(0, 60), keys = top.map(a => a.n.id + a.k).join('|'), list = $('alerts');
@@ -2085,7 +2088,13 @@ function applyStatus(st, first) {
   pinAll(); api.dirty = true; apiPaint();
 }
 function refreshSoon() { clearTimeout(api.soon); api.soon = setTimeout(pollStatus, 350); }
-function pollStatus() { if (api.on) getJSON('/status').then(st => applyStatus(st, false)).catch(() => {}); }
+function pollStatus() { if (api.on) { getJSON('/status').then(st => applyStatus(st, false)).catch(() => {}); pollHelp(); } }
+// the help queue, ranked by the API's triage score; delivered ones come from ?status=delivered (an older API rejects it: then none)
+function pollHelp() {
+  Promise.all([getJSON('/help?status=all'), getJSON('/help?status=delivered').catch(() => null)]).then(([all, done]) => {
+    api.help = Array.isArray(all) ? all : []; api.helpDelivered = Array.isArray(done); api.dirty = true;
+  }).catch(() => {});
+}
 
 function adoptLimits(L) {
   const map = { batteryWarnH: 'battery_warn_hours', batteryAlarmH: 'battery_alarm_hours', co2Warn: 'air_co2_stale_ppm', co2Alarm: 'air_co2_danger_ppm', heatWarn: 'air_heat_warn_c', heatAlarm: 'air_heat_danger_c', floodClosed: 'flood_depth_closed_cm', tdsMax: 'water_tds_max_ppm', ntuMax: 'water_turbidity_max_ntu' };
@@ -2127,6 +2136,7 @@ async function apiConnect(url) {
     api.on = true; api.state = 'on'; api.seq = st.seq;
     for (const m of blocks) { api.seen.add(m.id); onReading(m, false); }
     applyStatus(st, true);
+    pollHelp();
     openStream();
     api.timer = setInterval(() => { pollStatus(); renderFeed(); }, 5000);
     for (let pct = 60; pct <= 104; pct++) fairTable(pct); // the allocation table for every supply level the scenario reaches
@@ -2185,10 +2195,18 @@ function apiOverview() {
       out.push(`<div class="ck" data-bid="${a.block}"><span class="s${s}">${nice(a.values.text)}.</span>${lim && lim.source ? ` <span class="note">Limit: ${lim.value} ${lim.unit || ''}, ${lim.source}.</span>` : ''}</div>`);
     }
   }
+  const help = (api.help || []).filter(h => h.status !== 'delivered').slice(0, 6), done = (api.help || []).filter(h => h.status === 'delivered').length;
+  if (help.length || done) {
+    out.push(`<h3>Help requests <span>${(api.help || []).filter(h => h.status === 'open').length} waiting${done ? `, ${done} delivered` : ''}</span></h3>`);
+    help.forEach((h, i) => {
+      const why = (h.reasons || []).slice(1, 3).map(r => escH(r.replace(/ \(.*$/, ''))).join('; ');
+      const state = h.status === 'assigned' ? `<span class="s1">${escH(h.assigned_to || 'Someone')} on the way</span>` : `<button class="help-send" data-send="${escH(h.block)}" ${rov.busy ? 'disabled' : ''}>Send the rover</button>`;
+      out.push(`<div class="ck hq" data-bid="${escH(h.block)}"><b>${i + 1}. ${escH(h.device)} in ${escH(blockName(h.block))}</b> <span class="note">score ${h.score}${why ? ': ' + why : ''}</span><div>${state}</div></div>`);
+    });
+  }
   const bits = [];
-  if (st.queue && st.queue.length) bits.push(`<div class="k">Help requests</div><div>${st.queue.length} waiting. First: ${st.queue.top.device} in ${blockName(st.queue.top.block)}, score ${st.queue.top.score}.</div>`);
   if (st.truth && (st.truth.residents_total || st.truth.official_total)) bits.push(`<div class="k">Symptom reports</div><div>Residents ${st.truth.residents_total}, Directorate ${st.truth.official_total}.</div>`);
-  if (st.surface && st.surface.verdict !== 'not enough data') bits.push(`<div class="k">Surface</div><div>${st.surface.verdict} <span class="note">(${st.surface.source === 'live' ? 'from devices' : st.surface.source === 'mixed' ? 'part device, part scripted' : 'scripted readings'})</span></div>`);
+  if (st.surface && st.surface.verdict !== 'not enough data') bits.push(`<div class="k">Surface</div><div>${escH(st.surface.verdict)} <span class="note">(${st.surface.source === 'live' ? 'from devices' : st.surface.source === 'mixed' ? 'part device, part scripted' : 'scripted readings'})</span>. <a href="broadcast/" target="hollow-broadcast">Public broadcast</a></div>`);
   if (bits.length) out.push('<h3>Also from the API</h3><div class="kv">' + bits.join('') + '</div>');
   return out.join('');
 }
@@ -2317,7 +2335,7 @@ async function sendRover(n) {
   if (rov.busy) return false;
   const route = roverRoute(rov.at, n);
   if (!route) { log('warn', `Rover-01 has no dry route to ${n.name}. Every tunnel into it is flooded.`, [n]); return false; }
-  rov.busy = true; rov.target = n; rov.cargo = cargoFor(n); rov.phase = 'out';
+  rov.busy = true; rov.target = n; rov.cargo = cargoFor(n); rov.phase = 'out'; rov.helpId = null; api.dirty = true;
   log('info', `Rover-01 is on its way from the ${LEVELS[rov.at.level].name} lift to ${n.name} with a ${rov.cargo.short}${sim.netCut ? '. Its relay box keeps passing messages as it drives' : ''}.`, [n]);
   if (api.on) assignHelp(n);
   renderPanels();
@@ -2334,8 +2352,19 @@ async function sendRover(n) {
   return true;
 }
 
+// connected: the request is done, and the API tells the resident's watch what arrived
+async function deliveredHelp(n, what) {
+  const id = rov.helpId; rov.helpId = null;
+  if (!api.on || !id) return;
+  try {
+    const r = await fetch(`${api.url}/help/${encodeURIComponent(id)}/delivered`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ by: 'rover-01', note: what }) });
+    if (r.ok) { log('ok', `The API closed ${escH(rov.helpDevice || 'the')} help request in ${n.name}: delivered by Rover-01.`, [n], 'API'); pollHelp(); }
+  } catch (e) { /* an API without POST /help/<id>/delivered: the request stays assigned */ }
+}
+
 function deliver(n) {
   const c = rov.cargo, bits = [];
+  deliveredHelp(n, c.short);
   rov.last = { cargo: c.short, held: 0 };
   if (c.what === 'Battery pack') {
     const add = 0.3 * n.cap; n.B = Math.min(n.cap, n.B + add);
@@ -2363,8 +2392,9 @@ async function assignHelp(n) {
     const list = await getJSON('/help');
     const req = Array.isArray(list) && list.find(h => h.block === n.bid);
     if (!req) return;
+    rov.helpId = req.id; rov.helpDevice = req.device;
     const r = await fetch(`${api.url}/help/${encodeURIComponent(req.id)}/assign`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: 'rover-01' }) });
-    if (r.ok) log('info', `The API assigned ${escH(req.device)}'s help request in ${n.name} to Rover-01.`, [n], 'API');
+    if (r.ok) { log('info', `The API assigned ${escH(req.device)}'s help request in ${n.name} to Rover-01.`, [n], 'API'); pollHelp(); }
   } catch (e) { /* the API is optional for the rover */ }
 }
 
@@ -2395,7 +2425,7 @@ const mil = k => (k / 1000).toFixed(1); // populations are held in thousands
 const totalPop = NBHDS.reduce((s, n) => s + n.pop, 0);
 function setSpeed(v) { speed = v; document.querySelectorAll('[data-speed]').forEach(x => x.classList.toggle('on', +x.dataset.speed === v)); }
 function runTo(hour, rate) { return new Promise(res => { story.until = hour; story.done = res; setSpeed(rate); }); }
-function roverHome() { rov.pts = null; rov.done = null; rov.busy = false; rov.target = null; rov.cargo = null; rov.phase = null; roverPark(DEPOT); }
+function roverHome() { rov.helpId = null; rov.pts = null; rov.done = null; rov.busy = false; rov.target = null; rov.cargo = null; rov.phase = null; roverPark(DEPOT); }
 function resetSim(policy) { selected = null; sim.policy = policy; initSim(); setPolicy(policy, false); roverHome(); drawnT = -1; }
 const darkNow = () => NBHDS.filter(n => n.blackout);
 const popOf = ns => mil(ns.reduce((s, n) => s + n.pop, 0));
