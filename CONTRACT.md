@@ -92,6 +92,19 @@ Everything in this table is optional. The rows above are unchanged.
 | `surface` | Optional `o2_pct` (oxygen, % by volume) and `pm25_ugm3` (fine dust, µg/m3). Every surface value is optional per message: send what you measure. The surface verdict needs all five readings (`co2_ppm`, `temp_c`, `radiation_usv_h`, `o2_pct`, `pm25_ugm3`); until a scout has sent each one at least once the verdict is `not enough data`. |
 | `alert` | A new kind written only by the API (`device` is `backend`), never accepted on `/ingest`. It is how warnings travel back down to watches and to the twin. `values`: `level` (`info`, `warn` or `danger`), `text` (one line for a watch screen), `why` (the reading, the limit it crossed and the limit's source), `cause` (the `id` of the message that triggered it), and `to` (a list of watch IDs) when it is addressed to particular watches. |
 
+### 2.2 What a `checkin` can say
+
+Addition (lane 1): besides `ok`, a `checkin`'s `status` may be any of these.
+
+| `status` | Means | Shown as |
+| --- | --- | --- |
+| `ok` | I'm OK. The default when `status` is missing. | "watch-0042 is OK" |
+| `help` | I need help. Send a `button` `help` as well, so the request lands in `GET /help`. | "needs help" |
+| `msg:<text>` | A short message to the family: a preset ("On my way") or typed text. | the text |
+| `morse:<text>` | A message keyed in Morse, already decoded to text. | the text, marked Morse |
+
+The API passes `status` through unchanged to every watch in `to` and the family group (the alert's `values.status`). Screens show `<text>` as plain text, never as HTML, because it is typed by a person. Keep `<text>` short: watches show about 20 characters.
+
 ## 3. Device IDs
 
 | Device | ID pattern | Example |
@@ -283,3 +296,4 @@ Additions, except the rows marked **Removed**, which say what was taken out and 
 | 2026-11-17 | 6, 6.1 | The sourced limits in 6.1 are agreed by the team; the twin reads them from `GET /limits`. **Removed:** the twin's old thresholds table (CO2 2,000 / 4,000 ppm, air temperature 39 / 43 °C, flood 25 / 45 cm) and the "water is still open" line (6.2 fills it in). |
 | 2026-11-17 | 1.1, 4.1, 4.2 | Forged readings are visible: a message with a wrong `sig` is still rejected and never stored as a reading, and the rejection goes out on `GET /live` as `event: forgery` and into the public log `GET /forgeries`, rate-limited like `POST /ingest`. |
 | 2026-11-17 | 1.2, 1.3 | Sensor errors: an impossible value, a jump or drift is stored with `plausible: false`, `sensor_error` and `sensor_flags`, raises no alert, and is left out of all logic; `GET /status` counts them as `readings.implausible`. |
+| 2026-11-17 | 2.2 | `checkin.status` may also be `help`, `msg:<text>` or `morse:<text>` (the lane 2 family watch). The API already passed any status through; this writes the values down. |
