@@ -1,0 +1,12 @@
+# Used when building with `docker build -f api/Dockerfile .` from the repository root (paths are from that root).
+.git
+**/node_modules
+**/*.jsonl
+api/shared/keys.json
+api/tests
+api/docs
+twin
+broadcast
+firmware
+robot
+.azure

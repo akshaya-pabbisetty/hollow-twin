@@ -1,0 +1,4 @@
+node_modules/
+readings.jsonl
+*.jsonl
+shared/keys.json

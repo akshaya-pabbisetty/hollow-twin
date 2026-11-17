@@ -1,0 +1,20 @@
+{
+  "_note": "The people register for GET /firstwave. device = the person's watch. skills = what they can do on the surface. sole_caregiver = someone depends on them alone, so they are never sent up. needed_skills = what the first surface party needs most. Demo data: invented people. A watch that is not listed here can volunteer but is never ranked (caregiver status unknown).",
+  "needed_skills": [
+    "medic",
+    "engineer",
+    "farmer"
+  ],
+  "people": [
+    { "device": "watch-0051", "name": "Asha Verran", "skills": ["medic"], "sole_caregiver": false },
+    { "device": "watch-0052", "name": "Tobin Okafor", "skills": ["engineer", "farmer"], "sole_caregiver": false },
+    { "device": "watch-0053", "name": "Mirela Stoica", "skills": ["farmer"], "sole_caregiver": true },
+    { "device": "watch-0054", "name": "Jun Halloran", "skills": ["engineer"], "sole_caregiver": false },
+    { "device": "watch-0055", "name": "Pia Lindqvist", "skills": ["teacher"], "sole_caregiver": false },
+    { "device": "watch-0056", "name": "Dario Mbeki", "skills": ["medic", "engineer"], "sole_caregiver": false },
+    { "device": "watch-0057", "name": "Noor Castellan", "skills": ["farmer"], "sole_caregiver": false },
+    { "device": "watch-0058", "name": "Ilya Brandt", "skills": ["cook"], "sole_caregiver": false },
+    { "device": "watch-0059", "name": "Sena Aldaine", "skills": ["medic", "farmer"], "sole_caregiver": true },
+    { "device": "watch-0060", "name": "Rafe Dunmore", "skills": ["engineer"], "sole_caregiver": false }
+  ]
+}
