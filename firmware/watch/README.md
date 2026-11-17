@@ -4,8 +4,8 @@ Two watches are built:
 
 | Watch | What it is | Guide |
 | --- | --- | --- |
-| [`watch.ino`](watch.ino) | An Arduino with an "I'm OK" button, wired by USB to a Raspberry Pi relay ([`../relay/relay.py`](../relay/relay.py)) that signs its messages and holds them through a real network cut | [`docs/HARDWARE.md`](../../docs/HARDWARE.md) |
-| [`web/index.html`](web/index.html) | The family watch on a phone: I'M OK, help, family status, walkie-talkie presets and Morse. Its relays are simulated | below |
+| [`watch.ino`](watch.ino) | An Arduino with I'm OK, help and I feel sick buttons and a buzzer, wired by USB to a Raspberry Pi relay ([`../relay/relay.py`](../relay/relay.py)) that signs its messages and holds them through a real network cut | [`docs/HARDWARE.md`](../../docs/HARDWARE.md) |
+| [`web/index.html`](web/index.html) | The family watch on a phone: I'M OK, help, I feel sick, family status, its block's power, its help call, walkie-talkie presets and Morse. Its relays are simulated | below |
 
 The ESP32 wrist watch described next is the original design and is not built.
 
@@ -24,11 +24,11 @@ The fallback, built. One file, no install: the watch's software on a phone, plus
 
 **On the watch** (three screens, tabs at the bottom):
 
-- **Home:** a big **I'M OK** button and a **NEED HELP** button (two taps, so a bump doesn't call for help).
+- **Home:** a big **I'M OK** button, a **NEED HELP** button (two taps, so a bump doesn't call for help) and **I feel sick** (a `button` `symptom` message: it goes to the API, not the family, and counts toward the residents' sickness number in `GET /truth`). Under the clock: the hours of power the API forecasts for the wearer's block, coloured at the 24 h and 8 h lines.
 - **Family:** who in the family is safe, who needs help, and who hasn't been heard from.
 - **Talk:** walkie-talkie presets ("On my way", "Stay where you are", "Meet at the lift", "Need water") and a **Morse key**: tap for a dot, hold for a dash, a pause ends the letter. Morse that arrives is played back as beeps and vibration, with the dots and dashes on screen.
 
-**In the family app** (next to the watch): everyone's status with where and when they were last heard from, and the whole radio message history.
+**In the family app** (next to the watch): **Your block** (the API's battery forecast for it, with the reason and whether the readings are scripted or from a device), **Your help call** (in the rescue queue and its place, then "Rover-01 is on the way", then "Rover-01 reached you: med kit", from `GET /help`), everyone's status with where and when they were last heard from, and the whole radio message history. When the rover is sent and when it arrives, the watch face says so too. Without an API none of this is shown, rather than guessed.
 
 **When the Directorate cuts the network** (the **Cut network** button), every message still gets through, by radio: the screen shows it hop from the watch to its block's relay, to the next block's relay (which still has a line out), and up to the API. It arrives with `hops: 2` and `via` naming both relays (CONTRACT.md section 5); on L7 Chalk Cut that is the scenario's own route. **The relays are simulated** (a phone has no radio for this), and the screen says so. A real outage (no signal, API down) holds messages on the phone with their original `time` and posts them as one array when the API is back.
 

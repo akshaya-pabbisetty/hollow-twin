@@ -31,7 +31,9 @@
   .radio-badge { display: none; font-size: 10px; color: #ffb4ad; letter-spacing: .5px; }
   .face.cut .radio-badge { display: block; }
   .face.cut .where { display: none; }
-  .screen { position: absolute; top: 24%; bottom: 17%; left: 9%; right: 9%; display: none;
+  .pwr { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); min-height: 1.2em; }
+  .pwr.warn { color: var(--warn); } .pwr.alarm { color: var(--danger); } .pwr.ok { color: var(--ok-hi); }
+  .screen { position: absolute; top: 28%; bottom: 17%; left: 9%; right: 9%; display: none;
     flex-direction: column; align-items: center; justify-content: center; text-align: center; }
   .screen.on { display: flex; }
   .tabs { position: absolute; bottom: 6%; left: 0; right: 0; display: flex; justify-content: center; gap: 8px; }
@@ -41,16 +43,16 @@
   .tabs button.ping .pip { display: inline-block; }
 
   /* home */
-  .okbtn { width: 46%; aspect-ratio: 1; border-radius: 50%; border: 0; color: #fff;
-    background: radial-gradient(circle at 50% 35%, var(--ok-hi), var(--ok)); font-size: 24px; font-weight: 800;
+  .okbtn { width: 31%; aspect-ratio: 1; border-radius: 50%; border: 0; color: #fff;
+    background: radial-gradient(circle at 50% 35%, var(--ok-hi), var(--ok)); font-size: 20px; font-weight: 800;
     box-shadow: 0 0 0 6px rgba(46,160,67,.18), 0 8px 24px rgba(46,160,67,.35); transition: transform .08s; }
   .okbtn:active, .helpbtn:active, .chip:active, .key:active { transform: scale(.94); }
   .okbtn.busy { background: radial-gradient(circle at 50% 35%, #e3b341, var(--warn)); box-shadow: 0 0 0 6px rgba(210,153,34,.2); }
-  .helpbtn { margin-top: 10px; padding: 6px 16px; border-radius: 999px; border: 1px solid var(--danger-lo);
+  .helpbtn { margin-top: 8px; padding: 6px 16px; border-radius: 999px; border: 1px solid var(--danger-lo);
     background: rgba(248,81,73,.12); color: #ffb4ad; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
   .sickbtn { margin-top: 6px; padding: 4px 14px; border-radius: 999px; border: 1px solid #6b6f73; background: none; color: inherit; font: inherit; font-size: 11px; opacity: .85; }
   .helpbtn.arm { background: var(--danger-lo); color: #fff; }
-  .status { margin-top: 8px; min-height: 2.5em; font-size: 12px; color: var(--dim); max-width: 92%; }
+  .status { margin-top: 6px; min-height: 2.4em; font-size: 11px; color: var(--dim); max-width: 92%; }
   .status b { color: var(--text); }
 
   /* family */
@@ -126,6 +128,10 @@
   .msg.help { background: rgba(248,81,73,.12); border: 1px solid var(--danger-lo); }
   .msg.safe { background: rgba(46,160,67,.10); }
   .empty { font-size: 12px; color: #6e7681; }
+  .card { font-size: 13px; padding: 9px 10px; border-radius: 12px; background: #010409; border: 1px solid #21262d; }
+  .card b { display: block; font-size: 14px; margin-bottom: 2px; }
+  .card span { display: block; font-size: 12px; color: var(--dim); margin-top: 3px; }
+  .card.warn { border-color: #6b4f00; } .card.alarm { border-color: var(--danger-lo); } .card.ok { border-color: #1f4f2e; }
   .note { font-size: 11px; color: #6e7681; margin-top: 12px; }
 
   dialog { background: #0d1117; color: var(--text); border: 1px solid var(--line); border-radius: 12px; width: min(92vw, 420px); padding: 18px; }
@@ -146,6 +152,7 @@
     <div class="top">
       <div class="clock" id="clock">--:--</div>
       <div class="where" id="where">—</div>
+      <div class="pwr" id="pwr"></div>
       <div class="radio-badge">📡 RADIO ONLY · NETWORK CUT</div>
     </div>
 
@@ -203,6 +210,10 @@
 <div class="app">
   <h1>Hollow Family</h1>
   <div class="sub" id="app-sub">—</div>
+  <h2>Your block</h2>
+  <div class="card" id="blk"><span>Connect the API to see your block's power forecast.</span></div>
+  <h2>Your help call</h2>
+  <div class="card" id="hlp"><span>None. Tap NEED HELP twice on the watch to call for help.</span></div>
   <h2>Who's safe</h2>
   <div id="fam-app"></div>
   <h2>Radio messages</h2>
@@ -542,7 +553,8 @@ async function poll() {
       const v = a.values || {};
       // message ids are <device>-<counter> and a relay's counter can contain dashes: match the contract's device pattern
       const from = (String(v.cause || '').match(/^watch-\d{4}/) || [])[0] || (v.cause || '').replace(/-\d+$/, '');
-      if (from === cfg.device) continue;                       // the echo of our own message
+      const toMe = (v.to || []).includes(cfg.device);
+      if (from === cfg.device && !toMe) continue;              // the echo of our own message (help to us still counts)
       if (v.family) {                                          // a family member checked in or called
         const e = { from, status: v.status || 'ok', time: v.sent || a.time, block: a.block, hops: v.hops || 0 };
         const fresh = addLog(e);
@@ -550,7 +562,12 @@ async function poll() {
         if (p.type === 'safe' || p.type === 'help') { const n = news[from]; if (!n || Date.parse(e.time) >= Date.parse(n.time)) news[from] = e; }
         if (fresh && !quiet) arrive(e);
       } else if (!quiet && v.text) {                          // warnings for this block, help on its way
-        showAlert(v.level || 'info', v.level === 'danger' ? 'Danger' : v.level === 'warn' ? 'Warning' : 'Message', v.text, '', '');
+        const m = toMe && String(v.text).match(/^(\S+) (sent to|reached) watch-\d{4} in \S+(?:: (.*))?$/);
+        if (m) {                                               // the responder's own words, said to the wearer
+          const who = m[1].replace(/^\w/, c => c.toUpperCase());
+          showAlert('safe', 'Help', m[2] === 'reached' ? `${who} reached you` : `${who} is on its way to you`, '', m[3] || '');
+          pollBlock();
+        } else showAlert(v.level || 'info', v.level === 'danger' ? 'Danger' : v.level === 'warn' ? 'Warning' : 'Message', v.text, '', '');
       }
     }
     store.set(S('seq'), lastSeq); store.set(S('news'), news);
@@ -648,6 +665,51 @@ function paint() {
   }
 }
 
+// ---------- your block and your help call, from the API ----------
+// The API owns these numbers (GET /forecast, GET /help). Without an API the watch shows nothing rather than guess.
+let blockNow = null, helpNow = null, helpRank = 0;
+async function pollBlock() {
+  if (!api()) return;
+  try {
+    const [f, all, open] = await Promise.all([
+      call('GET', `/forecast?block=${encodeURIComponent(cfg.block)}`),
+      call('GET', '/help?status=all'),
+      call('GET', '/help'),
+    ]);
+    if (f.ok && Array.isArray(f.data)) blockNow = f.data.find(x => x.block === cfg.block) || null;
+    if (all.ok && Array.isArray(all.data)) {
+      const mine = all.data.filter(h => h.device === cfg.device).sort((a, b) => Date.parse(b.time) - Date.parse(a.time));
+      helpNow = mine[0] || null;
+      helpRank = helpNow && open.ok && Array.isArray(open.data) ? open.data.findIndex(h => h.id === helpNow.id) + 1 : 0;
+    }
+    paintBlock();
+  } catch (e) { /* shown as last known */ }
+}
+function paintBlock() {
+  const pw = $('pwr'), bk = $('blk'), hp = $('hlp');
+  const f = blockNow, known = f && f.level && f.level !== 'unknown';
+  const hrs = known && f.hours_left != null ? (f.hours_left >= 100 ? '100+' : (+f.hours_left).toFixed(f.hours_left < 10 ? 1 : 0)) : null;
+  pw.className = 'pwr ' + (known ? f.level : '');
+  pw.textContent = !known ? '' : f.dark ? 'Power: dark' : hrs ? `Power ${hrs} h left` : 'Power OK';
+  if (api()) {
+    if (!known) bk.innerHTML = `<b>${esc(pretty(cfg.block))}</b><span>No power reading for this block yet.</span>`;
+    else {
+      const head = f.dark ? 'Dark: the battery is empty' : hrs ? `About ${esc(hrs)} h of power left` : 'Power is holding';
+      const last = String((f.reasons || []).slice(-1)[0] || '').split(' (')[0];
+      const why = f.level === 'ok' ? '' : last ? last[0].toUpperCase() + last.slice(1) + '. The 24 h and 8 h warning lines are the team\'s own choice.' : '';
+      const src = f.source === 'simulated' ? 'Scripted readings.' : f.source === 'live' ? 'From the block relay.' : '';
+      bk.className = 'card ' + f.level;
+      bk.innerHTML = `<b>${esc(pretty(cfg.block))}: ${head}</b>${why ? `<span>${esc(why)}</span>` : ''}${src ? `<span>${src}</span>` : ''}`;
+    }
+  }
+  const h = helpNow;
+  if (!h) return;
+  const when = t => t ? hhmm(t) : '', cap = t => String(t).replace(/^\w/, c => c.toUpperCase());
+  if (h.status === 'delivered') { hp.className = 'card ok'; hp.innerHTML = `<b>${esc(cap(h.delivered_by || 'Help'))} reached you${h.note ? `: ${esc(h.note)}` : ''}</b><span>Called ${when(h.time)}, arrived ${when(h.delivered_at)}.</span>`; }
+  else if (h.status === 'assigned') { hp.className = 'card warn'; hp.innerHTML = `<b>${esc(cap(h.assigned_to || 'Help'))} is on the way</b><span>Called ${when(h.time)}, sent ${when(h.assigned_at)}.</span>`; }
+  else { hp.className = 'card alarm'; hp.innerHTML = `<b>In the rescue queue${helpRank ? `, number ${helpRank}` : ''}</b><span>Called ${when(h.time)}. ${esc((h.reasons || []).join('; '))}</span>`; }
+}
+
 // ---------- controls ----------
 $('ok').addEventListener('click', () => send('ok'));
 let helpArmed = null;
@@ -682,8 +744,9 @@ $('dlg').addEventListener('close', () => {
 
 window.addEventListener('online', () => { flush(); poll(); });
 setInterval(() => { flush(); poll(); pollFamily(); }, 2500);
+setInterval(pollBlock, 5000);
 setInterval(paint, 15000);
-paint(); flush(); poll(); pollFamily();
+paint(); flush(); poll(); pollFamily(); pollBlock();
 </script>
 </body>
 </html>

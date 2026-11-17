@@ -14,7 +14,7 @@ Five problems from the track, because they are one event seen from five sides: a
 
 | Track problem | What Hollow Twin does about it |
 | --- | --- |
-| 1. Blackouts last for days and nobody knows when the next one hits | Forecasts every block's battery, hours ahead, and warns the blocks that will run dry before their lights go out |
+| 1. Blackouts last for days and nobody knows when the next one hits | Forecasts every block's battery, hours ahead, and warns the blocks that will run dry before their lights go out. The warning reaches every watch in that block, and the watch shows its block's hours of power left |
 | 2. The Directorate decides who keeps the lights, and the deep levels always lose | Replaces "upper levels first" with a rule anyone can check: every block's air, pumps and medical load first, then the rest per person |
 | 7. The Directorate can shut the network down whenever it wants | Relay boxes in each block store messages and pass them block to block, then upload the backlog when any relay gets through |
 | 8. Families split across levels cannot tell if each other are OK | One "I'm OK" press travels over those relays to the family's watches, with the route it took |
@@ -68,7 +68,8 @@ We would rather tell you than have you find out.
 | The 3D twin, the guided story, block cards, the power rules | Real and running at the link above |
 | The API: ingest, live stream, forecast, fair share, alerts, check-in delivery, replay after a network cut | Real code, with tests. Run it locally (below). It is not hosted yet, so the public link runs on the twin's built-in simulation |
 | Sensor readings, populations, the failure scenario | Simulated. The screen tags every reading as twin simulation, scripted data through the API, or a device |
-| One watch and one relay box | Real: an Arduino with an "I'm OK" button, and a Raspberry Pi that signs its messages, holds them while the network is down and uploads them when it returns ([`docs/HARDWARE.md`](docs/HARDWARE.md)). The family member upstairs is scripted |
+| The family watch on a phone | Real: a web page on a real phone, sending to the API. I'm OK, help (two taps), I feel sick, family status, walkie-talkie presets and Morse; it shows its block's power forecast and its help call from queued to delivered. Its relay hops during a cut are drawn, not radioed ([`firmware/watch/`](firmware/watch/)) |
+| One watch and one relay box | Real: an Arduino with I'm OK, help and I feel sick buttons and a buzzer, and a Raspberry Pi that signs its messages, holds them while the network is down and uploads them when it returns ([`docs/HARDWARE.md`](docs/HARDWARE.md)). The family member upstairs is scripted |
 | The other 69 relays, the radio links between relays, sensor nodes | Simulated. One real relay talks to the API directly; relay-to-relay radio is not built |
 
 ## Run it yourself
