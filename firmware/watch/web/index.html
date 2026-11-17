@@ -51,6 +51,11 @@
   .net { font-size: 12px; color: var(--dim); text-align: center; }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--dim); vertical-align: 1px; }
   .dot.up { background: var(--ok-hi); } .dot.down { background: var(--danger); } .dot.none { background: var(--warn); }
+  .route { display: none; align-items: center; gap: 4px; font-size: 11px; color: var(--dim); }
+  .route.show { display: flex; }
+  .route .n { padding: 4px 8px; border: 1px solid #30363d; border-radius: 999px; white-space: nowrap; transition: all .25s; }
+  .route .n.lit { border-color: var(--info); color: #cfe6ff; background: rgba(88,166,255,.12); box-shadow: 0 0 10px rgba(88,166,255,.35); }
+  .route .w { color: #484f58; transition: color .25s; } .route .w.lit { color: var(--info); }
   .note { font-size: 11px; color: #6e7681; text-align: center; max-width: 360px; }
 
   dialog { background: #0d1117; color: var(--text); border: 1px solid #30363d; border-radius: 12px; width: min(92vw, 420px); padding: 18px; }
@@ -80,8 +85,9 @@
 </div>
 
 <div class="net" id="net"><span class="dot"></span>…</div>
+<div class="route" id="route" aria-label="Radio route"></div>
 <div class="bar">
-  <button id="cut" title="Simulates the Directorate switching the network off: nothing leaves this watch until it is back on.">Cut network</button>
+  <button id="cut" title="Simulates the Directorate switching the network off. Check-ins then go by radio, relay to relay.">Cut network</button>
   <button id="cfg">Settings</button>
 </div>
 <div class="note">Hollow Twin watch, prototyped on a phone. It sends the same <code>checkin</code> message a real watch would (CONTRACT.md).</div>
@@ -138,6 +144,7 @@ let cut = store.get('cut', false);     // the demo "network cut" switch
 let reachable = null;                  // last result of talking to the API: true, false or null (unknown)
 let lastSeq = store.get('seq.' + cfg.device, 0);
 let flushing = false;
+let routeDone = false;                // keep the radio route lit after a delivery
 let caughtUp = lastSeq > 0;          // seen this API's inbox before?
 
 const api = () => (cfg.api || '').trim().replace(/\/+$/, '');
@@ -160,6 +167,39 @@ function headers() {
   return h;
 }
 
+// ---------- the radio route around a network cut ----------
+// The watch talks by radio to its block's relay box, which passes it by radio to the
+// next block's relay, which still has a line out to the API (CONTRACT.md section 5).
+// The relays are simulated on this page: hops and via say which route it "took".
+function neighbour(b) {
+  const i = BLOCKS.indexOf(b), lvl = b.split('-')[0];
+  const next = BLOCKS[i + 1], prev = BLOCKS[i - 1];
+  return next && next.startsWith(lvl + '-') ? next : prev && prev.startsWith(lvl + '-') ? prev : next || prev;
+}
+const shortName = b => b.split('-').slice(1).map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+const radioRoute = () => [`relay-${cfg.block}`, `relay-${neighbour(cfg.block)}`];
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+function drawRoute(lit = -1) {
+  const nodes = ['Watch', 'Relay · ' + shortName(cfg.block), 'Relay · ' + shortName(neighbour(cfg.block)), 'Uplink'];
+  $('route').innerHTML = nodes.map((n, i) =>
+    (i ? `<span class="w${i <= lit ? ' lit' : ''}">〰</span>` : '') + `<span class="n${i <= lit ? ' lit' : ''}">${n}</span>`).join('');
+}
+
+// Play the hop on screen, then stamp the message with the route it took.
+async function sendByRadio(msgs) {
+  const [r1, r2] = radioRoute();
+  const steps = [
+    `📡 Radio → <b>${shortName(cfg.block)}</b> relay`,
+    `📡 Radio → <b>${shortName(neighbour(cfg.block))}</b> relay`,
+    `↑ ${shortName(neighbour(cfg.block))} still has a line out`,
+  ];
+  drawRoute(0);
+  for (let i = 0; i < steps.length; i++) { await wait(700); drawRoute(i + 1); say(steps[i]); }
+  for (const m of msgs) if (!m.via.length) { m.hops = 2; m.via = [r1, r2]; }
+  store.set('queue', queue);
+}
+
 // ---------- sending ----------
 function pressOk() {
   const msg = {
@@ -168,6 +208,7 @@ function pressOk() {
     hops: 0, via: [], source: 'live',   // a real person pressed a real button
   };
   queue.push(msg); store.set('queue', queue);
+  routeDone = false;
   if (navigator.vibrate) navigator.vibrate(40);
   paint();
   flush();
@@ -175,10 +216,12 @@ function pressOk() {
 
 // Post everything held as ONE array, oldest first, with original times (CONTRACT.md section 5).
 async function flush() {
-  if (flushing || !queue.length || cut || !api()) return paint();
+  if (flushing || !queue.length || !api()) return paint();
   flushing = true;
   const batch = queue.slice();
+  const byRadio = cut;
   try {
+    if (byRadio) await sendByRadio(batch);
     const r = await fetch(api() + '/ingest', { method: 'POST', headers: headers(), body: JSON.stringify(batch.length === 1 ? batch[0] : batch) });
     reachable = true;
     if (r.status === 429) { setTimeout(flush, 1200); return; }
@@ -189,6 +232,7 @@ async function flush() {
       const sent = batch.filter(m => !rejected.has(m.id)).length;
       queue = queue.filter(m => !batch.includes(m)); store.set('queue', queue);
       if (rejected.size) say('<b>Not accepted:</b> ' + [...rejected.values()][0].join('; '));
+      else if (byRadio) (routeDone = true, drawRoute(3)), say(`<b>Delivered by radio ✓</b><br>${batch[0].hops} hops around the cut. Family told.`);
       else if (batch.length > 1) say(`<b>Delivered ${sent} held check-ins</b><br>with their original times.`);
       else say(`<b>Sent ✓</b> ${hhmm(batch[0].time)}<br>Your family will be told you're OK.`);
       registerFamily();
@@ -215,7 +259,7 @@ async function registerFamily() {
 
 // ---------- receiving: alerts for this watch, the way a relay would fetch them ----------
 async function poll() {
-  if (cut || !api()) return;
+  if (!api()) return;
   try {
     const r = await fetch(`${api()}/inbox?device=${encodeURIComponent(cfg.device)}&after_seq=${lastSeq}`);
     reachable = r.ok;
@@ -259,11 +303,13 @@ function paint() {
 
   const net = $('net');
   if (!api()) net.innerHTML = '<span class="dot none"></span>No API set · check-ins are held';
-  else if (cut) net.innerHTML = '<span class="dot down"></span>Network cut by the Directorate';
+  else if (cut) net.innerHTML = '<span class="dot down"></span>Network cut · sending by radio (relays simulated)';
   else if (reachable === false) net.innerHTML = '<span class="dot down"></span>Can\'t reach the API · holding';
   else net.innerHTML = `<span class="dot up"></span>Connected · ${api().replace(/^https?:\/\//, '')}`;
 
-  if (queue.length && (cut || !api() || reachable === false)) {
+  $('route').classList.toggle('show', cut);
+  if (cut && !flushing && !routeDone) drawRoute(-1);
+  if (queue.length && !flushing && (!api() || reachable === false)) {
     $('status').innerHTML = `<b>Holding ${queue.length} check-in${queue.length > 1 ? 's' : ''}</b><br>Sends when the network is back.`;
   } else if (statusHtml) {
     $('status').innerHTML = statusHtml;
@@ -273,10 +319,9 @@ function paint() {
 // ---------- controls ----------
 $('ok').addEventListener('click', pressOk);
 $('cut').addEventListener('click', () => {
-  cut = !cut; store.set('cut', cut);
-  statusHtml = cut ? 'Network is down.<br>You can still press <b>I\'M OK</b>.' : null;
+  cut = !cut; store.set('cut', cut); routeDone = false;
+  statusHtml = cut ? 'Network is down.<br>Radio still works: press <b>I\'M OK</b>.' : null;
   paint();
-  if (!cut) { flush(); poll(); }
 });
 
 const sel = $('f-block');
