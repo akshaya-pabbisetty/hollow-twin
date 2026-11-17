@@ -38,6 +38,10 @@ Every message is a contract `checkin` to `POST /ingest`, with `source: "live"` b
 
 Family news comes back from `GET /inbox` (each alert's `status`, `sent`, `hops` and `via`) and `GET /family` (who last said OK). The first time, the watch registers itself and its family with `POST /family`.
 
+### Connected to the twin
+
+The twin shows every watch message in its **Family check-ins** panel and its log: "watch-0071 in Chalk Cut needs help … It crossed 2 relays (Chalk Cut to Ash Wells)". A help call also shows in the help queue. A copy of this page is deployed with the twin at `/watch` (see [`twin/README.md`](../../twin/README.md)), and on that site a new watch uses the API the twin is connected to. Once the API is hosted, set `TWIN_API` near the top of the file to its `https://` address.
+
 ### Try it on your own (no API, no install)
 
 Open the page with no API address and it runs in **local mode**: the messages stay in your browser, and Mom and Dad answer on their own (Mom says she's safe, or "On my way" when you call for help; Dad answers in Morse). Turn that off in Settings to play both sides yourself: open the page in a second tab with `#mom` on the end.

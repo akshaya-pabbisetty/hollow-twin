@@ -253,6 +253,8 @@ const BLOCKS = ['l0-rail-wells','l0-rail-steps','l0-drift-yard','l0-rivet-galler
 // Defaults match the network-cut beat in api/tools/scenario.js: a resident on L7 Chalk Cut, family on L1.
 // Open a second copy as Mom with ?device=watch-0011&name=Mom&block=l1-winch-gallery&to=watch-0071=Maya,watch-0012=Dad
 const DEFAULTS = { api: '', key: '', device: 'watch-0071', name: 'Maya', block: 'l7-chalk-cut', family: 'fam-0071', to: 'watch-0011=Mom, watch-0012=Dad', bots: true };
+// The deployed API, once lane 1 has one: set it here and in twin/index.html (DEFAULT_API). Empty = local mode.
+const TWIN_API = '';
 const PRESETS = ['On my way', 'Stay where you are', 'Meet at the lift', 'Need water'];
 
 const $ = id => document.getElementById(id);
@@ -269,6 +271,8 @@ const profile = PROFILES[location.hash.slice(1)] || null;
 const q = new URLSearchParams(location.search);
 const slot = (profile && profile.device) || q.get('device') || store.get('lastDevice', DEFAULTS.device);
 const cfg = { ...DEFAULTS, ...(profile || {}), ...store.get('cfg.' + slot, {}) };
+// Served next to the twin (hollow-twin.vercel.app/watch), a new watch uses the API the twin is connected to.
+if (!q.has('api') && !store.get('cfg.' + slot, null)) { try { cfg.api = localStorage.getItem('hollow.api') || TWIN_API; } catch (e) { cfg.api = TWIN_API; } }
 for (const k of Object.keys(DEFAULTS)) if (q.has(k)) cfg[k] = k === 'bots' ? q.get(k) !== 'off' : q.get(k);
 const S = k => k + '.' + cfg.device;          // per-watch storage key
 store.set('cfg.' + cfg.device, cfg); if (!profile) store.set('lastDevice', cfg.device);
