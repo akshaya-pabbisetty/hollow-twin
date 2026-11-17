@@ -99,9 +99,13 @@ uploads everything in a single POST whose body is a JSON array:
   `"device_time": "<what you sent>"` and a warning. So a device with no clock still works live, but a backlog
   from it loses its real timing (every message gets the upload time). Sync the clock before you rely on
   store-and-forward.
-- **More than 5 minutes in the future**: the same treatment (kept, stamped with the receive time, warned). That is
-  a wrong time zone or a broken RTC. Send UTC. This is also why the files in `contract/samples/` are accepted
-  before their fixed time of 2026-11-18 20:00 UTC has arrived.
+- **Ahead of the moment the API receives it** (even by a second): the same treatment (kept, stamped with the
+  receive time, `device_time` keeps what you sent, warned when it is more than 1 second ahead). Nothing can be measured after it arrives, so a time
+  ahead is a fast clock, a wrong time zone or a broken RTC. Send UTC and sync with NTP. This is also why the files
+  in `contract/samples/` are accepted before their fixed time of 2026-11-18 20:00 UTC has arrived.
+- **"Latest"** for a block and kind is the message with the greatest stored `time`; equal times go to the one
+  stored last. So a relay backlog posted late, with its real older times, fills in history but never replaces a
+  fresher reading, and a fast clock cannot hold "latest" either.
 
 ## 4. Kinds and values, per device
 

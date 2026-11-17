@@ -295,9 +295,9 @@
       "value": 20, "unit": "requests/s per device", "type": "design choice",
       "reason": "No real device needs more than 20 single posts a second; a backlog sent as one array counts as one request and is never dropped. Override with the RATE_LIMIT env var."
     },
-    "ingest_max_future_min": {
-      "value": 5, "unit": "min", "type": "design choice",
-      "reason": "A reading stamped more than 5 minutes ahead of the server clock is a broken clock or a forgery, and would corrupt forecasts, so it is rejected."
+    "ingest_clock_warn_ahead_ms": {
+      "value": 1000, "unit": "ms", "type": "design choice",
+      "reason": "Any time ahead of the receive time is replaced by the receive time and marked time_estimated (CONTRACT.md 1.3). The warning that the device's clock is fast is only added when it is more than 1 second ahead: two honest clocks always disagree by a few milliseconds (NTP-synced devices by tens of milliseconds, two Node processes on one Windows machine by 1 to 3 ms), and a warning the builder cannot act on is noise."
     },
     "ingest_min_valid_time": {
       "value": "2020-01-01T00:00:00Z", "unit": "UTC time", "type": "design choice",

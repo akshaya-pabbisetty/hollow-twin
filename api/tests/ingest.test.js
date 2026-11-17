@@ -44,25 +44,41 @@ test("unknown routes give 404 JSON", async () => {
   assert.strictEqual((await s.post("/nope", {})).status, 404);
 });
 
-test("future timestamp: more than 5 minutes ahead never reaches the timeline (kept, stamped with the receive time, warned); a small drift is fine", async () => {
+test("future timestamp: any time ahead of the receive time never reaches the timeline (kept, stamped with the receive time, device_time kept, warned)", async () => {
   const b = "l4-coke-yard", t0 = Date.now();
   const future = s.R("sensor", b, "air", { co2_ppm: 800 }, t0 + 10 * MIN);
   const ahead = await s.post("/ingest", future);
+  const t1 = Date.now();
   assert.deepStrictEqual([ahead.status, ahead.body.accepted], [200, 1], "kept: a wrong clock must not lose a reading");
   let got = (await s.get(`/history?block=${b}`)).find((r) => r.id === future.id);
   assert.strictEqual(got.time_estimated, true);
   assert.strictEqual(got.device_time, future.time, "what the device sent is kept beside it");
-  assert.ok(Math.abs(Date.parse(got.time) - t0) < 5000, `time ${got.time} should be the receive time, not the future`);
-  assert.match(got.warnings.join(" | "), /more than 5 minutes in the future \(server clock .*stored with the receive time/);
+  // the receive time, give or take a second for two processes reading the clock (never 10 minutes ahead)
+  assert.ok(Date.parse(got.time) >= t0 - 1000 && Date.parse(got.time) <= t1 + 1000, `time ${got.time} should be the receive time, not the future`);
+  assert.match(got.warnings.join(" | "), /is ahead of the server's receive time .*stored with the receive time, the device's time kept as device_time/);
+  // there is no tolerance any more: 2 minutes ahead (the old rule let anything up to 5 through) is replaced too
   const drift = s.R("sensor", b, "air", { co2_ppm: 801 }, Date.now() + 2 * MIN);
   assert.strictEqual((await s.post("/ingest", drift)).body.accepted, 1);
   got = (await s.get(`/history?block=${b}`)).find((r) => r.id === drift.id);
-  assert.deepStrictEqual([got.time, got.time_estimated, got.warnings], [drift.time, undefined, undefined], "2 minutes ahead is left alone");
+  assert.deepStrictEqual([got.time_estimated, got.device_time], [true, drift.time], "2 minutes ahead is a fast clock too");
+  assert.ok(Date.parse(got.time) <= Date.now() + 1000);
+  // under a second ahead (two honest clocks never agree to the millisecond): still replaced, but no warning to act on
+  const jitter = s.R("sensor", b, "air", { co2_ppm: 805 }, Date.now() + 800);
+  await s.post("/ingest", jitter);
+  got = (await s.get(`/history?block=${b}`)).find((r) => r.id === jitter.id);
+  assert.strictEqual(got.warnings, undefined, "no warning for clock jitter");
+  assert.ok(Date.parse(got.time) <= Date.now() + 1000);
+  if (got.time_estimated) assert.strictEqual(got.device_time, jitter.time, "if it was still ahead on arrival, it was replaced and the device's time kept");
+  // a time at or before the receive time is left alone
+  const past = s.R("sensor", b, "air", { co2_ppm: 802 }, Date.now() - 1000);
+  await s.post("/ingest", past);
+  got = (await s.get(`/history?block=${b}`)).find((r) => r.id === past.id);
+  assert.deepStrictEqual([got.time, got.time_estimated, got.device_time, got.warnings], [past.time, undefined, undefined, undefined]);
   // a reading stamped far ahead cannot push itself to the end of the timeline or into a forecast
-  await s.post("/ingest", [s.R("sensor", b, "air", { co2_ppm: 802 }), s.R("sensor", b, "air", { co2_ppm: 803 }, Date.now() + 48 * 3600e3)]);
+  await s.post("/ingest", [s.R("sensor", b, "air", { co2_ppm: 803 }), s.R("sensor", b, "air", { co2_ppm: 804 }, Date.now() + 48 * 3600e3)]);
   const hist = await s.get(`/history?block=${b}`);
-  assert.strictEqual(hist.length, 4);
-  assert.ok(hist.every((r) => Date.parse(r.time) <= Date.now() + 5 * MIN), "nothing stored is dated in the future");
+  assert.strictEqual(hist.length, 6);
+  assert.ok(hist.every((r) => Date.parse(r.time) <= Date.now() + 1000), "nothing stored is dated in the future");
 });
 
 test("1970 timestamp (ESP32 with no clock sync): accepted, stamped with the receive time, marked time_estimated", async () => {

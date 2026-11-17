@@ -52,14 +52,15 @@ They appear on everything the API sends back (`/live`, `/history`, `/blocks/<blo
 | `seq` | Server sequence number, rising by one per stored message. It is also the event id on `/live`. |
 | `source` | Always present on the way out: `live` or `simulated` (section 1.1). |
 | `verified` | `true` only when the message carried a valid `sig`. |
-| `time_estimated`, `device_time` | Present only when the device's `time` could not be trusted (section 1.3). `time` is then the moment the API received the message and `device_time` is what the device sent. |
+| `time_estimated`, `device_time` | Present only when the device's `time` could not be trusted (section 1.3): before 2020, or ahead of the moment the API received it. `time` is then the receive time, `time_estimated` is `true` and `device_time` is what the device sent. |
 | `warnings` | A list of plain sentences about things the API accepted but the sender should fix (for example an estimated time, or an old field name). Left out when there is nothing to say. |
 | `sig_unchecked` | Present when a `sig` arrived but the API holds no secret for that device, so it could not be checked. |
 
 ### 1.3 How the API treats the fields above (lane 1)
 
 - `hops` and `via` are stored and passed through unchanged. If a message leaves them out, the API stores `"via": []` and `"hops": 0`.
-- `time` before 2020 (an ESP32 that has not synced its clock reports 1970) or more than 5 minutes ahead of the server clock: the message is kept, `time` is replaced by the receive time, and `time_estimated`, `device_time` and a warning are added. A wrong clock never loses a reading and never corrupts the timeline.
+- `time` before 2020 (an ESP32 that has not synced its clock reports 1970), or ahead of the moment the API received the message (by any amount: nothing can be measured after it arrives, so the device's clock is fast): the message is kept, `time` is replaced by the receive time, `time_estimated: true` is added, and the device's own time is kept as `device_time`. A warning is added too, except when the time is less than 1 second ahead (ordinary disagreement between two good clocks, which the builder cannot fix). A wrong clock never loses a reading and never corrupts the timeline.
+- **Latest.** Wherever the API speaks of the latest message (per block and kind in `/blocks/<block id>/latest` and `/blocks`, the reading a forecast, a verdict or a triage score is built on), it is the one with the greatest stored `time`; between equal times, the one with the higher `seq` (stored later). So a device with a fast clock cannot hold "latest" (its time is the receive time, and the next honest reading is newer), and a relay backlog that arrives late with its real, older times fills in the history but never replaces a fresher reading.
 - A message that cannot be used (a field missing, an unknown `kind`, a `time` that is not ISO 8601, a wrong `sig`) is rejected, and the reply says why (section 4).
 - `block` must be an id from [`contract/blocks.json`](contract/blocks.json), or `surface`. Any other block is rejected, and the reply says so (with a hint when only the letter case is wrong).
 - A `device` id that does not match section 3 is still accepted: the stored message carries a warning instead. The same goes for a relay or sensor whose id names a different block from the one in the message. A mislabelled watch must still be able to call for help.
@@ -208,7 +209,7 @@ All optional to use. Details and examples are in [`api/README.md`](api/README.md
 3. Any relay that has seen an `id` before drops it.
 4. When any relay reaches the API again, it posts its whole queue to `POST /ingest` as one array, with the original `time` values. The twin replays the gap in order.
 
-What the API does with that array (lane 1): it sorts it by `time` before storing, drops any `id` it has already seen (counted in `duplicates`), and sends the rest out on `/live` oldest first. `GET /history` always returns messages in `time` order, so the gap can be replayed later as well. A `checkin` that arrives this way still reaches the watches in its `to` list and its family group, and the alert it produces carries the `hops` and `via` it travelled.
+What the API does with that array (lane 1): it sorts it by `time` before storing, drops any `id` it has already seen (counted in `duplicates`), and sends the rest out on `/live` oldest first. The backlog's older times never replace a fresher reading as the latest (section 1.3). `GET /history` always returns messages in `time` order (equal times by `seq`), so the gap can be replayed later as well. A `checkin` that arrives this way still reaches the watches in its `to` list and its family group, and the alert it produces carries the `hops` and `via` it travelled.
 
 ## 6. Thresholds the twin uses today
 
@@ -276,3 +277,4 @@ Additions only. Nothing above was renamed or removed. Each row says where the ad
 | 2026-11-17 | 6.2 | The open water item filled in: `tds_ppm` over 1,000 ppm (WHO) or `turbidity_ntu` over 5 NTU (US EPA) means do not drink. |
 | 2026-11-17 | 4.1, 4.3 | Surface verdict covers all four return options (`sealed outposts needed` added); only the contract's three surface readings are required, `o2_pct` and `pm25_ugm3` are optional and listed in `not_measured`; each limit says which option it leads to. |
 | 2026-11-17 | 4.2 | `GET /fairshare`: one per-person model for the table, `levels` summary, and a separate `measured` section for blocks with a real relay. |
+| 2026-11-17 | 1.2, 1.3, 5 | Clock rule: any `time` ahead of the receive time (not only more than 5 minutes ahead) is replaced by the receive time, with `time_estimated: true` and `device_time`. "Latest" per block and kind is the greatest stored `time`, ties broken by `seq`; a late relay backlog never replaces a fresher reading. |

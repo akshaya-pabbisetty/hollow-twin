@@ -381,3 +381,41 @@ contract carries the same table for the team.
   the demo shot prints that table and the measured section.
 - Implausible power messages (`plausible: false`, task 3) are left out of `measured`.
 - No new limits.
+
+# Third brief (branch `lane1-clocks-and-contract`)
+
+Started from `main` at 057e262. `lane1-wip` (one commit, 34778d4) held the bad-sensor checks
+(`sensors.js`, its tests, 38 design-choice limits, an `outside` range operator in `limits.js`, and a
+`usable` list in `server.js` that leaves implausible readings out of all logic). `main` had not touched `api/`
+since that branch was cut, so task 4 brings it over as it was, adapted where tasks 1 to 3 changed the same code.
+
+## Task 1: the clock rule
+
+- **Any time ahead of the receive time is replaced**, not only one more than 5 minutes ahead. Reason: nothing can be
+  measured after the API receives it, so a time ahead is always a fast clock. With the 5-minute allowance a watch
+  running 4 minutes fast held "latest" for its block and kind for 4 minutes, hiding every honest reading sent in
+  that time. The reading is still kept; `time` becomes the receive time, `time_estimated: true`,
+  `device_time` keeps what the device sent, and the warning says so. No tolerance number is needed, so the
+  `ingest_max_future_min` limit (5 min) is removed from `shared/limits.json`; nothing else read it (checked
+  in `api/`, `twin/`, `tools/`).
+- **The warning has a threshold; the rule does not.** Running the suite 5 times showed the scenario tool's
+  readings, stamped with `Date.now()` in one process, arriving 1 to 3 ms "ahead" of the server's `Date.now()` in
+  another (Windows). Any honest NTP-synced device will do the same by tens of milliseconds. Such a reading is still
+  replaced and marked `time_estimated` (exactly the brief's rule), but the "device clock fast" warning is only
+  added past `ingest_clock_warn_ahead_ms` (1000 ms, design choice, reason in `shared/limits.json`): a warning
+  nobody can act on is noise, and it would have made every scenario message "unclean".
+- `tools/scenario.js` stamped three readings `Date.now() + 1..3` ms so they would sort after the one before.
+  That is now a time ahead of the receive time, and no longer needed (equal times go to the higher seq), so the
+  offsets are removed.
+- **Latest = greatest stored time, ties broken by seq**, in one place: `api/order.js`. Every "latest" or
+  "newest" now goes through it: `/blocks/<id>/latest`, `/blocks`, `/status` blocks, `/forecast` and the
+  battery alerts, `/fairshare` measured, the surface verdict, the broadcast photo, triage vitals, first-wave
+  vitals, `/family` last check-in, and the order of `/history`. Before, most of these happened to break ties by
+  array order, and `/blocks` kept the *older* of two readings with the same time.
+- A late relay backlog already could not become "latest" by time; the new tests pin that down across every view,
+  and check that it raises no battery alarm and no surface verdict change (both judge the latest reading).
+  An old backlog reading that crosses a limit on its own (for example water) still raises its alert: that alert
+  is a true statement about the past and carries the reading's id as `cause`.
+- Timing: the tests compare the receive time with a second of slack (two processes reading the clock), and an
+  "honest" reading in the fast-clock test is never dated before the fast reading's stored time, so the run does
+  not depend on which millisecond the server reads.

@@ -229,7 +229,7 @@ something the sender should fix comes back in `warnings`.
 | `INGEST_KEY` set and `x-api-key` missing or wrong | `401` |
 | `block` not in `contract/blocks.json` and not `surface` | rejected, with a hint when only the case is wrong |
 | `device` does not fit CONTRACT.md section 3 | stored, with a warning |
-| `time` before 2020, or more than 5 minutes ahead of the server | stored; `time` becomes the receive time, plus `"time_estimated": true`, `"device_time"` and a warning |
+| `time` before 2020, or ahead of the moment the API receives it | stored; `time` becomes the receive time, plus `"time_estimated": true`, `"device_time"` and a warning |
 | `hops` / `via` missing | stored as `0` / `[]` |
 | `source` missing | stored as `"simulated"`. Real hardware sends `"live"` |
 | `sig` valid / missing / wrong | stored `"verified": true` / stored `"verified": false` / rejected: `bad signature for <device>` |

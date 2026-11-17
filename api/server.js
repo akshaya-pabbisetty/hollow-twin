@@ -5,7 +5,8 @@
 // POST /ingest            one message or an array (relay backlogs). Duplicates by id are dropped.
 //                         Replies { accepted, duplicates, rejected: [{ id, problems }], warnings: [{ id, warnings }] }.
 //                         Limits: 5 MB body, 20 single posts per device per second (an array is one request, never dropped),
-//                         a time before 2020 or more than 5 min ahead is replaced by the receive time (time_estimated).
+//                         a time before 2020, or any time ahead of the receive time, is replaced by the receive time
+//                         (time_estimated, device_time). "Latest" = greatest stored time, ties broken by seq (order.js).
 //                         An unknown block is rejected; a device id that does not fit section 3 is a warning.
 //                         The old value names (hr, spo2, button type) are accepted as aliases and renamed.
 //                         If the INGEST_KEY env var is set, every POST needs the header x-api-key.
@@ -49,6 +50,7 @@ const C = require("./contract");
 const HEAT = require("./heat");
 const L = require("./logic");
 const LIM = require("./limits");
+const O = require("./order");
 const SIGN = require("./sign");
 const SURF = require("./surface");
 
@@ -57,8 +59,8 @@ const DATA = process.env.DATA || path.join(__dirname, "readings.jsonl");
 const INGEST_KEY = process.env.INGEST_KEY || "";       // when set, every POST needs header x-api-key
 const RATE_LIMIT = Number(process.env.RATE_LIMIT) || LIM.val("ingest_rate_limit_per_s");
 const MAX_BODY = LIM.val("ingest_max_body_bytes");
-const MAX_FUTURE_MS = LIM.val("ingest_max_future_min") * 60e3;
 const MIN_TIME = Date.parse(LIM.val("ingest_min_valid_time"));
+const WARN_AHEAD_MS = LIM.val("ingest_clock_warn_ahead_ms");  // replaced when ahead at all; warned only past clock jitter
 const KEYS = SIGN.loadKeys();                          // device -> secret, for checking signed readings
 // Who people are: skills and whether someone depends on them alone. Used only by /firstwave.
 const PEOPLE = JSON.parse(fs.readFileSync(process.env.PEOPLE || path.join(__dirname, "shared/people.json"), "utf8"));
@@ -141,15 +143,17 @@ function accept(r, now) {
   if (sigUnchecked) rec.sig_unchecked = sigUnchecked;
   // A time we cannot trust never reaches the timeline: the reading is kept, stamped with the receive time and marked.
   //   before 2020 = an ESP32 that has not synced its clock yet (it reports 1970)
-  //   more than a few minutes ahead of this server = a wrong clock, a wrong time zone, or a fixed sample time
-  const taken = Date.parse(r.time), early = taken < MIN_TIME, late = taken > now + MAX_FUTURE_MS;
+  //   ahead of the moment we received it = a clock running fast, a wrong time zone, or a fixed sample time. Nothing can
+  //   be measured after it arrives, so any time ahead is replaced: otherwise a fast clock would hold "latest" for its
+  //   block and kind over every honest reading until real time caught up with it.
+  const taken = Date.parse(r.time), early = taken < MIN_TIME, late = taken > now;
   if (early || late) {
     rec.device_time = r.time;
     rec.time = new Date(now).toISOString();
     rec.time_estimated = true;
-    warnings.push(early
+    if (early || taken - now > WARN_AHEAD_MS) warnings.push(early
       ? `time ${r.time} is before ${LIM.val("ingest_min_valid_time").slice(0, 4)} (device clock not set): stored with the receive time`
-      : `time ${r.time} is more than ${LIM.val("ingest_max_future_min")} minutes in the future (server clock ${new Date(now).toISOString()}): stored with the receive time`);
+      : `time ${r.time} is ahead of the server's receive time ${new Date(now).toISOString()} (device clock fast): stored with the receive time, the device's time kept as device_time`);
   }
   if (warnings.length) rec.warnings = warnings;
   return { rec };
@@ -258,18 +262,18 @@ function blockSources() {
   const out = {};
   for (const r of readings) {
     if (r.kind === "alert") continue;
-    const b = (out[r.block] ||= { source: r.source, latest_time: r.time, latest_device: r.device, live_kinds: new Set(), simulated_kinds: new Set() });
-    if (Date.parse(r.time) >= Date.parse(b.latest_time)) { b.source = r.source; b.latest_time = r.time; b.latest_device = r.device; }
+    const b = (out[r.block] ||= { latest: null, source: r.source, latest_time: r.time, latest_device: r.device, live_kinds: new Set(), simulated_kinds: new Set() });
+    if (O.newer(r, b.latest)) { b.latest = r; b.source = r.source; b.latest_time = r.time; b.latest_device = r.device; }
   }
   // a kind is live when that kind's newest reading in the block is live
   const newest = {};
   for (const r of readings) {
     if (r.kind === "alert") continue;
     const k = `${r.block}|${r.kind}`;
-    if (!newest[k] || Date.parse(r.time) >= Date.parse(newest[k].time)) newest[k] = r;
+    if (O.newer(r, newest[k])) newest[k] = r;
   }
   for (const r of Object.values(newest)) out[r.block][`${r.source}_kinds`].add(r.kind);
-  for (const b of Object.values(out)) { b.live_kinds = [...b.live_kinds].sort(); b.simulated_kinds = [...b.simulated_kinds].sort(); }
+  for (const b of Object.values(out)) { delete b.latest; b.live_kinds = [...b.live_kinds].sort(); b.simulated_kinds = [...b.simulated_kinds].sort(); }
   return out;
 }
 
@@ -366,7 +370,7 @@ function route(req, res) {
       const a = accept(r, now);
       if (a.problems) rejected.push({ id: a.id, problems: a.problems }); else recs.push(a.rec);
     }
-    recs.sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
+    recs.sort((a, b) => Date.parse(a.time) - Date.parse(b.time)); // stable: equal times keep the order they were sent in
     for (const r of recs) {
       if (!store(r)) { duplicates++; continue; }
       accepted++;
@@ -402,7 +406,7 @@ function route(req, res) {
     const since = q.since ? Date.parse(q.since) : 0, afterSeq = Number(q.after_seq) || 0;
     return send(res, 200, readings
       .filter((r) => (!q.block || r.block === q.block) && (!q.kind || r.kind === q.kind) && Date.parse(r.time) >= since && r.seq > afterSeq)
-      .sort((a, b) => Date.parse(a.time) - Date.parse(b.time)));
+      .sort(O.byTime));
   }
   // CONTRACT.md section 4: the latest message of each kind for one block
   const one = /^\/blocks\/([^/]+)\/latest$/.exec(p);
@@ -411,7 +415,7 @@ function route(req, res) {
     if (!B.known(id)) return send(res, 404, { error: B.problem(id) });
     const latest = {};
     for (const r of readings)
-      if (r.block === id && r.kind !== "alert" && (!latest[r.kind] || Date.parse(r.time) >= Date.parse(latest[r.kind].time))) latest[r.kind] = r;
+      if (r.block === id && r.kind !== "alert" && O.newer(r, latest[r.kind])) latest[r.kind] = r;
     const info = B.get(id), src = blockSources()[id];
     return send(res, 200, { block: id, name: info ? info.name : "Surface", level: info ? info.level : null, people: info ? info.people : null,
       source: src ? src.source : null, // is this block's newest message live hardware or simulated? null = nothing yet
@@ -421,7 +425,7 @@ function route(req, res) {
     const latest = {};
     for (const r of readings) {
       const k = `${r.block}|${r.kind}`;
-      if (!latest[k] || Date.parse(r.time) > Date.parse(latest[k].time)) latest[k] = r;
+      if (O.newer(r, latest[k])) latest[k] = r;
     }
     const src = blockSources();
     return send(res, 200, Object.values(latest).map((r) => ({ ...r, block_source: src[r.block] ? src[r.block].source : r.source })));
@@ -477,7 +481,7 @@ function route(req, res) {
     const devs = familyOf(q.group ?? q.family); // ?group= (the original name) or ?family= (the contract's word)
     if (!devs.length) return send(res, 404, { error: "unknown group" });
     return send(res, 200, devs.map((d) => {
-      const last = readings.filter((r) => r.device === d && isOk(r)).sort((a, b) => Date.parse(b.time) - Date.parse(a.time))[0];
+      const last = O.newest(readings.filter((r) => r.device === d && isOk(r)));
       return { device: d, last_ok: last ? last.time : null, block: last ? last.block : null, hops: last ? last.hops : null, via: last ? last.via : null };
     }));
   }
