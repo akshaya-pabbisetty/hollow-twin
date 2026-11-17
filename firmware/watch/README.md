@@ -38,6 +38,10 @@ Every message is a contract `checkin` to `POST /ingest`, with `source: "live"` b
 
 Family news comes back from `GET /inbox` (each alert's `status`, `sent`, `hops` and `via`) and `GET /family` (who last said OK). The first time, the watch registers itself and its family with `POST /family`.
 
+### Try it on your own (no API, no install)
+
+Open the page with no API address and it runs in **local mode**: the messages stay in your browser, and Mom and Dad answer on their own (Mom says she's safe, or "On my way" when you call for help; Dad answers in Morse). Turn that off in Settings to play both sides yourself: open the page in a second tab with `#mom` on the end.
+
 ### Try it: two family members talking
 
 ```sh

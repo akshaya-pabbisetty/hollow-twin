@@ -14,7 +14,8 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text);
     font: 15px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-  body { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 28px; padding: 20px 14px 40px; }
+  body { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 28px;
+    padding: calc(20px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left)); }
   button { font: inherit; color: inherit; cursor: pointer; }
   .col { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 
@@ -204,7 +205,7 @@
   <div id="fam-app"></div>
   <h2>Radio messages</h2>
   <div class="log" id="log"><div class="empty">Nothing yet. Check-ins, help calls and radio messages from your family land here.</div></div>
-  <div class="note">Hollow Twin watch and family app, prototyped on a phone. Every message is a contract <code>checkin</code> through the API (CONTRACT.md). When the network is cut, the radio relays are simulated and the screen says so.</div>
+  <div class="note">Hollow Twin watch and family app, prototyped on a phone. Every message is a contract <code>checkin</code> (CONTRACT.md), sent to the team's API, or kept in this browser in local mode. When the network is cut, the radio relays are simulated and the screen says so.</div>
 </div>
 
 <dialog id="dlg">
@@ -212,7 +213,7 @@
     <h2>Watch settings</h2>
     <label for="f-api">API address</label>
     <input id="f-api" placeholder="http://localhost:8787" autocomplete="off" inputmode="url">
-    <small>Leave empty to try the watch without an API: messages are held until you add one.</small>
+    <small>Leave empty to use the watch on its own: messages stay in this browser (local mode).</small>
     <label for="f-key">API key (only if the API was started with INGEST_KEY)</label>
     <input id="f-key" autocomplete="off">
     <label for="f-device">This watch</label>
@@ -225,6 +226,8 @@
     <input id="f-family" placeholder="fam-0071" autocomplete="off">
     <label for="f-to">Family (watch=name, comma separated)</label>
     <input id="f-to" placeholder="watch-0011=Mom, watch-0012=Dad" autocomplete="off">
+    <label><input type="checkbox" id="f-bots" style="width:auto;margin-right:6px">Without an API, family answers on their own</label>
+    <small>Turn this off to play both sides yourself: open this page in a second tab as Mom.</small>
     <div class="row">
       <button value="cancel">Cancel</button>
       <button value="save" class="primary">Save</button>
@@ -249,7 +252,7 @@ const BLOCKS = ['l0-rail-wells','l0-rail-steps','l0-drift-yard','l0-rivet-galler
 
 // Defaults match the network-cut beat in api/tools/scenario.js: a resident on L7 Chalk Cut, family on L1.
 // Open a second copy as Mom with ?device=watch-0011&name=Mom&block=l1-winch-gallery&to=watch-0071=Maya,watch-0012=Dad
-const DEFAULTS = { api: '', key: '', device: 'watch-0071', name: 'Maya', block: 'l7-chalk-cut', family: 'fam-0071', to: 'watch-0011=Mom, watch-0012=Dad' };
+const DEFAULTS = { api: '', key: '', device: 'watch-0071', name: 'Maya', block: 'l7-chalk-cut', family: 'fam-0071', to: 'watch-0011=Mom, watch-0012=Dad', bots: true };
 const PRESETS = ['On my way', 'Stay where you are', 'Meet at the lift', 'Need water'];
 
 const $ = id => document.getElementById(id);
@@ -260,12 +263,15 @@ const store = {
 
 // Settings from storage, then from the link (?api=…&device=…&name=…&block=…&family=…&to=…).
 // Each watch on the same browser keeps its own storage, so two tabs can be two family members.
+// #mom opens the second family member, for playing both sides in two tabs (works where links drop ?query).
+const PROFILES = { mom: { device: 'watch-0011', name: 'Mom', block: 'l1-winch-gallery', to: 'watch-0071=Maya, watch-0012=Dad' } };
+const profile = PROFILES[location.hash.slice(1)] || null;
 const q = new URLSearchParams(location.search);
-const slot = q.get('device') || store.get('lastDevice', DEFAULTS.device);
-const cfg = { ...DEFAULTS, ...store.get('cfg.' + slot, {}) };
-for (const k of Object.keys(DEFAULTS)) if (q.has(k)) cfg[k] = q.get(k);
+const slot = (profile && profile.device) || q.get('device') || store.get('lastDevice', DEFAULTS.device);
+const cfg = { ...DEFAULTS, ...(profile || {}), ...store.get('cfg.' + slot, {}) };
+for (const k of Object.keys(DEFAULTS)) if (q.has(k)) cfg[k] = k === 'bots' ? q.get(k) !== 'off' : q.get(k);
 const S = k => k + '.' + cfg.device;          // per-watch storage key
-store.set('cfg.' + cfg.device, cfg); store.set('lastDevice', cfg.device);
+store.set('cfg.' + cfg.device, cfg); if (!profile) store.set('lastDevice', cfg.device);
 
 let queue = store.get(S('queue'), []);        // messages not yet accepted by the API
 let cut = store.get('cut', false);            // the demo "network cut" switch
@@ -294,6 +300,76 @@ function nextId() {   // unique per watch; starts from the clock so a cleared ph
   store.set(S('counter'), n);
   return `${cfg.device}-${String(n).padStart(6, '0')}`;
 }
+// ---------- local mode: no API set, so this browser keeps the messages ----------
+// It answers the same four calls the real API does (POST /ingest, GET /inbox, POST and GET /family),
+// keeps them in localStorage so two tabs of this page can be two family members, and, unless turned
+// off in Settings, lets the rest of the family answer on their own.
+const LOCAL_KEY = 'localdb';
+const freshDb = () => ({ seq: 0, rows: [], fams: {} });
+let memDb = freshDb();
+const loadDb = () => store.get(LOCAL_KEY, null) || memDb;
+const saveDb = db => { memDb = db; store.set(LOCAL_KEY, db); };
+function familyOf(db, group) {
+  const set = new Set(db.fams[group] || []);
+  for (const r of db.rows) if (r.values && r.values.family === group && r.kind !== 'alert') set.add(r.device);
+  return [...set];
+}
+function localIngest(body) {
+  const db = loadDb(), list = Array.isArray(body) ? body : [body];
+  let accepted = 0, duplicates = 0;
+  for (const m of list.slice().sort((a, b) => Date.parse(a.time) - Date.parse(b.time))) {
+    if (db.rows.some(r => r.id === m.id)) { duplicates++; continue; }
+    db.rows.push({ ...m, seq: ++db.seq }); accepted++;
+    if (m.kind === 'checkin') {   // the same rule as the API: tell the `to` list and the family group
+      const v = m.values, fam = v.family;
+      const to = [...new Set([...(v.to || []), ...(fam ? familyOf(db, fam) : [])])].filter(d => d !== m.device);
+      if (to.length) db.rows.push({ id: `alert-${m.id}-0`, device: 'backend', block: m.block, time: new Date().toISOString(), kind: 'alert', seq: ++db.seq,
+        values: { level: 'info', text: `${m.device} checked in: ${v.status}`, cause: m.id, to, family: fam, status: v.status, sent: m.time, hops: m.hops, via: m.via } });
+    }
+  }
+  db.rows = db.rows.slice(-400);
+  saveDb(db);
+  return { accepted, duplicates, rejected: [], warnings: [] };
+}
+function localCall(method, path, body) {
+  const u = new URL(path, 'http://local'), q = u.searchParams, db = loadDb();
+  if (method === 'POST' && u.pathname === '/ingest') return localIngest(body);
+  if (method === 'POST' && u.pathname === '/family') { db.fams[body.group] = body.devices; saveDb(db); return { ok: true }; }
+  if (u.pathname === '/inbox') { const d = q.get('device'), after = Number(q.get('after_seq')) || 0;
+    return db.rows.filter(r => r.kind === 'alert' && r.seq > after && (r.values.to || []).includes(d)); }
+  if (u.pathname === '/family') return familyOf(db, q.get('family')).map(d => {
+    const last = db.rows.filter(r => r.device === d && r.kind === 'checkin' && (r.values.status || 'ok') === 'ok').pop();
+    return { device: d, last_ok: last ? last.time : null, block: last ? last.block : null, hops: last ? last.hops : null };
+  });
+  return null;
+}
+// One way to talk to "the API", real or local: resolves to { ok, status, data }, throws when the network is down.
+async function call(method, path, body) {
+  if (!api()) return { ok: true, status: 200, data: localCall(method, path, body) };
+  const r = await fetch(api() + path, method === 'POST' ? { method, headers: headers(), body: JSON.stringify(body) } : {});
+  return { ok: r.ok, status: r.status, data: await r.json().catch(() => ({})) };
+}
+
+// The rest of the family, played by this page in local mode: they answer what you send.
+const BOT_BLOCKS = ['l1-winch-gallery', 'l4-coke-yard', 'l2-chalk-gallery', 'l3-flint-row'];
+function botReply(status) {
+  if (api() || !cfg.bots) return;
+  const fam = members(), t = parse(status).type;
+  const plan = t === 'help' ? [[0, 3000, 'msg:On my way'], [1, 7000, 'morse:OK']]
+    : t === 'safe' ? [[0, 2500, 'ok'], [1, 6000, 'ok']]
+    : [[0, 3500, t === 'morse' ? 'morse:OK' : 'msg:Got it. Stay safe']];
+  for (const [i, ms, st] of plan) {
+    const m = fam[i]; if (!m) continue;
+    setTimeout(() => {
+      const block = BOT_BLOCKS[i % BOT_BLOCKS.length];
+      const n = (loadDb().seq + 1) * 7 + i;
+      localIngest({ id: `${m.device}-${String(n).padStart(6, '0')}`, device: m.device, block, time: new Date().toISOString(), kind: 'checkin',
+        values: { status: st, family: cfg.family, to: [cfg.device] }, hops: cut ? 2 : 0, via: cut ? [`relay-${block}`, `relay-${neighbour(block)}`] : [], source: 'simulated' });
+      poll();
+    }, ms);
+  }
+}
+
 function headers() { const h = { 'Content-Type': 'application/json' }; if (cfg.key) h['x-api-key'] = cfg.key; return h; }
 
 // ---------- what a status means ----------
@@ -396,16 +472,16 @@ async function sendByRadio(msgs) {
 
 // post everything waiting as ONE request, oldest first, with original times (CONTRACT.md section 5)
 async function flush() {
-  if (flushing || !queue.length || !api()) return paint();
+  if (flushing || !queue.length) return paint();
   flushing = true;
   const batch = queue.slice(), byRadio = cut;
   try {
     if (byRadio) await sendByRadio(batch);
-    const r = await fetch(api() + '/ingest', { method: 'POST', headers: headers(), body: JSON.stringify(batch.length === 1 ? batch[0] : batch) });
+    const r = await call('POST', '/ingest', batch.length === 1 ? batch[0] : batch);
     reachable = true;
     if (r.status === 429) { setTimeout(flush, 1200); return; }
     if (r.status === 401) { say('<b>API key needed.</b> Add it in Settings.'); return; }
-    const body = await r.json().catch(() => ({}));
+    const body = r.data || {};
     if (r.ok || r.status === 422) {
       const rejected = new Map((body.rejected || []).map(x => [x.id, x.problems]));
       queue = queue.filter(m => !batch.includes(m)); store.set(S('queue'), queue);
@@ -415,6 +491,7 @@ async function flush() {
       else if (byRadio) { routeDone = true; drawRoute(3); say(`<b>Sent by radio ✓</b><br>Family knows ${what}.`); }
       else say(`<b>Sent ✓</b> ${hhmm(batch[0].time)}<br>Family knows ${what}.`);
       registerFamily();
+      for (const m of batch) if (m.kind === 'checkin') botReply(m.values.status);
     } else say(`<b>API error ${r.status}.</b> Holding and retrying.`);
   } catch (e) {
     reachable = false;   // a real outage: keep holding
@@ -425,7 +502,7 @@ async function registerFamily() {   // so GET /family lists every watch in the g
   const key = S(`fam.${cfg.family}.${cfg.to}`);
   if (!cfg.family || store.get(key, false)) return;
   try {
-    const r = await fetch(api() + '/family', { method: 'POST', headers: headers(), body: JSON.stringify({ group: cfg.family, devices: [cfg.device, ...members().map(m => m.device)] }) });
+    const r = await call('POST', '/family', { group: cfg.family, devices: [cfg.device, ...members().map(m => m.device)] });
     if (r.ok) store.set(key, true);
   } catch (e) {}
 }
@@ -438,11 +515,10 @@ function addLog(e) {
 }
 
 async function poll() {
-  if (!api()) return;
   try {
-    const r = await fetch(`${api()}/inbox?device=${encodeURIComponent(cfg.device)}&after_seq=${lastSeq}`);
+    const r = await call('GET', `/inbox?device=${encodeURIComponent(cfg.device)}&after_seq=${lastSeq}`);
     reachable = r.ok; if (!r.ok) return;
-    const list = await r.json();
+    const list = r.data || [];
     const quiet = !caughtUp; caughtUp = true;
     for (const a of list) {
       lastSeq = Math.max(lastSeq, a.seq || 0);
@@ -465,11 +541,11 @@ async function poll() {
 }
 
 async function pollFamily() {   // who has checked in "ok", from the API's own record
-  if (!api() || !cfg.family) return;
+  if (!cfg.family) return;
   try {
-    const r = await fetch(`${api()}/family?family=${encodeURIComponent(cfg.family)}`);
-    if (!r.ok) return;
-    for (const m of await r.json()) {
+    const r = await call('GET', `/family?family=${encodeURIComponent(cfg.family)}`);
+    if (!r.ok || !Array.isArray(r.data)) return;
+    for (const m of r.data) {
       if (!m.last_ok || m.device === cfg.device) continue;
       const n = news[m.device];
       if (!n || Date.parse(m.last_ok) > Date.parse(n.time)) news[m.device] = { status: 'ok', time: m.last_ok, block: m.block, hops: m.hops || 0 };
@@ -527,14 +603,15 @@ function paint() {
   $('ok').classList.toggle('busy', flushing || queue.length > 0);
 
   const net = $('net');
-  if (!api()) net.innerHTML = '<span class="dot none"></span>No API set · messages are held';
+  if (!api() && cut) net.innerHTML = '<span class="dot down"></span>Network cut · sending by radio (relays simulated) · local mode';
+  else if (!api()) net.innerHTML = '<span class="dot none"></span>Local mode · no API' + (cfg.bots !== false ? ' · family replies simulated' : '');
   else if (cut) net.innerHTML = '<span class="dot down"></span>Network cut · sending by radio (relays simulated)';
   else if (reachable === false) net.innerHTML = '<span class="dot down"></span>Can\'t reach the API · holding';
   else net.innerHTML = `<span class="dot up"></span>Connected · ${esc(api().replace(/^https?:\/\//, ''))}`;
   $('route').classList.toggle('show', cut);
   if (cut && !flushing && !routeDone) drawRoute(-1);
 
-  if (queue.length && !flushing && (!api() || reachable === false)) $('status').innerHTML = `<b>Holding ${queue.length}</b><br>Sends when it can reach the network.`;
+  if (queue.length && !flushing && reachable === false) $('status').innerHTML = `<b>Holding ${queue.length}</b><br>Sends when it can reach the network.`;
   else if (statusHtml) $('status').innerHTML = statusHtml;
 
   const rows = familyRows();
@@ -571,18 +648,18 @@ const sel = $('f-block');
 for (const b of BLOCKS) { const o = document.createElement('option'); o.value = b; o.textContent = pretty(b); sel.appendChild(o); }
 $('cfg').addEventListener('click', () => {
   $('f-api').value = cfg.api; $('f-key').value = cfg.key; $('f-device').value = cfg.device; $('f-name').value = cfg.name;
-  sel.value = cfg.block; $('f-family').value = cfg.family; $('f-to').value = cfg.to;
+  sel.value = cfg.block; $('f-family').value = cfg.family; $('f-to').value = cfg.to; $('f-bots').checked = cfg.bots !== false;
   $('dlg').showModal();
 });
 $('dlg').addEventListener('close', () => {
   if ($('dlg').returnValue !== 'save') return;
   const u = new URL(location.href);
   const vals = { api: $('f-api').value.trim(), key: $('f-key').value.trim(), device: $('f-device').value.trim() || DEFAULTS.device,
-    name: $('f-name').value.trim() || DEFAULTS.name, block: sel.value, family: $('f-family').value.trim(), to: $('f-to').value.trim() };
+    name: $('f-name').value.trim() || DEFAULTS.name, block: sel.value, family: $('f-family').value.trim(), to: $('f-to').value.trim(), bots: $('f-bots').checked };
   store.set('cfg.' + vals.device, { ...store.get('cfg.' + vals.device, {}), ...vals }); store.set('lastDevice', vals.device);
   for (const k of Object.keys(DEFAULTS)) u.searchParams.delete(k);
-  u.searchParams.set('device', vals.device);
-  location.href = u.toString();   // reload as that watch, with its own history
+  if (location.search) { u.searchParams.set('device', vals.device); u.hash = ''; location.href = u.toString(); }
+  else { history.replaceState(null, '', location.pathname); location.reload(); }   // reload as that watch, with its own history
 });
 
 window.addEventListener('online', () => { flush(); poll(); });
