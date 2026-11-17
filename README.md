@@ -1,6 +1,6 @@
 # Hollow Twin
 
-**When the power fails in the Hollow, the deep levels go dark first, and when the Directorate cuts the network, nobody can tell their family they are alive. Hollow Twin warns each block before it goes dark, shares the power that is left fairly, and gets "I'm OK" through anyway.**
+**When the power fails in the Hollow, the deep levels go dark first, and when the Directorate cuts the network, nobody can tell their family they are alive. Hollow Twin warns each block before it goes dark, shares the power that is left fairly, and gets "I'm OK" through anyway: over relay boxes in every block, and where even they cannot reach, on a rover that drives the tunnels carrying messages and supplies.**
 
 Patriot HackFest Fall 2026, Life Underground track.
 
@@ -10,7 +10,7 @@ Patriot HackFest Fall 2026, Life Underground track.
 
 ## The problem we picked
 
-Four problems from the track, because they are one event seen from four sides: a power failure in a place where the government controls both the power and the news.
+Five problems from the track, because they are one event seen from five sides: a power failure in a place where the government controls the power, the network and the news.
 
 | Track problem | What Hollow Twin does about it |
 | --- | --- |
@@ -18,6 +18,17 @@ Four problems from the track, because they are one event seen from four sides: a
 | 2. The Directorate decides who keeps the lights, and the deep levels always lose | Replaces "upper levels first" with a rule anyone can check: every block's air, pumps and medical load first, then the rest per person |
 | 7. The Directorate can shut the network down whenever it wants | Relay boxes in each block store messages and pass them block to block, then upload the backlog when any relay gets through |
 | 8. Families split across levels cannot tell if each other are OK | One "I'm OK" press travels over those relays to the family's watches, with the route it took |
+| 10. Medicine runs out first in the deep levels, far from any clinic | **The scout rover** rides the lift and drives the tunnels to a block that asked for help, with a med kit, a battery pack or water filters. It carries a relay box, so it also collects the messages a cut-off block is holding and brings them back into range. On the way it checks that the tunnel is passable (problem 5) |
+
+## The scout rover
+
+Our most distinctive part: a six-wheel rocker-bogie rover, designed in CAD down to every part, joint and bolt-on sensor ([`robot/`](robot/)). It is the physical link when both the network and the tunnels fail.
+
+- **Carries supplies** to blocks that cannot reach a clinic or a depot.
+- **Carries communications:** it has the same relay box as every block, so it drives to where the signal is and brings held messages out.
+- **Scouts tunnels** before people use them, and reports open or closed in the same message format as every other device.
+
+In the twin, open any block and press **Send the rover**. The full design (CAD model, parts list, a mission down a flooded tunnel) is at [hollow-twin.vercel.app/scout](https://hollow-twin.vercel.app/scout/). The rover is designed and simulated, not built.
 
 In the story's scenario a geothermal unit fails. Under the Directorate's rule, 12 deep blocks are dark by hour 30 and 8.5 million people have no fans or scrubbers. With the same supply shared fairly, no block goes dark.
 

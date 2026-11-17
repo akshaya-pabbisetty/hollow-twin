@@ -20,7 +20,7 @@ We stopped claiming the rest. The outbreak simulator, the water and flood layers
 
 | Decision | Before | Now | Why |
 | --- | --- | --- | --- |
-| Problems claimed | 8 or 9 | 4 | Four connected claims that all work beat nine with gaps |
+| Problems claimed | 8 or 9 | 5: 1, 2, 7, 8, and 10 by rover (Nov 17: the rover is part of the product) | Each works end to end in the twin; the rover is designed in CAD and simulated, and says so |
 | Hardware | Five devices by Wednesday | One watch (Arduino) and one relay box (Raspberry Pi), already written and tested against the API; see docs/HARDWARE.md | Uses parts we have; proves the network-cut claim with real hardware |
 | AI | "Add AI that does real work" | No AI. Pitch rules where every alert cites a published limit | There is no real data to train or test on; a rushed estimator would dress up invented numbers as evidence. The claim that judges want AI came from our own notes, not from the organizers |
 | Who owns the numbers | Twin and API each had their own forecast, allocation and limits | The API owns them. The twin shows them and falls back to its own simulation only where the API has no data | A judge asking "which number is true?" must get one answer |
