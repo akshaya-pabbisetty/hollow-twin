@@ -163,6 +163,8 @@
   #api-url { font: inherit; font-size: 12px; flex: 1; min-width: 0; padding: 4px 6px; border: 1px solid var(--line-2); background: var(--well); border-radius: 2px; color: var(--ink); }
   .lbl-src { font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 2px; background: rgba(20,22,24,.82); color: #e9eae6; white-space: nowrap; }
   .lbl-src.dev { background: #1f7a4d; color: #fff; }
+  .lbl-sick { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 2px; background: rgba(120,20,30,.9); color: #fff; white-space: nowrap; }
+  .lbl-sick.even { background: rgba(20,22,24,.82); }
   .lbl-rover { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 2px; white-space: nowrap; background: #D2A01E; color: #17181A; transform: translateY(-14px); }
   .ck.hq .help-send { margin-top: 4px; padding: 3px 8px; }
   .lbl-flag { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 2px; white-space: nowrap; }
@@ -1521,7 +1523,7 @@ function setLayer(k) {
   document.getElementById('lg-lo').textContent = lo;
   document.getElementById('lg-hi').textContent = hi;
   document.getElementById('lg-desc').textContent = LAYERS[k].desc;
-  paint(); renderPanels();
+  paintSick(); paint(); renderPanels();
 }
 
 const obKind = document.getElementById('ob-kind'), obR0 = document.getElementById('ob-r0');
@@ -1701,6 +1703,8 @@ function updateOverview() {
     apiHtml = ah; $('o-api').innerHTML = ah;
     $('o-api').querySelectorAll('[data-bid]').forEach(r => { const o = BYID[r.dataset.bid]; if (o) { r.style.cursor = 'pointer'; r.onclick = () => select(o); } });
     $('o-api').querySelectorAll('[data-send]').forEach(b => { const o = BYID[b.dataset.send]; if (o) b.onclick = ev => { ev.stopPropagation(); sendRover(o); }; });
+    $('o-api').querySelectorAll('[data-kit]').forEach(b => { const o = BYID[b.dataset.kit]; if (o) b.onclick = ev => { ev.stopPropagation(); sendRover(o, MEDKIT); }; });
+    $('o-api').querySelectorAll('[data-lung]').forEach(a => { a.onclick = ev => { ev.preventDefault(); setLayer('lung'); }; });
   }
   $('o-n').textContent = sim.alerts.length;
   const top = sim.alerts.slice(0, 60), keys = top.map(a => a.n.id + a.k).join('|'), list = $('alerts');
@@ -2081,11 +2085,31 @@ function srcTag(n) {
   n.srcTag.element.className = 'lbl-src' + (live.length ? ' dev' : '');
 }
 
+// Sickness the residents report themselves (GET /truth: distinct people pressing "I feel sick" or with low SpO2)
+// against the Directorate's published count, per block. On the Lung layer each reporting block carries a tag, and
+// the overview ranks the blocks where the official number misses the most people: that is where med kits go.
+const MEDKIT = { what: 'Med kit', short: 'med kit' };
+function sickRows() {
+  const t = api.on && api.status && api.status.truth;
+  return t && Array.isArray(t.blocks) ? t.blocks.filter(b => BYID[b.block] && (b.residents || b.official)).sort((a, b) => b.gap - a.gap || b.residents - a.residents) : [];
+}
+function paintSick() {
+  const rows = new Map(sickRows().map(b => [b.block, b]));
+  for (const n of NBHDS) {
+    const b = rows.get(n.bid), show = !!b && layer === 'lung';
+    if (!show) { if (n.sickTag) n.sickTag.visible = false; continue; }
+    if (!n.sickTag) n.sickTag = addLabel('', 'lbl-sick', new THREE.Vector3(n.x, caveFloor(n.level) + n.h + 3.6, n.z));
+    n.sickTag.element.textContent = `Residents ${b.residents} sick · Directorate ${b.official}`;
+    n.sickTag.element.className = 'lbl-sick' + (b.gap > 0 ? '' : ' even');
+    n.sickTag.visible = true;
+  }
+}
+
 function applyStatus(st, first) {
   api.status = st;
   api.forecast = Object.fromEntries((st.forecast || []).map(f => [f.block, f]));
   if (first) for (const a of ((st.alerts && st.alerts.latest) || []).slice().reverse()) { api.seen.add(a.id); onAlert(a, false); }
-  pinAll(); api.dirty = true; apiPaint();
+  pinAll(); paintSick(); api.dirty = true; apiPaint();
 }
 function refreshSoon() { clearTimeout(api.soon); api.soon = setTimeout(pollStatus, 350); }
 function pollStatus() { if (api.on) { getJSON('/status').then(st => applyStatus(st, false)).catch(() => {}); pollHelp(); } }
@@ -2204,8 +2228,18 @@ function apiOverview() {
       out.push(`<div class="ck hq" data-bid="${escH(h.block)}"><b>${i + 1}. ${escH(h.device)} in ${escH(blockName(h.block))}</b> <span class="note">score ${h.score}${why ? ': ' + why : ''}</span><div>${state}</div></div>`);
     });
   }
+  const sick = sickRows();
+  if (sick.length) {
+    const t = st.truth;
+    out.push(`<h3>Sickness reported by residents <span>${t.residents_total} vs ${t.official_total} official</span></h3>`);
+    out.push(`<div class="note">Where med kits should go first: the blocks where the Directorate's count misses the most people. ${escH(t.rule || '')} <a href="#" data-lung="1">Show on the map</a> · <a href="research/" target="hollow-research">Data for researchers</a></div>`);
+    sick.slice(0, 5).forEach((b, i) => {
+      const gap = b.gap > 0 ? `<span class="s2">${b.gap} not in the official count</span>` : '<span class="note">matches the official count</span>';
+      const btn = b.gap > 0 ? `<button class="help-send" data-kit="${escH(b.block)}" ${rov.busy ? 'disabled' : ''}>Send a med kit</button>` : '';
+      out.push(`<div class="ck hq" data-bid="${escH(b.block)}"><b>${i + 1}. ${escH(blockName(b.block))}</b> <span class="note">residents ${b.residents}, Directorate ${b.official}</span> ${gap}<div>${btn}</div></div>`);
+    });
+  }
   const bits = [];
-  if (st.truth && (st.truth.residents_total || st.truth.official_total)) bits.push(`<div class="k">Symptom reports</div><div>Residents ${st.truth.residents_total}, Directorate ${st.truth.official_total}.</div>`);
   if (st.surface && st.surface.verdict !== 'not enough data') bits.push(`<div class="k">Surface</div><div>${escH(st.surface.verdict)} <span class="note">(${st.surface.source === 'live' ? 'from devices' : st.surface.source === 'mixed' ? 'part device, part scripted' : 'scripted readings'})</span>. <a href="broadcast/" target="hollow-broadcast">Public broadcast</a></div>`);
   if (bits.length) out.push('<h3>Also from the API</h3><div class="kv">' + bits.join('') + '</div>');
   return out.join('');
@@ -2331,11 +2365,11 @@ function roverStatus() {
   return rov.phase === 'out' ? `On the way to ${rov.target.name} with a ${rov.cargo.short}${sim.netCut ? ', relaying' : ''}.` : `Coming back from ${rov.target.name}.`;
 }
 
-async function sendRover(n) {
+async function sendRover(n, cargo) {
   if (rov.busy) return false;
   const route = roverRoute(rov.at, n);
   if (!route) { log('warn', `Rover-01 has no dry route to ${n.name}. Every tunnel into it is flooded.`, [n]); return false; }
-  rov.busy = true; rov.target = n; rov.cargo = cargoFor(n); rov.phase = 'out'; rov.helpId = null; api.dirty = true;
+  rov.busy = true; rov.target = n; rov.cargo = cargo || cargoFor(n); rov.phase = 'out'; rov.helpId = null; api.dirty = true;
   log('info', `Rover-01 is on its way from the ${LEVELS[rov.at.level].name} lift to ${n.name} with a ${rov.cargo.short}${sim.netCut ? '. Its relay box keeps passing messages as it drives' : ''}.`, [n]);
   if (api.on) assignHelp(n);
   renderPanels();
@@ -2430,6 +2464,7 @@ function resetSim(policy) { selected = null; sim.policy = policy; initSim(); set
 const darkNow = () => NBHDS.filter(n => n.blackout);
 const popOf = ns => mil(ns.reduce((s, n) => s + n.pop, 0));
 
+let roverDone = false;   // the rover beat says "delivered" only after this run's delivery
 const BEATS = [
   { title: 'The Hollow, 2124',
     cap: () => `This is Sector 7 of the Hollow: nine levels, ${mil(totalPop)} million people, up to 2,560 m underground. The Directorate decides who gets power, air and news. The deep levels get the least.`,
@@ -2472,23 +2507,24 @@ const BEATS = [
       if (!sim.netCut) setNet(true, false);
       select(null, false); setFocus(null);
       await wait(900); if (!ok()) return;
-      const a = BYID['l8-bore-bend'], b = BYID['l1-winch-gallery'];
+      const a = BYID['l8-sump-row'], b = BYID['l1-winch-gallery'];   // Bore Bend is the block out of reach, in the next beat
       courier(a, b, "I'm OK");
       log('ok', `A check-in from ${a.name} reached family in ${b.name} over the block relays.`, [a, b]);
       setTimeout(() => { if (ok()) courier(a, b, "I'm OK"); }, 4800);
     } },
   { title: "Where the network can't reach",
-    cap: () => rov.phase === 'back' || !rov.busy
-      ? `Bore Bend is out of radio reach. Rover-01 rode the lift to Deepwell and drove the tunnels to it, delivered a ${rov.last ? rov.last.cargo : 'med kit'}${rov.last && rov.last.held ? `, and picked up the check-ins of about ${fmtInt(Math.round(rov.last.held / 100) * 100)} households to carry back into relay range` : ''}.`
+    cap: () => roverDone || rov.phase === 'back'
+      ? `Bore Bend is out of radio reach. Rover-01 rode the lift to Deepwell, drove the tunnels to it and delivered a ${rov.last ? rov.last.cargo : 'med kit'}${rov.last && rov.last.held ? `. It also picked up the check-ins of about ${fmtInt(Math.round(rov.last.held / 100) * 100)} households to carry back into relay range` : ''}.`
       : `Some blocks are out of radio reach, or cut off by flooding. Rover-01 rides the lift and drives the tunnels to them, carrying supplies and a relay box. Now: ${roverStatus()}`,
     dwell: 6500,
     async run(ok) {
-      roverHome(); select(null, false); setFocus(8);
+      roverDone = false; roverHome(); select(null, false); setFocus(8);
       await wait(1200); if (!ok()) return;
       const n = BYID['l8-bore-bend'];
       n.checkin = Math.min(n.checkin, 0.2);
       sendRover(n);
       for (let k = 0; k < 80 && ok() && rov.phase !== 'back'; k++) await wait(200);
+      if (rov.phase === 'back') roverDone = true;
     } },
   { title: 'Nothing hidden',
     cap: () => 'Every number says where it comes from: the built-in simulation, scripted data through the backend, or a real device. Every safety limit cites a published standard. Click any block to step inside.',
