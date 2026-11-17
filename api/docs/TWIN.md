@@ -49,6 +49,9 @@ function connect() {
   live.addEventListener("reading", (e) => { const m = once(e); if (m) updateBlock(m); });
   // lane 1 addition: the API's own warnings arrive on the same stream as `event: alert`
   live.addEventListener("alert", (e) => { const a = once(e); if (a) showAlert(a); });
+  // lane 1 addition: a forged reading (wrong signature) was refused. Flash it; never draw it as data, and do not
+  // pass it through once(): the genuine message with the same id may still arrive and must not be skipped.
+  live.addEventListener("forgery", (e) => showForgery(JSON.parse(e.data)));
 
   // The API's data file was wiped (a free-tier disk reset): forget everything and reload.
   live.addEventListener("reset", () => { seen.clear(); lastSeq = 0; live.close(); start(); });
@@ -91,6 +94,38 @@ Rules you can rely on:
   the connection.
 - No SSE available (a locked-down network)? Poll `GET API/history?after_seq=<lastSeq>` every few seconds: it
   returns the same records.
+
+### Forged readings: show "FORGED: rejected"
+
+When a message arrives with a `sig` that does not match the key the API holds for that device (someone faking a
+relay's numbers, or changing them in transit), the API refuses it as before, and now also says so in public
+(CONTRACT.md section 4.1):
+
+```
+event: forgery
+data: {"time":"2026-11-17T20:03:11.402Z","device":"relay-l8-bore-bend","block":"l8-bore-bend","kind":"power","id":"relay-l8-bore-bend-000124","claimed_time":"2026-11-17T20:03:10Z","claimed_values":{"battery_wh":9900,"draw_w":96,"supply_w":96},"hops":0,"via":[],"reason":"bad signature for relay-l8-bore-bend: sig does not match id|device|block|time|kind|values","rejected":true,"n":7}
+```
+
+- Flash the block named in `block` with **FORGED: rejected**, and if there is room, what it claimed
+  (`claimed_values`) and `reason`. The block's real numbers do not change: a forgery is never a reading, never in
+  `/history`, `/blocks` or `/status`, and never raises an alert.
+- Draw `claimed_values` as text (`textContent`), never as HTML: it is whatever the forger sent. Past 2 KB it is
+  `null` and `claimed_bytes` says how big the claim was.
+- A forgery event has no `id:` line, so it does not move `lastSeq`, and it is not replayed on reconnect.
+  To catch up on forgeries missed while disconnected, or to list them on a page, use
+  `GET API/forgeries?after=<n>` (the newest 1,000, oldest first; `n` numbers them; `count` is the total ever).
+- At most 20 per device per second are shown (the ingest rate limit); the rest are still refused and are counted
+  in `GET /forgeries` as `rate_limited`.
+- `/feed` (the older stream with unnamed events) never carries forgeries.
+
+### Sensor errors: `plausible: false`
+
+A reading from a broken or misbehaving sensor (an impossible value, a jump, or drift away from the other sensors on
+its level; CONTRACT.md section 1.3) still arrives as `event: reading`, but carries `"plausible": false` and a
+`sensor_error` sentence. Do not move the block's numbers or colours with it: the API leaves it out of everything
+(`/blocks`, `/status`, forecasts, the surface verdict) and raises no alert for it. If you show it at all, show it
+as a sensor fault on the block (for example a grey "sensor fault" tag with `sensor_error` as the tooltip).
+`status.readings.implausible` counts them.
 
 ### The twin's four tasks, in API terms
 
@@ -153,17 +188,17 @@ function tagFor(blockId, status) {
 
 Suggested colours for `values.level`: `info` blue, `warn` amber, `danger` red.
 
-**The API's limits are not the twin's numbers yet.** The twin colours a block from its own thresholds (the table in
-the contract's section 6); the API alerts from sourced limits (section 6.1). Until the team agrees one set, a
-block can be amber in the twin while the API has raised no alert, or the other way round. The cases:
+**One set of limits.** The team agreed the sourced limits in the contract's section 6.1, and the twin's old
+thresholds table is gone from the contract. Read every number from `GET /limits` (the twin already does), so a
+block is amber in the twin exactly when the API has raised a warning:
 
-| Reading | Twin | API |
-|---|---|---|
-| CO2 | warning over 2,000 ppm, alarm over 4,000 | warning over 1,000 ppm, alarm over 5,000 |
-| Air temperature | warning over 39 °C, alarm over 43 °C | heat index (temperature and humidity together) 39.4 °C and 51.7 °C |
-| Flood | warning over 25 cm, tunnel closes over 45 cm | tunnel closed over 15 cm |
-| Battery | warning under 24 h, alarm under 8 h or dark | the same |
-| Water | simulated contamination index 25 / 50 | `tds_ppm` over 1,000 or `turbidity_ntu` over 5 |
+| Reading | Agreed limit (section 6.1) |
+|---|---|
+| CO2 | warning over 1,000 ppm, alarm over 5,000 |
+| Air temperature | heat index (temperature and humidity together) 39.4 °C warning, 51.7 °C alarm |
+| Flood | tunnel closed over 15 cm |
+| Battery | warning under 24 h, alarm under 8 h or dark |
+| Water | `tds_ppm` over 1,000 or `turbidity_ntu` over 5 (section 6.2; lane 3 still checks them against the calibrated probe) |
 
 The simplest way to show one truth is to colour from the API's alerts and `forecast[].level` rather than from the
 raw values.
@@ -236,7 +271,7 @@ More panels for the broadcast page, all open GETs:
     "l6-flint-face": { "source": "simulated", "latest_time": "2026-11-18T20:04:58.000Z", "latest_device": "relay-l6-flint-face", "live_kinds": [], "simulated_kinds": ["power"] },
     "l3-ember-yard": { "source": "live", "latest_time": "2026-11-18T20:04:59.000Z", "latest_device": "sensor-l3-ember-yard", "live_kinds": ["water"], "simulated_kinds": ["vitals"] }
   },
-  "readings": { "total": 96, "verified": 12, "unverified": 84, "live": 20, "simulated": 76 },
+  "readings": { "total": 96, "verified": 12, "unverified": 84, "implausible": 0, "live": 20, "simulated": 76 },
   "feed_clients": 2
 }
 ```

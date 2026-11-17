@@ -55,11 +55,12 @@ test("water: alert at the sourced limit, carries the limit and its source", asyn
 });
 
 test("air: stale warning at the Health Canada limit, danger at the OSHA limit", async () => {
-  const b = "l2-chalk-gallery";
-  await s.post("/ingest", s.R("sensor", b, "air", { co2_ppm: limits.air_co2_stale_ppm.value - 1 }));
+  const b = "l2-chalk-gallery", H = 3600e3, t0 = Date.now() - 5 * H;
+  // two hours apart: a step from 1,200 to 5,500 ppm within the hour would be held back as a jump (tests/sensors.test.js)
+  await s.post("/ingest", s.R("sensor", b, "air", { co2_ppm: limits.air_co2_stale_ppm.value - 1 }, t0));
   assert.strictEqual((await s.get(`/history?kind=alert&block=${b}`)).length, 0);
-  await s.post("/ingest", s.R("sensor", b, "air", { co2_ppm: limits.air_co2_stale_ppm.value + 200 }));
-  await s.post("/ingest", s.R("sensor", b, "air", { co2_ppm: limits.air_co2_danger_ppm.value + 500 }));
+  await s.post("/ingest", s.R("sensor", b, "air", { co2_ppm: limits.air_co2_stale_ppm.value + 200 }, t0 + 2 * H));
+  await s.post("/ingest", s.R("sensor", b, "air", { co2_ppm: limits.air_co2_danger_ppm.value + 500 }, t0 + 4 * H));
   const al = await s.get(`/history?kind=alert&block=${b}`);
   assert.deepStrictEqual(al.map((a) => a.values.level), ["warn", "danger"]);
   assert.match(al[0].values.text, /Air going stale/);

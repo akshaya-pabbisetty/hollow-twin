@@ -33,11 +33,13 @@ test("every file in contract/samples/ is accepted unchanged, stored as sent, and
     const got = (await s.get(`/history?kind=${sent.kind}`)).find((m) => m.id === sent.id);
     assert.ok(got, `${f} is in the history`);
     for (const k of ["id", "device", "block", "kind", "values", "hops", "via"]) assert.deepStrictEqual(got[k], sent[k], `${f}: ${k} is stored exactly as sent`);
-    // The samples carry a fixed time. While that moment is still ahead of the server clock the message is kept
-    // with the receive time and says so; once it has passed, the time is stored as sent. Either way: accepted.
-    if (Date.parse(sent.time) > Date.now() + 5 * 60e3) assert.deepStrictEqual([got.time_estimated, got.device_time], [true, sent.time], f);
-    else assert.strictEqual(got.time, sent.time, f);
-    const other = (got.warnings || []).filter((w) => !/in the future/.test(w));
+    // The samples carry a fixed time. While that moment is still ahead of the server's receive time the message is
+    // kept with the receive time and says so (CONTRACT.md 1.3); once it has passed, the time is stored as sent.
+    if (got.time_estimated) {
+      assert.strictEqual(got.device_time, sent.time, f);
+      assert.ok(Date.parse(got.time) < Date.parse(sent.time), `${f}: replaced only because it was ahead`);
+    } else assert.deepStrictEqual([got.time, got.device_time], [sent.time, undefined], f);
+    const other = (got.warnings || []).filter((w) => !/ahead of the server's receive time/.test(w));
     assert.deepStrictEqual(other, [], `${f}: block and device ids fit the contract`);
   }
   // sending the same files again: every one is a duplicate, nothing is stored twice

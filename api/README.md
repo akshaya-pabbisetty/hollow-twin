@@ -24,8 +24,8 @@ It needs Node 20 or newer and nothing else. There are no packages to install.
       (`docs/DEPLOY.md`), nothing has been deployed.
 - [x] The team's tools pass: `node tools/replay.mjs http://localhost:8787/ingest 1 3`, and every file in
       `contract/samples/` is accepted unchanged.
-- [ ] Agree the thresholds with the team. The API's sourced limits differ from the twin's numbers; both are listed
-      in `CONTRACT.md` section 6.1.
+- [x] Agree the thresholds with the team: the sourced limits in `CONTRACT.md` section 6.1 are agreed, and the twin
+      reads them from `GET /limits`.
 
 ## Guides
 
@@ -195,6 +195,7 @@ shortened with `...`.
 | `GET /surface`, `GET /surface/history` | The surface verdict in full, and its public record |
 | `GET /firstwave` | Who goes up first |
 | `GET /limits` | Every threshold, with its source |
+| `GET /forgeries` | The public log of forged readings (wrong `sig`): refused, never stored as readings |
 | `GET /feed`, `GET /queue`, `POST /dispatch` | Earlier names, kept working |
 
 ### POST /ingest
@@ -229,7 +230,8 @@ something the sender should fix comes back in `warnings`.
 | `INGEST_KEY` set and `x-api-key` missing or wrong | `401` |
 | `block` not in `contract/blocks.json` and not `surface` | rejected, with a hint when only the case is wrong |
 | `device` does not fit CONTRACT.md section 3 | stored, with a warning |
-| `time` before 2020, or more than 5 minutes ahead of the server | stored; `time` becomes the receive time, plus `"time_estimated": true`, `"device_time"` and a warning |
+| An impossible value, a jump or drift (sensor error, CONTRACT.md 1.3) | stored with `"plausible": false`, `sensor_error` and `sensor_flags`, with a warning; no alert, and left out of all logic |
+| `time` before 2020, or ahead of the moment the API receives it | stored; `time` becomes the receive time, plus `"time_estimated": true`, `"device_time"` and a warning |
 | `hops` / `via` missing | stored as `0` / `[]` |
 | `source` missing | stored as `"simulated"`. Real hardware sends `"live"` |
 | `sig` valid / missing / wrong | stored `"verified": true` / stored `"verified": false` / rejected: `bad signature for <device>` |
@@ -277,13 +279,14 @@ Rules create alerts automatically. They are stored like messages with `kind: "al
 | X sent to Y | a help request is assigned | info |
 | Surface verdict | the surface verdict changes (suits: info, domes: warn, outposts and stay: danger) | info / warn / danger |
 
-Several of these numbers differ from the ones the twin uses today. `CONTRACT.md` section 6.1 lists both.
+These are the limits the team agreed (`CONTRACT.md` section 6.1). The twin uses the same numbers, read from `GET /limits`.
 
 ### GET /live
 
 Server-sent events. `event: reading` for every accepted message, `event: alert` for every alert. Every event has an
 `id` (the message's `seq`). Reconnect with the `Last-Event-ID` header, or `?lastEventId=`, to receive everything
-missed, in order. See `docs/TWIN.md`.
+missed, in order. See `docs/TWIN.md`. A message refused for a wrong `sig` is sent as `event: forgery` (no `id`, never
+replayed; see `GET /forgeries`).
 
 ```
 GET /live?lastEventId=41
@@ -411,7 +414,7 @@ GET /status
   "truth": { "window_h": 24, "residents_total": 14, "official_total": 2, "gap": 12, "blocks": ["..."] },
   "surface": { "verdict": "sealed outposts needed", "reasons": ["radiation 2.1 µSv/h is above 1 µSv/h (IAEA, ...)"], "missing": [], "not_measured": [], "source": "simulated" },
   "blocks": { "l6-flint-face": { "source": "simulated", "latest_time": "...", "latest_device": "relay-l6-flint-face", "live_kinds": [], "simulated_kinds": ["power"] } },
-  "readings": { "total": 61, "verified": 0, "unverified": 61, "live": 0, "simulated": 61 },
+  "readings": { "total": 61, "verified": 0, "unverified": 61, "implausible": 0, "live": 0, "simulated": 61 },
   "feed_clients": 2 }
 ```
 
@@ -600,6 +603,27 @@ GET /limits
 { "water_tds_max_ppm": { "value": 1000, "unit": "ppm", "op": ">", "type": "safety fact", "source": "WHO, ...", "url": "https://...", "verified": true, "note": "..." },
   "battery_warn_hours": { "value": 24, "unit": "h", "op": "<", "type": "design choice", "reason": "CONTRACT.md section 6, ..." },
   "...": "..." }
+```
+
+### GET /forgeries
+
+The public log of forged readings: messages whose `sig` does not match the key on file for their device. Each one
+is refused on `POST /ingest` (`bad signature for <device>`) and never stored as a reading; it is logged here and
+sent on `GET /live` as `event: forgery`. At most 20 per device per second are logged (`ingest_rate_limit_per_s`,
+counting every message, also inside an array); the rest are counted in `rate_limited` (since the server started).
+The newest 1,000 are kept here (`forgery_log_max`); the data file keeps all. A claim over 2 KB
+(`forgery_max_values_bytes`) is replaced by `claimed_bytes`. `?after=<n>` returns only newer entries.
+
+```
+GET /forgeries?after=6
+```
+
+```json
+{ "count": 7, "rate_limited": 0, "kept": 7,
+  "forgeries": [{ "time": "2026-11-17T20:03:11.402Z", "device": "relay-l8-bore-bend", "block": "l8-bore-bend", "kind": "power",
+    "id": "relay-l8-bore-bend-000124", "claimed_time": "2026-11-17T20:03:10Z", "claimed_values": { "battery_wh": 9900, "draw_w": 96, "supply_w": 96 },
+    "hops": 0, "via": [], "reason": "bad signature for relay-l8-bore-bend: sig does not match id|device|block|time|kind|values", "rejected": true, "n": 7 }],
+  "rule": "A message whose sig does not match the key on file for its device is refused and never stored as a reading. ..." }
 ```
 
 ### Anything else

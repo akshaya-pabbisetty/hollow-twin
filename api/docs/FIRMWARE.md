@@ -99,9 +99,21 @@ uploads everything in a single POST whose body is a JSON array:
   `"device_time": "<what you sent>"` and a warning. So a device with no clock still works live, but a backlog
   from it loses its real timing (every message gets the upload time). Sync the clock before you rely on
   store-and-forward.
-- **More than 5 minutes in the future**: the same treatment (kept, stamped with the receive time, warned). That is
-  a wrong time zone or a broken RTC. Send UTC. This is also why the files in `contract/samples/` are accepted
-  before their fixed time of 2026-11-18 20:00 UTC has arrived.
+- **Ahead of the moment the API receives it** (even by a second): the same treatment (kept, stamped with the
+  receive time, `device_time` keeps what you sent, warned when it is more than 1 second ahead). Nothing can be measured after it arrives, so a time
+  ahead is a fast clock, a wrong time zone or a broken RTC. Send UTC and sync with NTP. This is also why the files
+  in `contract/samples/` are accepted before their fixed time of 2026-11-18 20:00 UTC has arrived.
+- **"Latest"** for a block and kind is the message with the greatest stored `time`; equal times go to the one
+  stored last. So a relay backlog posted late, with its real older times, fills in history but never replaces a
+  fresher reading, and a fast clock cannot hold "latest" either.
+
+**Sensor errors.** The API checks every reading before it uses it (CONTRACT.md section 1.3; every range and step is
+in `shared/limits.json` as `plausible_*`, `jump_*`, `drift_*`). A reading with an impossible value (SpO2 over
+100 %, a negative depth), a jump (a step bigger than the world allows, compared with your last two readings), or
+drift (your sensor walking away from the others of its kind on your level) is kept but marked
+`"plausible": false`, and the reply's `warnings` say `sensor error, stored but not used: ...` with the reason. It
+raises no alert and counts for nothing. If you see that warning on a bench test, check the wiring or the units
+before the demo. A real sudden change is fine: the next reading at the new level confirms it and counts.
 
 ## 4. Kinds and values, per device
 
@@ -143,8 +155,8 @@ Notes for lane 3:
   contract's three, the broadcast page says `not enough data` and names what is missing. If the rover has no
   oxygen or dust sensor, send simulated values for those two from a script (tagged `"source": "simulated"`) and
   the page will show the verdict as `mixed`.
-- **Every limit and its source** is in `shared/limits.json`, also served at `GET API/limits`. Several differ from
-  the numbers the twin uses today; the contract's section 6.1 lists both.
+- **Every limit and its source** is in `shared/limits.json`, also served at `GET API/limits`. The ones in the
+  contract's section 6.1 are agreed by the team, and the twin uses the same numbers.
 
 Old field names from before the contract (`hr`, `spo2`, button `type`) are still accepted and renamed, with a
 warning. Do not use them in new firmware.

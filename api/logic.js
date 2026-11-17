@@ -3,6 +3,7 @@
 // Every number comes from shared/limits.json (via ./limits); nothing here is a hard-coded threshold.
 const LIM = require("./limits");
 const B = require("./blocks");
+const O = require("./order");
 
 const HOUR = 3600e3;
 const t = (r) => Date.parse(r.time);
@@ -18,7 +19,7 @@ function gridWhy(hz) {
 const isNum = (x) => typeof x === "number" && !Number.isNaN(x);
 const isAmount = (x) => isNum(x) && x >= 0; // a measured quantity that cannot be negative
 const isPositive = (x) => isNum(x) && x > 0;
-const byTime = (a, b) => t(a) - t(b);
+const byTime = O.byTime; // oldest first; equal times by seq (CONTRACT.md section 1.3)
 
 // Least-squares slope of y against time, per hour. Negative = falling.
 function slopePerHour(pts, y) {
@@ -111,7 +112,7 @@ function sector(blocks = B.list) {
 function measured(readings) {
   const latest = {}; // block -> its newest power message
   for (const r of readings)
-    if (r.kind === "power" && r.plausible !== false && (!latest[r.block] || t(r) >= t(latest[r.block]))) latest[r.block] = r;
+    if (r.kind === "power" && r.plausible !== false && O.newer(r, latest[r.block])) latest[r.block] = r;
   return Object.values(latest).sort(byTime).map((p) => {
     const f = forecast(readings, p.block), b = B.get(p.block);
     return { block: p.block, name: b ? b.name : null, level: b ? b.level : null, people: b ? b.people : null,
@@ -205,8 +206,7 @@ function queue(readings, assigned, now = Date.now(), status = "open") {
     (status === "all" || assigned.has(r.id) === (status === "assigned")));
   const grace = LIM.val("triage_vitals_grace_s") * 1000, per = LIM.val("triage_wait_minutes_per_point");
   return helps.map((h) => {
-    const v = readings.filter((r) => r.device === h.device && r.kind === "vitals" && t(r) <= t(h) + grace)
-      .sort((a, b) => t(b) - t(a))[0];
+    const v = O.newest(readings.filter((r) => r.device === h.device && r.kind === "vitals" && t(r) <= t(h) + grace));
     const wait_min = Math.max(0, (now - t(h)) / 60e3);
     const d = triageDetail(v && v.values);
     const waited = Math.min(LIM.val("triage_wait_max_points"), Math.floor(wait_min / per)); // waiting long raises priority
