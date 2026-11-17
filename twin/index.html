@@ -267,12 +267,12 @@
   <main id="view">
     <div id="labels"></div>
     <div id="feed"></div>
-    <button id="story-btn">Play the 60-second story</button>
+    <button id="story-btn">Play the 75-second story</button>
     <div id="intro">
       <div class="card">
         <h1>Hollow Twin</h1>
         <p>A working model of one sector of the Hollow. It warns blocks before they go dark, shares power fairly when there is not enough, and gets a family's "I'm OK" through when the Directorate cuts the network.</p>
-        <div class="row"><button id="intro-play" class="primary">Play the 60-second story</button><button id="intro-explore">Explore on my own</button></div>
+        <div class="row"><button id="intro-play" class="primary">Play the 75-second story</button><button id="intro-explore">Explore on my own</button></div>
         <p class="small">Everything shown is simulated unless it is tagged as coming from a device.</p>
       </div>
     </div>
@@ -2309,7 +2309,7 @@ function roverGo(nodes) {
 
 function roverStatus() {
   if (!rov.busy) return `Parked at the ${LEVELS[rov.at.level].name} lift, ready.`;
-  return rov.phase === 'out' ? `On the way to ${rov.target.name} with ${rov.cargo.short}${sim.netCut ? ', relaying' : ''}.` : `Coming back from ${rov.target.name}.`;
+  return rov.phase === 'out' ? `On the way to ${rov.target.name} with a ${rov.cargo.short}${sim.netCut ? ', relaying' : ''}.` : `Coming back from ${rov.target.name}.`;
 }
 
 async function sendRover(n) {
@@ -2335,6 +2335,7 @@ async function sendRover(n) {
 
 function deliver(n) {
   const c = rov.cargo, bits = [];
+  rov.last = { cargo: c.short, held: 0 };
   if (c.what === 'Battery pack') {
     const add = 0.3 * n.cap; n.B = Math.min(n.cap, n.B + add);
     bits.push(`delivered a battery pack: about ${Math.round(add / n.demand)} more hours of power`);
@@ -2347,8 +2348,8 @@ function deliver(n) {
   }
   if (sim.netCut && n.checkin < 0.98) {
     const held = Math.max(1, Math.round((1 - n.checkin) * profile(n).households));
-    n.checkin = 1;
-    bits.push(`picked up ${fmtInt(held)} held check-ins and is carrying them back to the lift, where the relays reach upstairs`);
+    n.checkin = 1; rov.last.held = held;
+    bits.push(`picked up the check-ins of about ${fmtInt(Math.round(held / 100) * 100)} households it had not heard from, to carry back to the lift where the relays reach upstairs`);
   }
   log('ok', `Rover-01 reached ${n.name} and ${bits.join(', and ')}.`, [n]);
   flash(n, '#3DFFB0');
@@ -2447,7 +2448,7 @@ const BEATS = [
     } },
   { title: "Where the network can't reach",
     cap: () => rov.phase === 'back' || !rov.busy
-      ? `Bore Bend's relay is down and its battery is failing. Rover-01 rode the lift to Deepwell and drove the tunnels to it: it delivered a battery pack, and picked up the check-ins the block was holding to carry them back to the lift.`
+      ? `Bore Bend is out of radio reach. Rover-01 rode the lift to Deepwell and drove the tunnels to it, delivered a ${rov.last ? rov.last.cargo : 'med kit'}${rov.last && rov.last.held ? `, and picked up the check-ins of about ${fmtInt(Math.round(rov.last.held / 100) * 100)} households to carry back into relay range` : ''}.`
       : `Some blocks are out of radio reach, or cut off by flooding. Rover-01 rides the lift and drives the tunnels to them, carrying supplies and a relay box. Now: ${roverStatus()}`,
     dwell: 6500,
     async run(ok) {
@@ -2492,7 +2493,7 @@ function startStory() {
 }
 function endStory() {
   story.on = false; story.token++; story.until = null; story.done = null; clearInterval(story.tick);
-  $('story').style.display = 'none'; $('story-btn').style.display = ''; $('story-btn').textContent = 'Replay the 60-second story';
+  $('story').style.display = 'none'; $('story-btn').style.display = ''; $('story-btn').textContent = 'Replay the 75-second story';
   document.querySelectorAll('.corner').forEach(c => c.style.display = '');
   if (speed !== 1) setSpeed(1);
 }

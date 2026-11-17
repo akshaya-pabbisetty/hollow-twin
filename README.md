@@ -4,7 +4,7 @@
 
 Patriot HackFest Fall 2026, Life Underground track.
 
-**Try it: https://hollow-twin.vercel.app** and press **Play the 60-second story**.
+**Try it: https://hollow-twin.vercel.app** and press **Play the 75-second story**.
 
 ![Under the Directorate's rule, all ten blocks of Deepwell are dark by hour 30](docs/img/directorate-rule.jpg)
 
@@ -36,7 +36,7 @@ In the story's scenario a geothermal unit fails. Under the Directorate's rule, 1
 
 One sector of the Hollow in the year 2124, 37 years after the collapse: nine levels, 70 blocks, 32 million people, from the surface down to a geothermal plant 2,560 m underground.
 
-- **Play the story** for the pitch in a minute.
+- **Play the story** for the pitch in about a minute.
 - **Click any block** (or search for one, such as Rivet Gallery) to step inside: its readings, its forecast, its history, and what you can do for it.
 - **Switch the power rule** between Directorate and Fair share and watch who goes dark.
 - **Cut the Directorate network** and watch the block relays take over.

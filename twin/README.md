@@ -12,7 +12,7 @@ python3 -m http.server 8080        # then open http://localhost:8080
 | --- | --- |
 | `/` | The intro card, then the built-in simulation |
 | `/?api=http://localhost:8787` | Connected to the API. The address is remembered; `?api=off` forgets it |
-| `/?story=1` | Starts the 60-second story straight away (useful for recording) |
+| `/?story=1` | Starts the 75-second story straight away (useful for recording) |
 | `/?intro=0` | Skips the intro card |
 
 `DEFAULT_API` near the top of the API section in `index.html` is the address the public site connects to with no `?api=`. It is empty until the API is hosted.
