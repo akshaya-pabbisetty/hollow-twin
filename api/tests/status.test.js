@@ -51,7 +51,7 @@ test("one poll shows forecast, alerts, queue, truth, surface, live vs simulated 
   const texts = st.alerts.latest.map((a) => a.values.text).join(" | ");
   assert.match(texts, /power cut likely soon/); assert.match(texts, /h of battery left/);
   assert.match(texts, /Air going stale/); assert.match(texts, /Help requested by watch-0021/);
-  assert.match(texts, /Surface verdict: sealed domes needed/);
+  assert.match(texts, /Surface verdict: sealed outposts needed/);
   assert.ok(st.alerts.latest[0].seq > st.alerts.latest[st.alerts.latest.length - 1].seq, "newest first");
   // queue length and the top request (the sicker person), with its reasons
   assert.strictEqual(st.queue.length, 2);
@@ -60,7 +60,7 @@ test("one poll shows forecast, alerts, queue, truth, surface, live vs simulated 
   // truth totals: watch-0021 (low oxygen), 23 and 24 (symptoms) vs the official 1
   assert.deepStrictEqual([st.truth.residents_total, st.truth.official_total, st.truth.gap], [3, 1, 2]);
   // surface verdict with reasons
-  assert.strictEqual(st.surface.verdict, "sealed domes needed");
+  assert.strictEqual(st.surface.verdict, "sealed outposts needed");
   assert.match(st.surface.reasons[0], /radiation 2\.1 µSv\/h is above 1 µSv\/h/);
   // live vs simulated per block
   assert.strictEqual(st.blocks[deep].source, "live");

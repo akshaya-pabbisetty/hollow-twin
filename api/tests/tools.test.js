@@ -55,7 +55,7 @@ test("the samples drive the contract endpoints: latest per block, the help queue
   assert.deepStrictEqual(help.vitals, { hr_bpm: 104, spo2_pct: 93, temp_c: 38.1 }, "triage used the vitals sample");
   assert.ok((await s.get("/inbox?device=watch-0110")).some((a) => a.values.text === "watch-0042 is OK (l8-bore-bend)"), "the check-in reached the watch in `to`");
   const page = await s.get("/broadcast");
-  assert.deepStrictEqual([page.verdict, page.photo.url], ["not enough data", "https://example.invalid/surface-01/000012.jpg"]);
+  assert.deepStrictEqual([page.verdict, page.not_measured.sort(), page.photo.url], ["suits OK", ["o2_pct", "pm25_ugm3"], "https://example.invalid/surface-01/000012.jpg"], "the surface sample alone gives a real verdict");
   assert.strictEqual((await s.get("/forecast?block=l8-bore-bend"))[0].hours_left, 7.4);
 });
 

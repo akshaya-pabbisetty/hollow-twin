@@ -87,12 +87,12 @@ test("care: help requests ranked, then a robot dispatched", async () => {
 test("surface: readings arrive, the verdict and the first-wave list update", async () => {
   const r = await run("surface"); clean(r);
   const v = await r.s.get("/surface");
-  assert.strictEqual(v.verdict, "sealed domes needed");
+  assert.strictEqual(v.verdict, "sealed outposts needed");
   const record = (await r.s.get("/surface/history")).filter((e) => e.type === "verdict").map((e) => e.verdict);
-  assert.deepStrictEqual(record, ["not enough data", "suits OK", "sealed domes needed"]);
+  assert.deepStrictEqual(record, ["not enough data", "suits OK", "sealed outposts needed"]);
   const f = await r.s.get("/firstwave");
   assert.deepStrictEqual(f.ranked.map((p) => p.device), ["watch-0052", "watch-0051", "watch-0055"]);
-  assert.strictEqual(f.cleared, true);
+  assert.strictEqual(f.cleared, false, "nobody is sent up to hold an outpost yet");
 });
 
 test("all: every shot in order against one fresh server, and everything it sent is tagged simulated", async () => {
@@ -103,7 +103,7 @@ test("all: every shot in order against one fresh server, and everything it sent 
   assert.strictEqual(st.readings.live, 0, "scripted data never claims to be live");
   assert.ok(st.readings.simulated > 50);
   assert.ok(Object.values(st.blocks).every((b) => b.source === "simulated"));
-  assert.strictEqual(st.surface.verdict, "sealed domes needed");
+  assert.strictEqual(st.surface.verdict, "sealed outposts needed");
   assert.ok(st.forecast.find((f) => f.block === "l6-flint-face").hours_left < 8);
   // every message the scenarios sent is a clean contract message: real block ids, device ids that fit section 3
   const blocks = new Set([...BLOCK_IDS, "surface"]);

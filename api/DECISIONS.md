@@ -339,3 +339,32 @@ contract carries the same table for the team.
 3. The surface verdict needs `o2_pct` and `pm25_ugm3` as well as the contract's three readings.
 4. "Sealed outposts" has no level of its own in the API's verdicts.
 5. A desk relay's real `draw_w` replaces a megawatt estimate in `/fairshare` (`measured=0` avoids it).
+
+
+---
+
+# Second brief (branch `lane1-backend`, continued)
+
+## Task 1: the surface verdict from the contract's three readings
+
+- **Required and optional.** The verdict now needs only what the contract's surface scout sends: `co2_ppm`,
+  `temp_c`, `radiation_usv_h`. `o2_pct` and `pm25_ugm3` are optional: listed as `not measured`, and able to make
+  the verdict worse once measured. `contract/samples/surface.json` alone gives `suits OK`. The earlier "all five or
+  not enough data" rule is gone; a missing required reading still gives `not enough data`.
+- **Four options.** `sealed outposts needed` sits between domes and stay underground. The reading: domes = the air
+  is unfit but the land is fine (sealed domes, farming under cover, local water); outposts = the land itself is
+  unfit to live off, so only small sealed outposts supplied from below. Which option each sourced limit leads to is
+  a design choice, written in `surface.js` (CHECKS) and in CONTRACT.md 4.3:
+  - outposts: radiation over IAEA OIL3 (1 µSv/h: local produce, milk, rainwater not to be consumed, so nothing grown
+    or collected up there can be used); temperature at NWS Extreme Danger (51.7 °C) or frostbite cold (-28.3 °C),
+    so nobody works outside.
+  - domes: CO2 over the OSHA 8-hour limit, oxygen outside the OSHA band, PM2.5 Hazardous, heat index Danger.
+  - stay: radiation over IAEA OIL2 (relocation), CO2 at IDLH.
+  Two limits therefore changed level: radiation over OIL3 was "domes" and is now "outposts"; temperature at
+  Extreme Danger and frostbite cold were "stay" and "domes" and are now both "outposts". The limit values and
+  sources are unchanged. No new limits were added for this task.
+- The surface demo shot now ends at `sealed outposts needed` (radiation 2.1 µSv/h), and the first wave is not
+  cleared for outposts: `cleared` is true only for suits and domes.
+- Alert level for a verdict change: suits info, domes warn, outposts and stay danger.
+- The surface test server runs with `RATE_LIMIT=1000`: one scout posts more than 20 readings a second there, and
+  the 429 was silently dropping readings.

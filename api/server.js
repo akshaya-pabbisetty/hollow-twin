@@ -34,7 +34,7 @@
 // POST /official          {block, count}  the Directorate's published case count
 // GET  /truth             residents' count vs official count, per block
 // GET  /surface           latest surface readings vs their limits, and the verdict: suits OK / sealed domes needed /
-//                         stay underground / not enough data, with the exact reasons
+//                         sealed outposts needed / stay underground / not enough data, with the exact reasons
 // GET  /surface/history   append-only public record: every surface reading and every verdict change
 // GET  /firstwave         ?n=20  who goes up first: healthy volunteers, never sole caregivers, needed skills first
 // GET  /status            everything the twin needs in one poll: forecast per block, alerts in the last hour, help queue,
@@ -216,7 +216,7 @@ function rules(r) {
     // every verdict change goes on the record (and out on the feed) with the reading that caused it
     const sv = SURF.surface(readings);
     if (sv.verdict !== surfaceVerdict) {
-      const level = sv.verdict === SURF.VERDICTS[2] ? "danger" : sv.verdict === SURF.VERDICTS[1] ? "warn" : "info";
+      const level = sv.verdict === SURF.STAY || sv.verdict === SURF.OUTPOSTS ? "danger" : sv.verdict === SURF.DOMES ? "warn" : "info";
       const crossed = sv.readings.filter((x) => x.status === sv.verdict).flatMap((x) => x.limits.filter((l) => LIM.crossed(l.key, x.value)));
       out.push(alert(r, level, `Surface verdict: ${sv.verdict}`, { surface_verdict: sv.verdict, previous: surfaceVerdict,
         reasons: sv.reasons, why: sv.reasons.join("; "), ...(crossed.length ? { limit: crossed[0], limits: crossed } : {}) }, "surface"));
@@ -500,7 +500,7 @@ function route(req, res) {
     const sv = SURF.surface(readings);
     const openHelp = new Set(L.queue(readings, assigned).map((x) => x.device));
     // the list is always ranked, but it is only a go when the surface verdict allows people up at all
-    const cleared = sv.verdict === SURF.VERDICTS[0] || sv.verdict === SURF.VERDICTS[1];
+    const cleared = sv.verdict === SURF.SUITS || sv.verdict === SURF.DOMES; // outposts are not a place to send a first wave
     return send(res, 200, { surface_verdict: sv.verdict, cleared,
       note: cleared ? `Surface verdict is "${sv.verdict}": this is the order people go up.`
         : `Surface verdict is "${sv.verdict}": nobody goes up yet. This is the order they would go.`,

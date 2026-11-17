@@ -6,29 +6,49 @@ const path = require("path");
 const { makeServer, ROOT } = require("./helper");
 
 const limits = JSON.parse(fs.readFileSync(path.join(ROOT, "shared/limits.json"), "utf8")).limits;
-const s = makeServer();
+const s = makeServer({ RATE_LIMIT: "1000" }); // one scout posts many readings a second in these tests
 before(() => s.start());
 after(() => s.cleanup());
-const scout = (values, source) => s.post("/ingest", s.R("surface-01", "surface", "surface", values, Date.now(), source ? { source } : {}));
+const scout = (values, source, ms = 0) => s.post("/ingest", s.R("surface-01", "surface", "surface", values, Date.now() + ms, source ? { source } : {}));
 const SAFE = { co2_ppm: 430, o2_pct: 20.9, temp_c: 18, pm25_ugm3: 12, radiation_usv_h: 0.2 };
 
-test("no readings, then some readings: 'not enough data', never a guess", async () => {
+test("no readings, then some readings: 'not enough data' until the contract's three readings are all there, never a guess", async () => {
   let v = await s.get("/surface");
   assert.strictEqual(v.verdict, "not enough data");
-  assert.deepStrictEqual(v.missing.sort(), ["co2_ppm", "o2_pct", "pm25_ugm3", "radiation_usv_h", "temp_c"]);
+  assert.deepStrictEqual(v.missing.sort(), ["co2_ppm", "radiation_usv_h", "temp_c"], "the contract's three readings are required");
+  assert.deepStrictEqual(v.not_measured.sort(), ["o2_pct", "pm25_ugm3"], "oxygen and PM2.5 are optional");
   assert.strictEqual(v.source, null);
   await scout({ co2_ppm: 430, temp_c: 18 });
-  await scout({ radiation_usv_h: 900 }); // lethal, but two readings are still missing
   v = await s.get("/surface");
-  assert.strictEqual(v.verdict, "not enough data", "a missing reading is never filled in with a guess");
-  assert.deepStrictEqual(v.missing.sort(), ["o2_pct", "pm25_ugm3"]);
-  assert.match(v.reasons.join(" | "), /no oxygen reading yet.*no PM2\.5 reading yet.*already known: radiation 900 µSv\/h is above 25 µSv\/h \(IAEA/);
-  assert.strictEqual(v.readings.find((r) => r.reading === "o2_pct").value, null);
+  assert.strictEqual(v.verdict, "not enough data", "a missing required reading is never filled in with a guess");
+  assert.deepStrictEqual(v.missing, ["radiation_usv_h"]);
+  assert.match(v.reasons.join(" | "), /^no radiation reading yet$/);
+  await scout({ co2_ppm: 430, temp_c: 18, o2_pct: 20.9, pm25_ugm3: 10 }, undefined, 1);
+  v = await s.get("/surface");
+  assert.strictEqual(v.verdict, "not enough data", "optional readings do not stand in for a required one");
+  await scout({ radiation_usv_h: 900 }, undefined, 2); // lethal: a real verdict, even with no further optional readings
+  v = await s.get("/surface");
+  assert.strictEqual(v.verdict, "stay underground");
+  assert.deepStrictEqual(v.readings.find((r) => r.reading === "o2_pct").required, false);
 });
 
-test("all five readings inside their limits: suits OK, each reading shown with its limit and source", async () => {
-  await scout(SAFE);
-  const v = await s.get("/surface");
+test("the contract's three readings inside their limits: suits OK; the optional ones are listed as not measured without blocking it", async () => {
+  await scout({ co2_ppm: 430, temp_c: 17.5, radiation_usv_h: 0.31 }, undefined, 3);
+  let v = await s.get("/surface");
+  assert.strictEqual(v.verdict, "suits OK");
+  assert.deepStrictEqual([v.missing, v.not_measured.sort()], [[], []], "oxygen and PM2.5 were measured earlier in this test file");
+  const fresh = makeServer(); await fresh.start();
+  try {
+    await fresh.post("/ingest", fresh.R("surface-01", "surface", "surface", { co2_ppm: 430, temp_c: 17.5, radiation_usv_h: 0.31 }));
+    v = await fresh.get("/surface");
+    assert.strictEqual(v.verdict, "suits OK");
+    assert.deepStrictEqual([v.missing, v.not_measured.sort()], [[], ["o2_pct", "pm25_ugm3"]]);
+    assert.strictEqual(v.readings.find((r) => r.reading === "o2_pct").status, "not measured");
+    assert.match(v.reasons[v.reasons.length - 1], /^not measured: oxygen, PM2\.5 \(optional readings; the verdict rests on what was measured\)$/);
+    assert.ok(v.reasons.slice(0, -1).every((r) => /is inside every limit/.test(r)) && v.reasons.length === 4);
+  } finally { await fresh.cleanup(); }
+  await scout(SAFE, undefined, 4);
+  v = await s.get("/surface");
   assert.strictEqual(v.verdict, "suits OK");
   assert.deepStrictEqual(v.missing, []);
   assert.strictEqual(v.readings.length, 5);
@@ -41,10 +61,10 @@ test("all five readings inside their limits: suits OK, each reading shown with i
   assert.strictEqual(v.source, "simulated");
 });
 
-test("each limit, one at a time: the verdict and its exact reason", async () => {
+test("each limit, one at a time: the verdict (one of the four return options) and its exact reason", async () => {
   const L = (k) => limits[k].value;
   const cases = [
-    [{ radiation_usv_h: 2.1 }, "sealed domes needed", /^radiation 2\.1 µSv\/h is above 1 µSv\/h \(IAEA, Operational Intervention Levels/],
+    [{ radiation_usv_h: 2.1 }, "sealed outposts needed", /^radiation 2\.1 µSv\/h is above 1 µSv\/h \(IAEA, Operational Intervention Levels/],
     [{ radiation_usv_h: L("surface_radiation_domes_usv_h") }, "suits OK", /inside every limit/],
     [{ radiation_usv_h: L("surface_radiation_stay_usv_h") + 5 }, "stay underground", /radiation 30 µSv\/h is above 25 µSv\/h \(IAEA/],
     [{ co2_ppm: L("surface_co2_domes_ppm") + 1 }, "sealed domes needed", /CO2 5001 ppm is above 5000 ppm \(OSHA PEL/],
@@ -52,8 +72,8 @@ test("each limit, one at a time: the verdict and its exact reason", async () => 
     [{ o2_pct: 19.4 }, "sealed domes needed", /oxygen 19\.4 % is below 19\.5 % \(OSHA 29 CFR 1910\.146/],
     [{ o2_pct: 24 }, "sealed domes needed", /oxygen 24 % is above 23\.5 % \(OSHA/],
     [{ temp_c: 41 }, "sealed domes needed", /temperature 41 C is at or above 39\.4 C \(US National Weather Service/],
-    [{ temp_c: 55 }, "stay underground", /temperature 55 C is at or above 51\.7 C \(US National Weather Service/],
-    [{ temp_c: -30 }, "sealed domes needed", /temperature -30 C is at or below -28\.3 C \(US National Weather Service, wind chill/],
+    [{ temp_c: 55 }, "sealed outposts needed", /temperature 55 C is at or above 51\.7 C \(US National Weather Service/],
+    [{ temp_c: -30 }, "sealed outposts needed", /temperature -30 C is at or below -28\.3 C \(US National Weather Service, wind chill/],
     [{ pm25_ugm3: 300 }, "sealed domes needed", /PM2\.5 300 µg\/m3 is at or above 225\.5 µg\/m3 \(US EPA/],
   ];
   for (const [change, verdict, reason] of cases) {
@@ -64,10 +84,17 @@ test("each limit, one at a time: the verdict and its exact reason", async () => 
   }
   // worst reading wins, and the milder problem is still listed
   await scout({ ...SAFE, radiation_usv_h: 40, o2_pct: 18 });
-  const v = await s.get("/surface");
+  let v = await s.get("/surface");
   assert.strictEqual(v.verdict, "stay underground");
   assert.match(v.reasons[0], /^radiation 40/);
   assert.match(v.reasons[1], /^also: oxygen 18 % is below 19\.5 %/);
+  await scout({ ...SAFE, radiation_usv_h: 2, co2_ppm: 6000 });
+  v = await s.get("/surface");
+  assert.strictEqual(v.verdict, "sealed outposts needed", "outposts (land unfit) outrank domes (air unfit)");
+  assert.match(v.reasons[1], /^also: CO2 6000 ppm/);
+  // every limit says which option it leads to
+  const rad = v.readings.find((r) => r.reading === "radiation_usv_h");
+  assert.deepStrictEqual(rad.limits.map((l) => [l.key, l.option]), [["surface_radiation_stay_usv_h", "stay underground"], ["surface_radiation_domes_usv_h", "sealed outposts needed"]]);
   await scout(SAFE);
   assert.strictEqual((await s.get("/surface")).verdict, "suits OK", "the verdict follows the latest readings back down");
 });
@@ -88,13 +115,13 @@ test("/surface/history: append-only public record of every surface reading and e
   assert.strictEqual(h.filter((e) => e.type === "reading").length, surfaceReadings, "every surface reading is on the record");
   assert.deepStrictEqual(h.map((e) => e.seq), h.map((e) => e.seq).slice().sort((a, b) => a - b), "in the order it was stored");
   const verdicts = h.filter((e) => e.type === "verdict");
-  assert.deepStrictEqual(verdicts.slice(0, 2).map((e) => [e.previous, e.verdict]), [[null, "not enough data"], ["not enough data", "suits OK"]]);
+  assert.deepStrictEqual(verdicts.slice(0, 2).map((e) => [e.previous, e.verdict]), [[null, "not enough data"], ["not enough data", "stay underground"]]);
   for (let i = 1; i < verdicts.length; i++) {
     assert.strictEqual(verdicts[i].previous, verdicts[i - 1].verdict, "each entry links to the one before: no silent change");
     assert.notStrictEqual(verdicts[i].verdict, verdicts[i].previous, "only real changes are recorded");
     assert.ok(verdicts[i].reasons.length >= 1 && verdicts[i].cause, "with its reasons and the reading that caused it");
   }
-  assert.ok(verdicts.some((e) => e.verdict === "stay underground") && verdicts.some((e) => e.verdict === "sealed domes needed"));
+  for (const v of ["stay underground", "sealed outposts needed", "sealed domes needed"]) assert.ok(verdicts.some((e) => e.verdict === v), v);
   // verdict changes also go out on the feed as alerts, with the limit that was crossed
   const alert = (await s.get("/history?kind=alert")).find((a) => a.values.surface_verdict === "stay underground");
   assert.strictEqual(alert.values.level, "danger");

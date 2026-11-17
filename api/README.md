@@ -275,7 +275,7 @@ Rules create alerts automatically. They are stored like messages with `kind: "al
 | Help requested | a watch sends button `help` | danger |
 | X is OK | a `checkin` (sent to the watches in `to` and the family group only) | info |
 | X sent to Y | a help request is assigned | info |
-| Surface verdict | the surface verdict changes | info / warn / danger |
+| Surface verdict | the surface verdict changes (suits: info, domes: warn, outposts and stay: danger) | info / warn / danger |
 
 Several of these numbers differ from the ones the twin uses today. `CONTRACT.md` section 6.1 lists both.
 
@@ -361,16 +361,18 @@ GET /broadcast
 ```
 
 ```json
-{ "verdict": "sealed domes needed",
-  "text": "The latest surface readings support living in sealed domes only: at least one is past its limit for open air.",
-  "reasons": ["radiation 2.1 µSv/h is above 1 µSv/h (IAEA, Operational Intervention Levels for Reactor Emergencies (EPR-NPP-OILs 2017), OIL3)"],
-  "missing": [], "source": "simulated", "time": "2026-11-18T20:00:00Z",
+{ "verdict": "sealed outposts needed",
+  "text": "The latest surface readings support sealed outposts only: the surface itself is past a limit for living off it, so only small sealed outposts supplied from the Hollow can be held, with no work outside.",
+  "reasons": ["radiation 2.1 µSv/h is above 1 µSv/h (IAEA, Operational Intervention Levels for Reactor Emergencies (EPR-NPP-OILs 2017), OIL3)",
+              "not measured: oxygen, PM2.5 (optional readings; the verdict rests on what was measured)"],
+  "missing": [], "not_measured": ["o2_pct", "pm25_ugm3"], "source": "simulated", "time": "2026-11-18T20:00:00Z",
   "readings": [
-    { "reading": "radiation_usv_h", "label": "radiation", "value": 2.1, "unit": "µSv/h", "status": "sealed domes needed",
+    { "reading": "radiation_usv_h", "label": "radiation", "required": true, "value": 2.1, "unit": "µSv/h", "status": "sealed outposts needed",
       "reason": "radiation 2.1 µSv/h is above 1 µSv/h (IAEA, ...)", "time": "...", "device": "surface-01", "block": "surface",
       "source": "simulated", "verified": false,
-      "limits": [{ "key": "surface_radiation_stay_usv_h", "value": 25, "unit": "µSv/h", "source": "IAEA, ...", "url": "https://...", "...": "..." },
-                 { "key": "surface_radiation_domes_usv_h", "value": 1, "...": "..." }] },
+      "limits": [{ "key": "surface_radiation_stay_usv_h", "value": 25, "unit": "µSv/h", "option": "stay underground", "source": "IAEA, ...", "url": "https://...", "...": "..." },
+                 { "key": "surface_radiation_domes_usv_h", "value": 1, "option": "sealed outposts needed", "...": "..." }] },
+    { "reading": "o2_pct", "label": "oxygen", "required": false, "value": null, "status": "not measured", "reason": "oxygen has not been measured (optional: the verdict does not wait for it)", "...": "..." },
     "..."
   ],
   "photo": { "url": "https://example.invalid/surface-01/000012.jpg", "time": "...", "device": "surface-01" },
@@ -378,10 +380,19 @@ GET /broadcast
   "rule": "Worst reading wins. ..." }
 ```
 
-The verdict is `suits OK`, `sealed domes needed`, `stay underground`, or `not enough data`. It needs all five
-readings: `co2_ppm`, `temp_c`, `radiation_usv_h` (the contract's three) plus `o2_pct` and `pm25_ugm3` (optional in
-the contract). Until a scout has sent each one at least once the verdict is `not enough data`, and `text` names
-what is missing. The API never guesses.
+The verdict is the return option the readings support, worst reading wins:
+
+| Verdict | Means |
+|---|---|
+| `suits OK` | an open settlement: people work on the surface in suits |
+| `sealed domes needed` | the open air is unfit (CO2, oxygen, dust or heat): sealed domes with scrubbed air, farming under cover |
+| `sealed outposts needed` | the surface itself is unfit to live off (radiation past the IAEA food and water level, or lethal heat or cold): small sealed outposts supplied from the Hollow, no work outside |
+| `stay underground` | nobody goes up (radiation past the IAEA relocation level, or CO2 at the IDLH level) |
+| `not enough data` | one of the contract's three readings (`co2_ppm`, `temp_c`, `radiation_usv_h`) has not been sent yet; `text` names it |
+
+`o2_pct` and `pm25_ugm3` are optional: when measured they can only make the verdict worse, and until then they are
+listed in `not_measured`. The contract's own surface sample gives `suits OK` on its own. Each entry in `limits`
+says which option (`option`) crossing it leads to; `CONTRACT.md` section 4.3 has the table and the reasons.
 
 ### GET /status
 
@@ -398,7 +409,7 @@ GET /status
   "alerts": { "window_min": 60, "count": 14, "by_level": { "info": 3, "warn": 5, "danger": 6 }, "latest": ["..."] },
   "queue": { "length": 2, "top": { "device": "watch-0043", "score": 65, "...": "..." } },
   "truth": { "window_h": 24, "residents_total": 14, "official_total": 2, "gap": 12, "blocks": ["..."] },
-  "surface": { "verdict": "sealed domes needed", "reasons": ["radiation 2.1 µSv/h is above 1 µSv/h (IAEA, ...)"], "missing": [], "source": "simulated" },
+  "surface": { "verdict": "sealed outposts needed", "reasons": ["radiation 2.1 µSv/h is above 1 µSv/h (IAEA, ...)"], "missing": [], "not_measured": [], "source": "simulated" },
   "blocks": { "l6-flint-face": { "source": "simulated", "latest_time": "...", "latest_device": "relay-l6-flint-face", "live_kinds": [], "simulated_kinds": ["power"] } },
   "readings": { "total": 61, "verified": 0, "unverified": 61, "live": 0, "simulated": 61 },
   "feed_clients": 2 }
@@ -541,7 +552,7 @@ GET /surface/history
 ```json
 [ { "seq": 79, "type": "reading", "time": "...", "id": "surface-01-000013", "device": "surface-01", "block": "surface",
     "values": { "radiation_usv_h": 2.1 }, "source": "simulated", "verified": false },
-  { "seq": 80, "type": "verdict", "time": "...", "id": "alert-surface-01-000013-surface", "verdict": "sealed domes needed", "previous": "suits OK",
+  { "seq": 80, "type": "verdict", "time": "...", "id": "alert-surface-01-000013-surface", "verdict": "sealed outposts needed", "previous": "suits OK",
     "reasons": ["radiation 2.1 µSv/h is above 1 µSv/h (IAEA, ...)"], "cause": "surface-01-000013", "source": "simulated" } ]
 ```
 

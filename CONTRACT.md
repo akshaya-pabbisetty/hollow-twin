@@ -159,14 +159,28 @@ data: {"id":"watch-0042-000387","device":"watch-0042","block":"l8-bore-bend","ti
 
 | Field | Meaning |
 | --- | --- |
-| `verdict` | `suits OK`, `sealed domes needed`, `stay underground`, or `not enough data` (a reading is still missing: the API never guesses). |
+| `verdict` | Which return option the readings support: `suits OK`, `sealed domes needed`, `sealed outposts needed` or `stay underground`; or `not enough data` while one of the contract's three surface readings (`co2_ppm`, `temp_c`, `radiation_usv_h`) is still missing (the API never guesses). The optional `o2_pct` and `pm25_ugm3` can make the verdict worse when measured; the verdict does not wait for them. See 4.3. |
 | `text` | The verdict as one plain sentence. |
 | `reasons` | The readings and limits behind the verdict, one sentence each. |
-| `readings` | One entry per surface reading: `reading`, `label`, `value`, `unit`, `status`, `reason`, `time`, `device`, and `limits` (each limit with its `value`, `unit`, `source` and `url`). |
-| `missing` | Readings no scout has sent yet. |
+| `readings` | One entry per surface reading: `reading`, `label`, `required`, `value`, `unit`, `status` (`ok`, one of the four options, `no data`, `not measured`), `reason`, `time`, `device`, and `limits` (each limit with its `value`, `unit`, `source`, `url`, and the `option` crossing it leads to). |
+| `missing` | Required readings no scout has sent yet. |
+| `not_measured` | Optional readings no scout has sent yet (`o2_pct`, `pm25_ugm3`). |
 | `photo` | The newest `photo_url` with its `time` and `device`, or `null`. |
 | `history` | `/surface/history`: the append-only record of every surface reading and every verdict change. |
 | `source` | `live`, `simulated` or `mixed`: what the verdict rests on. |
+
+### 4.3 The surface verdict: which return option the readings support (lane 1)
+
+The broadcast page's verdict is one of the four return options, mildest first. Each means what the readings allow:
+
+| Verdict | Means | A reading points here when |
+| --- | --- | --- |
+| `suits OK` | An open settlement: people work on the surface in suits. | Every reading measured is inside every limit. |
+| `sealed domes needed` | The open air is unfit to live in, but the ground, water and temperature are fine: sealed domes with scrubbed air, farming under cover, local water. | `co2_ppm` over 5,000 ppm (OSHA PEL / NIOSH REL, 8-hour limit); `o2_pct` under 19.5 % or over 23.5 % (OSHA 29 CFR 1910.146); `pm25_ugm3` 225.5 or more (US EPA AQI Hazardous); `temp_c` 39.4 °C or more (NWS heat index Danger). |
+| `sealed outposts needed` | The surface itself is unfit to live off: nothing grown or collected there can be used, or nobody can work outside. Only small sealed outposts, supplied from the Hollow. | `radiation_usv_h` over 1 µSv/h (IAEA OIL3: local produce, milk and rainwater not to be consumed); `temp_c` 51.7 °C or more (NWS Extreme Danger) or -28.3 °C or less (NWS wind chill: frostbite in 30 minutes). |
+| `stay underground` | Nobody goes up. | `radiation_usv_h` over 25 µSv/h (IAEA OIL2: relocation); `co2_ppm` 40,000 ppm or more (NIOSH IDLH). |
+
+Worst reading wins. The limits are published safety facts (`GET /limits` has every source); which option a crossed limit leads to is lane 1's design choice, with the reason in each row. Lane 4's page can show `text` as it is, or map the four verdicts to its own words.
 
 ### 4.2 More endpoints the API offers (lane 1)
 
@@ -260,3 +274,4 @@ Additions only. Nothing above was renamed or removed. Each row says where the ad
 | 2026-11-17 | 5 | What the API does with a backlog array: sorted by `time`, duplicates dropped, replayed in order on `/live`. |
 | 2026-11-17 | 6.1 | Proposed limits with sources for CO2, air temperature (heat index), flood depth and mains frequency, beside the twin's numbers. The twin's table is unchanged. |
 | 2026-11-17 | 6.2 | The open water item filled in: `tds_ppm` over 1,000 ppm (WHO) or `turbidity_ntu` over 5 NTU (US EPA) means do not drink. |
+| 2026-11-17 | 4.1, 4.3 | Surface verdict covers all four return options (`sealed outposts needed` added); only the contract's three surface readings are required, `o2_pct` and `pm25_ugm3` are optional and listed in `not_measured`; each limit says which option it leads to. |

@@ -1,7 +1,7 @@
 // Task 4: the endpoints of CONTRACT.md section 4, exactly as the contract and tools/catcher.mjs describe them.
 const { test, before, after } = require("node:test");
 const assert = require("node:assert");
-const { makeServer } = require("./helper");
+const { makeServer, REPO } = require("./helper");
 
 const s = makeServer();
 const locked = makeServer({ INGEST_KEY: "s3cret" });
@@ -197,27 +197,32 @@ test("GET /broadcast: the latest surface readings, each against its limit, the v
     const scout = (values, ms = 0) => b.post("/ingest", b.R("surface-01", "surface", "surface", values, Date.now() + ms));
     let page = await b.get("/broadcast");
     assert.deepStrictEqual([page.verdict, page.photo, page.time, page.history], ["not enough data", null, null, "/surface/history"]);
-    assert.match(page.text, /^No verdict yet: 5 of the 5 surface readings have not been measured/);
-    // the contract's own surface message: three of the five readings, and a photo
-    await scout({ co2_ppm: 430, temp_c: 17.5, radiation_usv_h: 0.31, photo_url: "https://example.invalid/surface-01/000012.jpg" });
+    assert.match(page.text, /^No verdict yet: 3 of the 3 surface readings the contract requires have not been measured \(radiation_usv_h, co2_ppm, temp_c\)/);
+    // the contract's own surface sample, exactly as it is in contract/samples/surface.json: a real verdict on its own
+    const sample = JSON.parse(require("fs").readFileSync(require("path").join(REPO, "contract", "samples", "surface.json"), "utf8"));
+    assert.strictEqual((await b.post("/ingest", sample)).body.accepted, 1);
     page = await b.get("/broadcast");
-    assert.strictEqual(page.verdict, "not enough data", "the contract's three readings alone are not a verdict");
-    assert.deepStrictEqual(page.missing.sort(), ["o2_pct", "pm25_ugm3"]);
-    assert.match(page.text, /2 of the 5 surface readings have not been measured \(o2_pct, pm25_ugm3\)\. The API does not guess\./);
+    assert.deepStrictEqual([page.verdict, page.missing, page.not_measured.sort()], ["suits OK", [], ["o2_pct", "pm25_ugm3"]], "the contract's three readings give a verdict");
+    assert.strictEqual(page.text, "The latest surface readings support going up in suits: every reading measured is inside its human-safe limit, so an open settlement is possible.");
+    assert.match(page.reasons[page.reasons.length - 1], /^not measured: oxygen, PM2\.5 \(optional/);
     assert.strictEqual(page.photo.url, "https://example.invalid/surface-01/000012.jpg");
     const rad = page.readings.find((r) => r.reading === "radiation_usv_h");
-    assert.deepStrictEqual([rad.value, rad.unit, rad.status, rad.device], [0.31, "µSv/h", "ok", "surface-01"]);
-    assert.ok(rad.limits.length === 2 && rad.limits.every((l) => l.value && l.source && /^https:/.test(l.url)), "each reading comes with its sourced limits");
-    // the two optional readings complete it
+    assert.deepStrictEqual([rad.value, rad.unit, rad.status, rad.device, rad.required], [0.31, "µSv/h", "ok", "surface-01", true]);
+    assert.ok(rad.limits.length === 2 && rad.limits.every((l) => l.value && l.source && /^https:/.test(l.url) && l.option), "each reading comes with its sourced limits and the option each leads to");
+    assert.deepStrictEqual(page.readings.filter((r) => r.status === "not measured").map((r) => r.reading).sort(), ["o2_pct", "pm25_ugm3"]);
+    // the two optional readings, when measured, can only make it worse
     await scout({ o2_pct: 20.9, pm25_ugm3: 14 }, 5);
     page = await b.get("/broadcast");
-    assert.deepStrictEqual([page.verdict, page.text], ["suits OK", "The latest surface readings support going up in suits: all five are inside their human-safe limits."]);
-    assert.strictEqual(page.readings.length, 5);
+    assert.deepStrictEqual([page.verdict, page.not_measured], ["suits OK", []]);
     assert.ok(page.readings.every((r) => r.status === "ok" && /is inside every limit/.test(r.reason)));
-    await scout({ radiation_usv_h: 2.1, photo_url: "https://example.invalid/surface-01/000013.jpg" }, 10);
+    await scout({ co2_ppm: 6000 }, 8);
     page = await b.get("/broadcast");
     assert.strictEqual(page.verdict, "sealed domes needed");
-    assert.match(page.text, /support living in sealed domes only/);
+    assert.match(page.text, /support sealed domes: the open air is past a limit for living in it/);
+    await scout({ co2_ppm: 430, radiation_usv_h: 2.1, photo_url: "https://example.invalid/surface-01/000013.jpg" }, 10);
+    page = await b.get("/broadcast");
+    assert.strictEqual(page.verdict, "sealed outposts needed");
+    assert.match(page.text, /support sealed outposts only: the surface itself is past a limit for living off it/);
     assert.match(page.reasons[0], /radiation 2\.1 µSv\/h is above 1 µSv\/h \(IAEA/);
     assert.strictEqual(page.photo.url, "https://example.invalid/surface-01/000013.jpg", "the newest photo");
     await scout({ radiation_usv_h: 40 }, 15);
@@ -226,8 +231,8 @@ test("GET /broadcast: the latest surface readings, each against its limit, the v
     assert.match(page.text, /do not support going up at all/);
     // the link really is the public record, and it holds every reading and verdict change
     const record = await b.get(page.history);
-    assert.strictEqual(record.filter((e) => e.type === "reading").length, 4);
-    assert.deepStrictEqual(record.filter((e) => e.type === "verdict").map((e) => e.verdict), ["not enough data", "suits OK", "sealed domes needed", "stay underground"]);
+    assert.strictEqual(record.filter((e) => e.type === "reading").length, 5);
+    assert.deepStrictEqual(record.filter((e) => e.type === "verdict").map((e) => e.verdict), ["suits OK", "sealed domes needed", "sealed outposts needed", "stay underground"]);
     assert.deepStrictEqual((await b.get("/surface")).verdict, page.verdict, "GET /surface agrees");
   } finally { await b.cleanup(); }
 });

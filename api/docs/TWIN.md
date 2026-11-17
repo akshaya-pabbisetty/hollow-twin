@@ -184,20 +184,21 @@ const page = await fetch(API + "/broadcast").then((r) => r.json());
 | Task in `broadcast/README.md` | Fields |
 |---|---|
 | Live video or the latest rover photo | `page.photo` (`url`, `time`, `device`), or `null` when no scout has sent a `photo_url` |
-| Each `surface` reading against its human-safe limit | `page.readings[]`: `label`, `value`, `unit`, `status` (`ok`, `sealed domes needed`, `stay underground`, `no data`), `reason`, and `limits[]` with each limit's `value`, `unit`, `source` and `url` |
+| Each `surface` reading against its human-safe limit | `page.readings[]`: `label`, `value`, `unit`, `status` (`ok`, one of the four verdicts, `no data`, `not measured`), `required`, `reason`, and `limits[]` with each limit's `value`, `unit`, `source` and `url` |
 | A plain-language verdict | `page.verdict` and `page.text` (one sentence), with `page.reasons[]` |
 | A history of past readings so anyone can check old claims | `GET API + page.history` (`/surface/history`): every surface reading (`type: "reading"`) and every verdict change (`type: "verdict"`, with `previous`, `verdict`, `reasons`) in stored order. Nothing in the API can edit or delete an entry |
 
 Three things to know about the verdict:
 
-- It is one of `suits OK`, `sealed domes needed`, `stay underground`, `not enough data`. Suggested colours: green,
-  amber, red, grey.
-- It needs five readings: the contract's `co2_ppm`, `temp_c`, `radiation_usv_h`, plus `o2_pct` and `pm25_ugm3`
-  (optional additions, contract section 2.1). With only the contract's three, the page gets `not enough data` and
-  `page.missing` lists `o2_pct` and `pm25_ugm3`. Show that as it is; the API never guesses.
-- `broadcast/README.md` names the return options "suits, domes or sealed outposts". The API has no separate
-  "sealed outposts" level: `suits OK` is suits, `sealed domes needed` is domes, and `stay underground` means none
-  of the options is supported yet. If the page needs a third option, say so in the group chat.
+- It is one of the return options in `broadcast/README.md`, worst reading wins: `suits OK` (suits), `sealed domes
+  needed` (domes), `sealed outposts needed` (sealed outposts), or `stay underground` (none of them); or
+  `not enough data`. Suggested colours: green, amber, orange, red, grey. `CONTRACT.md` section 4.3 says what each
+  one means and which readings lead to it.
+- It needs the contract's three readings (`co2_ppm`, `temp_c`, `radiation_usv_h`). The contract's own surface
+  sample gives `suits OK` on its own. Until all three have arrived the page gets `not enough data` and
+  `page.missing` names what is missing. Show that as it is; the API never guesses.
+- `o2_pct` and `pm25_ugm3` are optional (contract section 2.1). Until a scout sends them they are listed in
+  `page.not_measured` and their rows have `status: "not measured"`; once measured they can make the verdict worse.
 
 More panels for the broadcast page, all open GETs:
 
@@ -229,7 +230,7 @@ More panels for the broadcast page, all open GETs:
   "queue": { "length": 2, "top": { "id": "watch-0043-...", "device": "watch-0043", "block": "l5-rail-face", "score": 65, "vitals": { "hr_bpm": 96, "spo2_pct": 96, "temp_c": 38.4 }, "reasons": ["help pressed: 50 points", "+15: temperature 38.4 C is above 38 C (...)"], "status": "open" } },
   "truth": { "window_h": 24, "residents_total": 14, "official_total": 2, "gap": 12,
              "blocks": [ { "block": "l8-bore-bend", "residents": 13, "official": 2, "gap": 11 } ] },
-  "surface": { "verdict": "sealed domes needed", "reasons": ["radiation 2.1 µSv/h is above 1 µSv/h (IAEA, ...)"], "missing": [], "source": "simulated" },
+  "surface": { "verdict": "sealed outposts needed", "reasons": ["radiation 2.1 µSv/h is above 1 µSv/h (IAEA, ...)"], "missing": [], "not_measured": [], "source": "simulated" },
   "blocks": {
     "l6-flint-face": { "source": "simulated", "latest_time": "2026-11-18T20:04:58.000Z", "latest_device": "relay-l6-flint-face", "live_kinds": [], "simulated_kinds": ["power"] },
     "l3-ember-yard": { "source": "live", "latest_time": "2026-11-18T20:04:59.000Z", "latest_device": "sensor-l3-ember-yard", "live_kinds": ["water"], "simulated_kinds": ["vitals"] }

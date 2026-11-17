@@ -303,21 +303,20 @@ shots.surface = async () => {
     return v;
   };
   say(`The surface scout ${scout} climbs out and reports what it measures, as block "${up}".`);
-  step("1. The first message arrives: the three readings of the contract, and a photo. The API refuses to guess");
-  await send(R(scout, up, "surface", { co2_ppm: 430, temp_c: 17.5, radiation_usv_h: 0.3, photo_url: `https://example.invalid/${scout}/000001.jpg` }));
-  say("CO2 430 ppm, temperature 17.5 C, radiation 0.3 uSv/h");
+  step("1. The first message arrives with two of the contract's three readings. The API refuses to guess");
+  await send(R(scout, up, "surface", { co2_ppm: 430, temp_c: 17.5, photo_url: `https://example.invalid/${scout}/000001.jpg` }));
+  say("CO2 430 ppm, temperature 17.5 C");
   let v = await show();
-  check(v.verdict !== "suits OK" || v.missing.length === 0, "with readings missing there is no 'safe' verdict");
-  await beat();
-  check(v.missing.join() === "o2_pct,pm25_ugm3", "oxygen and fine dust have not been measured yet, and the page says so");
+  check(v.verdict === "not enough data" && v.missing.join() === "radiation_usv_h", "no radiation reading yet, so no verdict, and the page says what is missing");
   await beat();
 
-  step("2. The scout's oxygen and dust sensors complete the picture");
-  await send(R(scout, up, "surface", { o2_pct: 20.9, pm25_ugm3: 14 }, Date.now() + 2));
-  say("oxygen 20.9 %, fine dust 14 ug/m3");
+  step("2. The radiation reading completes the contract's three");
+  await send(R(scout, up, "surface", { radiation_usv_h: 0.3 }, Date.now() + 2));
+  say("radiation 0.3 uSv/h");
   v = await show();
-  for (const r of v.readings) say(`  ${pad(r.label, 12)} ${pad(`${r.value} ${r.unit}`, 14)} ${r.status}`);
-  check(v.verdict === "suits OK", "all five readings are inside their limits: suits OK");
+  for (const r of v.readings) say(`  ${pad(r.label, 12)} ${pad(r.value === null ? "-" : `${r.value} ${r.unit}`, 14)} ${r.status}`);
+  check(v.verdict === "suits OK", "the three contract readings are inside their limits: suits OK");
+  check(v.not_measured.join() === "o2_pct,pm25_ugm3", "oxygen and fine dust are optional: listed as not measured, the verdict does not wait for them");
   await beat();
 
   step("3. Who goes up first? Residents volunteer from their watches");
@@ -353,10 +352,10 @@ shots.surface = async () => {
   say("The public record of verdict changes (nobody can quietly rewrite it):");
   for (const e of record) say(`    ${e.time.slice(11, 19)}  ${e.previous || "(none)"}  ->  ${e.verdict}`);
   f = await get("/firstwave");
-  check(v.verdict === "sealed domes needed", "radiation above the limit: sealed domes needed");
+  check(v.verdict === "sealed outposts needed", "radiation above the IAEA food and water limit: nothing grown up there can be eaten, so sealed outposts only");
   check(/radiation 2\.1 .Sv\/h is above 1 .Sv\/h \(IAEA/.test(v.reasons[0]), "the verdict states the reading, the limit and its source");
-  check(record.length >= 2 && record[record.length - 1].verdict === "sealed domes needed", "every verdict change is on the public record");
-  check(f.surface_verdict === "sealed domes needed" && f.ranked.length === 3, "the first-wave list follows the new verdict");
+  check(record.length >= 2 && record[record.length - 1].verdict === "sealed outposts needed", "every verdict change is on the public record");
+  check(f.surface_verdict === "sealed outposts needed" && f.ranked.length === 3 && f.cleared === false, "the first-wave list follows the new verdict: ranked, but nobody goes up to hold an outpost yet");
 };
 
 // ---------------------------------------------------------------------------------------------------------------
