@@ -2009,7 +2009,7 @@ function onReading(m, fresh) {
     const a = BYID[m.values.from_block], b = BYID[m.values.to_block];
     const e = a && b && EDGES.find(e => (e.a === a && e.b === b) || (e.a === b && e.b === a));
     if (e) { e.api = { status: m.values.status, reason: m.values.reason, m }; e.blocked = m.values.status === 'closed'; }
-    if (fresh && a && b) log(m.values.status === 'closed' ? 'crit' : 'ok', `${m.device} checked the tunnel from ${a.name} to ${b.name}: ${m.values.status}${m.values.reason ? ', ' + m.values.reason : ''}.`, [a, b], prov(m));
+    if (fresh && a && b) log(m.values.status === 'closed' ? 'crit' : 'ok', `${escH(m.device)} checked the tunnel from ${a.name} to ${b.name}: ${escH(m.values.status)}${m.values.reason ? ', ' + escH(m.values.reason) : ''}.${e ? '' : ' (These two blocks share no tunnel in this model, so no tunnel is marked.)'}`, [a, b], prov(m));
   }
   if (n && m.source === 'live') { n.liveMsg = m; srcTag(n); } // a real device is in this block, whatever it sent
   if (m.kind === 'surface' || m.kind === 'button' || m.kind === 'vitals') refreshSoon();
