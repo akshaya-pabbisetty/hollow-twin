@@ -34,14 +34,14 @@ after(async () => { await stopServer(); fs.rmSync(DATA, { force: true }); });
 
 test("format: valid readings stored, bad ones rejected with a reason", async () => {
   const ok = await post("/ingest", R("sensor", "l2-chalk-gallery", "air", { co2_ppm: 900 }));
-  assert.strictEqual(ok.body.added, 1);
+  assert.strictEqual(ok.body.accepted, 1);
   const b = "l2-chalk-gallery";
   const bad = await post("/ingest", [{ id: "x" }, { ...R("sensor", b, "smell", {}) }, { ...R("sensor", b, "air", {}), time: "yesterday" }]);
-  assert.strictEqual(bad.status, 400);
-  assert.deepStrictEqual(bad.body.errors.map((e) => e.err).sort(),
+  assert.strictEqual(bad.status, 422);
+  assert.deepStrictEqual(bad.body.rejected.map((e) => e.problems.join("; ")).sort(),
     ["missing device; missing block; missing time; missing kind; missing values", "time is not ISO 8601", 'unknown kind "smell"']);
   assert.strictEqual((await post("/ingest", "{not json")).status, 400);
-  assert.strictEqual((await post("/ingest", [null])).status, 400);
+  assert.strictEqual((await post("/ingest", [null])).status, 422);
 });
 
 test("shot 3, warning: hours left = battery_wh / (draw_w - supply_w); one warning under 24 h, one alarm under 8 h", async () => {
@@ -118,9 +118,9 @@ test("shot 5, network dies: relay backlog arrives late and out of order, copies 
   const held = [0, 1, 2, 3, 4].map((i) => R("sensor", b, "air", { co2_ppm: 900 + i }, t0 + i * 60e3));
   const shuffled = [held[3], held[0], held[4], held[1], held[2]];
   const first = await post("/ingest", shuffled);
-  assert.strictEqual(first.body.added, 5);
+  assert.strictEqual(first.body.accepted, 5);
   const copy = await post("/ingest", [held[1], held[2]]); // the same messages arriving via a second relay
-  assert.strictEqual(copy.body.dupes, 2);
+  assert.strictEqual(copy.body.duplicates, 2);
   const hist = await get(`/history?block=${b}&kind=air`);
   assert.deepStrictEqual(hist.map((r) => r.values.co2_ppm), [900, 901, 902, 903, 904]);
   assert.strictEqual(hist[0].time, held[0].time, "original reading times kept");
@@ -197,11 +197,11 @@ test("load: 2,000-reading backlog and 50 relays posting at once", async () => {
   const big = Array.from({ length: 2000 }, (_, i) => R("relay", "l4-coke-yard", "air", { co2_ppm: 800 + (i % 50) }, Date.now() - i * 1000));
   let t0 = Date.now();
   const r = await post("/ingest", big);
-  assert.strictEqual(r.body.added, 2000);
+  assert.strictEqual(r.body.accepted, 2000);
   const backlogMs = Date.now() - t0;
   t0 = Date.now();
   const rs = await Promise.all(Array.from({ length: 50 }, (_, i) => post("/ingest", R("sensor", BLOCK_IDS[i], "air", { co2_ppm: 700 }))));
-  assert.ok(rs.every((x) => x.body.added === 1));
+  assert.ok(rs.every((x) => x.body.accepted === 1));
   console.log(`    2,000 backlog: ${backlogMs} ms, 50 parallel posts: ${Date.now() - t0} ms`);
   assert.ok(backlogMs < 3000);
 });
@@ -214,5 +214,5 @@ test("restart: readings, families, official counts and dispatches survive a cras
   assert.strictEqual((await get("/truth")).blocks.find((r) => r.block === "l8-bore-bend").official, 2);
   assert.ok(!(await get("/queue")).some((x) => x.device === "watch-0042"), "dispatched stays dispatched");
   const old = (await get("/history?kind=air"))[0]; // a reading stored before the restart
-  assert.strictEqual((await post("/ingest", old)).body.dupes, 1, "a relay re-sending after a restart is still dropped");
+  assert.strictEqual((await post("/ingest", old)).body.duplicates, 1, "a relay re-sending after a restart is still dropped");
 });

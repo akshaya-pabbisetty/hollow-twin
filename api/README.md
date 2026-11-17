@@ -127,6 +127,17 @@ node server.js
 
 All responses are JSON. All GET endpoints are open (CORS `*`). Examples are shortened with `...`.
 
+### The contract endpoints (CONTRACT.md section 4)
+
+| Method and path | Does |
+|---|---|
+| `POST /ingest` | One message or an array. Replies `{ "accepted": n, "duplicates": n, "rejected": [...], "warnings": [...] }` |
+| `GET /live` | Server-sent events: `event: reading` per accepted message, `event: alert` per alert, with ids and `Last-Event-ID` replay |
+| `GET /blocks/<block id>/latest` | The latest message of each kind for that block |
+| `GET /help` | Open help requests, highest priority first |
+| `POST /help/<message id>/assign` | Body `{ "to": "rover-01" }`. Marks the request as assigned |
+| `GET /broadcast` | Latest surface readings against their limits, the verdict text, and a link to the history |
+
 ### POST /ingest
 
 One reading, or an array of readings (a relay backlog). Duplicates by `id` are dropped.

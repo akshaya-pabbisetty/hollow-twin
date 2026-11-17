@@ -18,20 +18,20 @@ test("oversize body: 413 with a reason, and the server keeps serving", async () 
   assert.match(r.body.error, /body too large/);
   assert.strictEqual(r.body.limit_bytes, 5000000);
   assert.strictEqual((await s.get("/history")).length, 0, "nothing from the oversize body was stored");
-  assert.strictEqual((await s.post("/ingest", s.R("relay", "l1-winch-gallery", "air", { co2_ppm: 700 }))).body.added, 1);
+  assert.strictEqual((await s.post("/ingest", s.R("relay", "l1-winch-gallery", "air", { co2_ppm: 700 }))).body.accepted, 1);
 });
 
-test("malformed JSON on every POST endpoint: 400 JSON, never a crash", async () => {
+test("malformed JSON on every POST endpoint: a 400 or 422 JSON answer, never a crash", async () => {
   for (const path of ["/ingest", "/dispatch", "/family", "/official"]) {
     for (const body of ["{not json", "", "null", "42", '"text"', "[1,2", "[[]]", "{\"a\":"]) {
       const r = await s.post(path, body);
-      assert.ok(r.status === 400 || (path === "/dispatch" && r.status === 200), `${path} with ${JSON.stringify(body)} gave ${r.status}`);
+      assert.ok(r.status === 400 || (path === "/ingest" && r.status === 422) || (path === "/dispatch" && r.status === 200), `${path} with ${JSON.stringify(body)} gave ${r.status}`);
       assert.strictEqual(typeof r.body, "object");
     }
   }
   const mixed = await s.post("/ingest", [null, 7, "x", [], {}, s.R("relay", "l1-winch-gallery", "air", { co2_ppm: 701 })]);
-  assert.strictEqual(mixed.body.added, 1, "the one good reading in a batch of junk is still stored");
-  assert.strictEqual(mixed.body.errors.length, 5);
+  assert.strictEqual(mixed.body.accepted, 1, "the one good reading in a batch of junk is still stored");
+  assert.strictEqual(mixed.body.rejected.length, 5);
   assert.ok((await s.get("/history")).length >= 2, "server still alive");
 });
 
@@ -48,14 +48,14 @@ test("future timestamp: more than 5 minutes ahead never reaches the timeline (ke
   const b = "l4-coke-yard", t0 = Date.now();
   const future = s.R("sensor", b, "air", { co2_ppm: 800 }, t0 + 10 * MIN);
   const ahead = await s.post("/ingest", future);
-  assert.deepStrictEqual([ahead.status, ahead.body.added], [200, 1], "kept: a wrong clock must not lose a reading");
+  assert.deepStrictEqual([ahead.status, ahead.body.accepted], [200, 1], "kept: a wrong clock must not lose a reading");
   let got = (await s.get(`/history?block=${b}`)).find((r) => r.id === future.id);
   assert.strictEqual(got.time_estimated, true);
   assert.strictEqual(got.device_time, future.time, "what the device sent is kept beside it");
   assert.ok(Math.abs(Date.parse(got.time) - t0) < 5000, `time ${got.time} should be the receive time, not the future`);
   assert.match(got.warnings.join(" | "), /more than 5 minutes in the future \(server clock .*stored with the receive time/);
   const drift = s.R("sensor", b, "air", { co2_ppm: 801 }, Date.now() + 2 * MIN);
-  assert.strictEqual((await s.post("/ingest", drift)).body.added, 1);
+  assert.strictEqual((await s.post("/ingest", drift)).body.accepted, 1);
   got = (await s.get(`/history?block=${b}`)).find((r) => r.id === drift.id);
   assert.deepStrictEqual([got.time, got.time_estimated, got.warnings], [drift.time, undefined, undefined], "2 minutes ahead is left alone");
   // a reading stamped far ahead cannot push itself to the end of the timeline or into a forecast
@@ -68,7 +68,7 @@ test("future timestamp: more than 5 minutes ahead never reaches the timeline (ke
 test("1970 timestamp (ESP32 with no clock sync): accepted, stamped with the receive time, marked time_estimated", async () => {
   const b = "l5-rail-face", t0 = Date.now();
   const r1970 = { ...s.R("sensor", b, "flood", { depth_cm: 3 }), time: "1970-01-01T00:00:07Z" };
-  assert.strictEqual((await s.post("/ingest", r1970)).body.added, 1);
+  assert.strictEqual((await s.post("/ingest", r1970)).body.accepted, 1);
   const [got] = await s.get(`/history?block=${b}`);
   assert.strictEqual(got.time_estimated, true);
   assert.strictEqual(got.device_time, "1970-01-01T00:00:07Z");
@@ -88,7 +88,7 @@ test("1970 timestamp (ESP32 with no clock sync): accepted, stamped with the rece
 
 test("rate limit: default allows 20 single posts a second per device", async () => {
   const rs = await Promise.all(Array.from({ length: 20 }, (_, i) => s.post("/ingest", s.R("watch-0020", "l2-chalk-gallery", "vitals", { hr_bpm: 70 + i, spo2_pct: 98, temp_c: 36.6 }))));
-  assert.ok(rs.every((r) => r.status === 200 && r.body.added === 1));
+  assert.ok(rs.every((r) => r.status === 200 && r.body.accepted === 1));
 });
 
 test("rate limit hit: 429 with Retry-After for single posts, but a 2,000-reading backlog array is never dropped", async () => {
@@ -106,7 +106,7 @@ test("rate limit hit: 429 with Retry-After for single posts, but a 2,000-reading
   await Promise.all(Array.from({ length: 8 }, one));
   const backlog = Array.from({ length: 2000 }, (_, i) => slow.R("relay", "l8-bore-bend", "air", { co2_ppm: 600 + (i % 40) }, Date.now() - i * 1000));
   const up = await slow.post("/ingest", backlog);
-  assert.deepStrictEqual([up.status, up.body.added, up.body.errors.length], [200, 2000, 0]);
+  assert.deepStrictEqual([up.status, up.body.accepted, up.body.rejected.length], [200, 2000, 0]);
   // and after a second the device may post singles again
   await new Promise((r) => setTimeout(r, 1100));
   assert.strictEqual((await one()).status, 200);
@@ -124,7 +124,7 @@ test("INGEST_KEY: POST endpoints need x-api-key, GET endpoints stay open", async
     assert.strictEqual((await locked.post(path, body)).status, 401, `${path} must need the key`);
   assert.deepStrictEqual(await locked.get("/history"), [], "nothing was stored without the key");
   const ok = await locked.post("/ingest", r, { "x-api-key": "s3cret" });
-  assert.deepStrictEqual([ok.status, ok.body.added], [200, 1]);
+  assert.deepStrictEqual([ok.status, ok.body.accepted], [200, 1]);
   assert.strictEqual((await locked.get("/history")).length, 1, "reading needs no key");
   assert.strictEqual((await locked.getRaw("/blocks")).status, 200);
 });

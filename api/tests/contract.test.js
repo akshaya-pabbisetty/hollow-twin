@@ -29,7 +29,7 @@ const EVERY_KIND = () => [
 test("one message of every contract kind is accepted, and comes back exactly as it was sent", async () => {
   const sent = EVERY_KIND();
   const r = await s.post("/ingest", sent);
-  assert.deepStrictEqual([r.status, r.body.added, r.body.errors], [200, 9, []]);
+  assert.deepStrictEqual([r.status, r.body.accepted, r.body.rejected], [200, 9, []]);
   const hist = await s.get("/history");
   for (const m of sent) {
     const got = hist.find((x) => x.id === m.id);
@@ -48,7 +48,7 @@ test("hops and via: a relayed message keeps them, a message without them gets 0 
   const broken = M("watch-0110", "l8-gantry-bend", "vitals", { hr_bpm: 82, spo2_pct: 97, temp_c: 36.9 }, { hops: "two", via: "relay-l8-bore-bend" });
   const feed = readEvents(s.api + "/feed", { want: 3 });
   await new Promise((r) => setTimeout(r, 100));
-  assert.strictEqual((await s.post("/ingest", [relayed, bare, broken])).body.added, 3);
+  assert.strictEqual((await s.post("/ingest", [relayed, bare, broken])).body.accepted, 3);
   const live = Object.fromEntries((await feed).map((e) => [e.data.id, e.data]));
   assert.deepStrictEqual([live[relayed.id].hops, live[relayed.id].via], [3, relayed.via], "the live feed carries hops and via too");
   assert.deepStrictEqual([live[bare.id].hops, live[bare.id].via], [0, []]);
@@ -56,7 +56,7 @@ test("hops and via: a relayed message keeps them, a message without them gets 0 
   assert.match(live[broken.id].warnings.join(" | "), /via was not a list of relay ids.*hops was not a whole number/);
   // the same message arriving again by another route (more hops) is a duplicate: the id decides
   const again = await s.post("/ingest", { ...relayed, hops: 5, via: [...relayed.via, "relay-l6-flint-face", "relay-l6-rail-row"] });
-  assert.deepStrictEqual([again.body.added, again.body.dupes], [0, 1]);
+  assert.deepStrictEqual([again.body.accepted, again.body.duplicates], [0, 1]);
 });
 
 test("old field names still work as aliases, but everything stored and served uses the contract names", async () => {
@@ -65,7 +65,7 @@ test("old field names still work as aliases, but everything stored and served us
   const help = M("watch-0077", b, "button", { type: "help" });
   await s.post("/family", { group: "fam-0077", devices: ["watch-0077", "watch-0078"] });
   const ok = M("watch-0077", b, "button", { type: "ok", to: "fam-0077" });
-  assert.strictEqual((await s.post("/ingest", [vit, help, ok])).body.added, 3);
+  assert.strictEqual((await s.post("/ingest", [vit, help, ok])).body.accepted, 3);
   const hist = Object.fromEntries((await s.get(`/history?block=${b}`)).map((r) => [r.id, r]));
   assert.deepStrictEqual(hist[vit.id].values, { temp_c: 39.1, hr_bpm: 128, spo2_pct: 90 });
   assert.deepStrictEqual(hist[help.id].values, { button: "help" });
@@ -99,8 +99,8 @@ test("what the contract does not allow is refused with a reason", async () => {
   ];
   for (const [msg, why] of cases) {
     const r = await s.post("/ingest", msg);
-    assert.strictEqual(r.status, 400, JSON.stringify(msg));
-    assert.match(r.body.errors[0].err, why);
+    assert.strictEqual(r.status, 422, JSON.stringify(msg));
+    assert.match(r.body.rejected[0].problems.join("; "), why);
   }
   assert.ok(!(await s.get("/history")).some((r) => r.values.text === "fake"), "nobody outside the API can plant an alert");
 });

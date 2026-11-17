@@ -130,7 +130,7 @@ test("checkin: routed to the watches in `to` and to its family group, with hops 
   await new Promise((r) => setTimeout(r, 100));
   const c = s.R("watch-0042", far, "checkin", { status: "ok", family: "fam-0007", to: ["watch-0110"] }, Date.now(),
     { hops: 2, via: ["relay-l8-bore-bend", "relay-l8-gantry-bend"] });
-  assert.strictEqual((await s.post("/ingest", c)).body.added, 1);
+  assert.strictEqual((await s.post("/ingest", c)).body.accepted, 1);
   const [msg, alert] = (await feed).map((e) => e.data);
   assert.deepStrictEqual([msg.kind, msg.hops, msg.via], ["checkin", 2, c.via], "the check-in itself goes out on the feed with its route");
   assert.strictEqual(alert.values.text, `watch-0042 is OK (${far})`);

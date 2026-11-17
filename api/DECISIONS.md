@@ -219,3 +219,29 @@ sections below replace it.
   carries `hops` and `via` so the twin can draw the relayed route. A check-in with nobody to tell is stored and
   raises no alert.
 - The blackout demo shot was rewritten on contract power values at block scale (72.3 MW draw, 1,800 MWh battery).
+
+## Task 4: contract endpoints
+
+- **`POST /ingest` reply** is now `{ accepted, duplicates, rejected, warnings }`. The old keys (`added`, `dupes`,
+  `errors`) are gone rather than kept beside the new ones: only my own tools used them, and two names for one
+  number invite mistakes. `rejected` has the catcher's shape (`{ id, problems: [...] }`). `warnings` lists stored
+  messages the sender should fix.
+- **Status codes follow the catcher:** `422` when nothing in the request could be stored (it was `400`), `400` only
+  for a body that is not JSON, with the catcher's message `body is not JSON`.
+- **`GET /live`** names its events (`reading`, `alert`). **`GET /feed` is kept** with unnamed events, so code written
+  against it (`EventSource.onmessage`) still works. Both share ids, replay and `event: reset`.
+- A backlog array is sorted by `time` before storing, so `/live` plays the gap in order.
+- **`GET /blocks/<block id>/latest`** returns `{ block, name, level, people, source, latest: { <kind>: message } }`.
+  Alerts are not in `latest` (they are not a device kind). Unknown block: `404`.
+- **`GET /help`** lists open requests only, as the contract says. `?status=assigned|all` and `&to=` were added so a
+  rover can find its own job and the twin can show who is on the way. `/queue` is the same list.
+- **`POST /help/<message id>/assign`**: `404` unknown id, `409` already assigned, `400` without `to`. It needs the
+  API key when one is set, like every POST. `POST /dispatch` (send a responder to the top request) is kept and
+  uses the same code. Assignments are stored with who and when; older data files that only recorded "dispatched"
+  load as assigned to nobody in particular.
+- **`GET /broadcast`** is `GET /surface` plus a one-sentence `text`, the newest `photo` and the `history` link. The
+  verdict logic is unchanged, which has one consequence worth knowing: the contract's surface message carries three
+  of the five readings the verdict needs (no oxygen, no fine dust), so with contract-only data the page says
+  `not enough data` until a scout also sends `o2_pct` and `pm25_ugm3` (both now optional in the contract).
+- The contract's lane 4 wording for the return options is "suits, domes or sealed outposts". The API's verdicts are
+  `suits OK`, `sealed domes needed`, `stay underground`. I did not invent a mapping for "sealed outposts".

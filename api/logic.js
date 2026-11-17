@@ -187,8 +187,11 @@ function triageDetail(v) {
 }
 const triage = (v) => triageDetail(v).score;
 
-function queue(readings, dispatched, now = Date.now()) {
-  const helps = readings.filter((r) => r.kind === "button" && r.values.button === "help" && !dispatched.has(r.id));
+// `assigned` maps a help message id to { to, time } once somebody has been sent. status: "open" (the default: nobody
+// sent yet), "assigned", or "all".
+function queue(readings, assigned, now = Date.now(), status = "open") {
+  const helps = readings.filter((r) => r.kind === "button" && r.values.button === "help" &&
+    (status === "all" || assigned.has(r.id) === (status === "assigned")));
   const grace = LIM.val("triage_vitals_grace_s") * 1000, per = LIM.val("triage_wait_minutes_per_point");
   return helps.map((h) => {
     const v = readings.filter((r) => r.device === h.device && r.kind === "vitals" && t(r) <= t(h) + grace)
@@ -197,7 +200,9 @@ function queue(readings, dispatched, now = Date.now()) {
     const d = triageDetail(v && v.values);
     const waited = Math.min(LIM.val("triage_wait_max_points"), Math.floor(wait_min / per)); // waiting long raises priority
     if (waited) d.reasons.push(`+${waited}: waited ${Math.floor(wait_min)} min (1 point per ${per} min, design choice)`);
-    return { id: h.id, device: h.device, block: h.block, time: h.time, score: d.score + waited, vitals: v ? v.values : null, reasons: d.reasons };
+    const a = assigned.get(h.id);
+    return { id: h.id, device: h.device, block: h.block, time: h.time, score: d.score + waited, vitals: v ? v.values : null, reasons: d.reasons,
+      status: a ? "assigned" : "open", assigned_to: a ? a.to : null, assigned_at: a ? a.time : null, hops: h.hops, via: h.via, source: h.source };
   }).sort((a, b) => b.score - a.score || t(a) - t(b));
 }
 

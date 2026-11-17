@@ -161,7 +161,7 @@ shots.networkcut = async () => {
   step("3. Network back: the relay uploads the backlog in ONE request (out of order, with a duplicate)");
   const shuffled = [held[3], held[0], held[5], held[1], held[4], held[2], held[1]];
   const up = await send(shuffled);
-  say(`backend answered: added ${up.added}, duplicates dropped ${up.dupes}, errors ${up.errors.length}`);
+  say(`backend answered: accepted ${up.accepted}, duplicates ${up.duplicates}, rejected ${up.rejected.length}`);
   await beat();
   for (const r of all.slice(10)) { await send(r); say(`sent  ${r.time.slice(11, 19)}  CO2 ${r.values.co2_ppm} ppm`); await beat(1); }
 
@@ -169,7 +169,7 @@ shots.networkcut = async () => {
   const hist = (await get(`/history?block=${block}&kind=air`)).filter((r) => r.id.includes(RUN));
   say(hist.map((r) => r.time.slice(14, 19)).join("  "));
   const gaps = hist.slice(1).map((r, i) => Date.parse(r.time) - Date.parse(hist[i].time));
-  check(up.added === 6 && up.dupes === 1, "the whole backlog was stored and the duplicate was dropped");
+  check(up.accepted === 6 && up.duplicates === 1, "the whole backlog was stored and the duplicate was dropped");
   check(hist.length === n, `all ${n} readings are in the history`);
   check(gaps.every((g) => g === gap), "no gap: every reading is exactly 5 s after the one before, with its original time");
   check(hist.every((r, i) => r.values.co2_ppm === 820 + i * 3), "and they are in the right order");

@@ -12,13 +12,13 @@ test("source: missing means simulated, live is kept, anything else is rejected w
   const plain = s.R("sensor", b, "air", { co2_ppm: 700 });
   const live = s.R("sensor", b, "air", { co2_ppm: 710 }, Date.now(), { source: "live" });
   const sim = s.R("sensor", b, "air", { co2_ppm: 720 }, Date.now(), { source: "simulated" });
-  assert.strictEqual((await s.post("/ingest", [plain, live, sim])).body.added, 3);
+  assert.strictEqual((await s.post("/ingest", [plain, live, sim])).body.accepted, 3);
   const hist = await s.get(`/history?block=${b}&kind=air`);
   const by = Object.fromEntries(hist.map((r) => [r.id, r.source]));
   assert.deepStrictEqual([by[plain.id], by[live.id], by[sim.id]], ["simulated", "live", "simulated"]);
   const bad = await s.post("/ingest", s.R("sensor", b, "air", { co2_ppm: 1 }, Date.now(), { source: "real" }));
-  assert.strictEqual(bad.status, 400);
-  assert.strictEqual(bad.body.errors[0].err, "source must be live or simulated");
+  assert.strictEqual(bad.status, 422);
+  assert.strictEqual(bad.body.rejected[0].problems.join("; "), "source must be live or simulated");
 });
 
 test("source travels through /feed, and an alert inherits the source of the reading that caused it", async () => {

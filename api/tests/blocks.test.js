@@ -25,7 +25,7 @@ test("the registry is contract/blocks.json: 70 blocks, 9 levels, the people in e
 
 test("every one of the 70 blocks accepts a message", async () => {
   const r = await s.post("/ingest", BLOCK_IDS.map((b) => s.R("sensor", b, "flood", { depth_cm: 1 })));
-  assert.deepStrictEqual([r.status, r.body.added, r.body.errors], [200, 70, []]);
+  assert.deepStrictEqual([r.status, r.body.accepted, r.body.rejected], [200, 70, []]);
   assert.ok((await s.get("/history?kind=flood")).every((m) => m.warnings === undefined), "sensor-<block id> in its own block needs no warning");
 });
 
@@ -38,18 +38,18 @@ test("an unknown block is rejected with a reason; the old demo ids and wrong cas
     ["Surface", /Did you mean "surface"\?$/],
   ]) {
     const r = await s.post("/ingest", s.R("watch-0042", block, "vitals", { hr_bpm: 70, spo2_pct: 98, temp_c: 36.6 }));
-    assert.strictEqual(r.status, 400, block);
-    assert.match(r.body.errors[0].err, why);
+    assert.strictEqual(r.status, 422, block);
+    assert.match(r.body.rejected[0].problems.join("; "), why);
   }
   assert.ok(!(await s.get("/history")).some((m) => m.device === "watch-0042"), "nothing from an unknown block is stored");
   // in a batch only the bad one is refused
   const mix = await s.post("/ingest", [s.R("watch-0042", "l8-bore-bend", "button", { button: "symptom" }), s.R("watch-0042", "nowhere", "button", { button: "symptom" })]);
-  assert.deepStrictEqual([mix.status, mix.body.added, mix.body.errors.length], [200, 1, 1]);
+  assert.deepStrictEqual([mix.status, mix.body.accepted, mix.body.rejected.length], [200, 1, 1]);
 });
 
 test('"surface" is the one block that is not in the file', async () => {
   const m = s.R("surface-01", "surface", "surface", { co2_ppm: 430, temp_c: 17.5, radiation_usv_h: 0.31 });
-  assert.strictEqual((await s.post("/ingest", m)).body.added, 1);
+  assert.strictEqual((await s.post("/ingest", m)).body.accepted, 1);
   assert.strictEqual((await stored(m.id)).warnings, undefined);
   // a surface reading filed under an ordinary block is kept, with a note
   const odd = s.R("surface-01", "l0-rail-wells", "surface", { co2_ppm: 431 });
@@ -65,7 +65,7 @@ test("device ids that fit CONTRACT.md section 3 pass silently", async () => {
     s.R("rover-01", "l6-flint-face", "tunnel", { from_block: "l6-flint-face", to_block: "l6-rail-row", status: "open", reason: "clear" }),
     s.R("surface-01", "surface", "surface", { co2_ppm: 430 }),
   ];
-  assert.strictEqual((await s.post("/ingest", ok)).body.added, 5);
+  assert.strictEqual((await s.post("/ingest", ok)).body.accepted, 5);
   for (const m of ok) assert.strictEqual((await stored(m.id)).warnings, undefined, m.device);
 });
 
@@ -83,7 +83,7 @@ test("a device id that does not fit is a warning on the record, not a rejection"
   for (const [device, why] of cases) {
     const m = s.R(device, b, "button", { button: "help" });
     const r = await s.post("/ingest", m);
-    assert.deepStrictEqual([r.status, r.body.added], [200, 1], `${device} must still be stored`);
+    assert.deepStrictEqual([r.status, r.body.accepted], [200, 1], `${device} must still be stored`);
     const got = await stored(m.id);
     assert.match(got.warnings.join(" | "), why);
   }
@@ -94,7 +94,7 @@ test("a device id that does not fit is a warning on the record, not a rejection"
 
 test("a tunnel end that is not a block is noted; the message is kept", async () => {
   const m = s.R("rover-01", "l6-flint-face", "tunnel", { from_block: "l6-flint-face", to_block: "l6-nowhere", status: "open", reason: "clear" });
-  assert.strictEqual((await s.post("/ingest", m)).body.added, 1);
+  assert.strictEqual((await s.post("/ingest", m)).body.accepted, 1);
   assert.deepStrictEqual((await stored(m.id)).warnings, ['tunnel to_block "l6-nowhere" is not a block id']);
 });
 

@@ -68,6 +68,30 @@ function surfaceHistory(readings) {
       reasons: r.values.reasons, cause: r.values.cause, source: r.source });
 }
 
+// The public broadcast page in one call (CONTRACT.md section 4, GET /broadcast): the latest surface readings, each
+// against its human-safe limits, the verdict in plain words, the newest photo, and where the full record is.
+const PLAIN = {
+  [VERDICTS[0]]: "The latest surface readings support going up in suits: all five are inside their human-safe limits.",
+  [VERDICTS[1]]: "The latest surface readings support living in sealed domes only: at least one is past its limit for open air.",
+  [VERDICTS[2]]: "The latest surface readings do not support going up at all: at least one is past the limit where nobody should be on the surface.",
+};
+function broadcast(readings) {
+  const sv = surface(readings);
+  const have = sv.readings.filter((r) => r.value !== null);
+  const photos = readings.filter((r) => r.kind === "surface" && typeof r.values.photo_url === "string" && r.values.photo_url).sort((a, b) => t(b) - t(a));
+  const text = sv.verdict === NO_DATA
+    ? `No verdict yet: ${sv.missing.length} of the ${sv.readings.length} surface readings ${sv.missing.length === 1 ? "has" : "have"} not been measured (${sv.missing.join(", ")}). The API does not guess.`
+    : PLAIN[sv.verdict];
+  return {
+    verdict: sv.verdict, text, reasons: sv.reasons, missing: sv.missing, source: sv.source,
+    time: have.length ? have.map((r) => r.time).sort().pop() : null, // when the newest reading behind the verdict was taken
+    readings: sv.readings,
+    photo: photos.length ? { url: photos[0].values.photo_url, time: photos[0].time, device: photos[0].device } : null,
+    history: "/surface/history", // the append-only public record: every surface reading and every verdict change
+    rule: sv.rule,
+  };
+}
+
 // First wave: rank who goes up first. Rules, in order:
 //   volunteers only; in the people register; never sole caregivers; no open help request;
 //   latest vitals present, recent and inside the healthy ranges; then prefer needed skills, then who volunteered first.
@@ -117,4 +141,4 @@ function firstwave(readings, openHelp, register, n = LIM.val("firstwave_default_
     rule: "Volunteers only. Never sole caregivers. No open help request. Latest vitals inside the healthy ranges. Then most needed skills first; ties go to who volunteered first." };
 }
 
-module.exports = { surface, surfaceHistory, firstwave, VERDICTS, NO_DATA, CHECKS };
+module.exports = { surface, surfaceHistory, broadcast, firstwave, VERDICTS, NO_DATA, CHECKS };

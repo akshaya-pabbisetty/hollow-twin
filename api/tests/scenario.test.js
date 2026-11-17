@@ -54,7 +54,7 @@ test("networkcut: relay holds readings, uploads the backlog, history shows no ga
   const gaps = hist.slice(1).map((x, i) => Date.parse(x.time) - Date.parse(hist[i].time));
   assert.ok(gaps.every((g) => g === 5000), `gaps: ${gaps}`);
   assert.deepStrictEqual(hist.map((x) => x.values.co2_ppm), Array.from({ length: 12 }, (_, i) => 820 + i * 3), "in the order they were taken");
-  assert.match(r.out, /added 6, duplicates dropped 1, errors 0/, "the backlog went up as one request and the duplicate was dropped");
+  assert.match(r.out, /accepted 6, duplicates 1, rejected 0/, "the backlog went up as one request and the duplicate was dropped");
 });
 
 test("water: clean cup is silent, salty cup gives do-not-drink", async () => {

@@ -45,7 +45,7 @@ test("the same vector is printed in docs/FIRMWARE.md and by tools/sign.js", () =
 
 test("valid sig: stored with verified true (the vector itself, posted to a real server)", async () => {
   const r = await s.post("/ingest", { ...VECTOR.reading, sig: VECTOR.sig, source: "live" });
-  assert.deepStrictEqual([r.status, r.body.added], [200, 1]);
+  assert.deepStrictEqual([r.status, r.body.accepted], [200, 1]);
   const [got] = await s.get("/history?block=l8-bore-bend&kind=power");
   assert.strictEqual(got.verified, true);
   assert.strictEqual(got.sig, VECTOR.sig, "the sig is kept so anyone holding the key can re-check the public record");
@@ -54,7 +54,7 @@ test("valid sig: stored with verified true (the vector itself, posted to a real 
 test("no sig: accepted but verified false, and a sender cannot just claim verified", async () => {
   const plain = s.R("relay-l8-bore-bend", "l8-bore-bend", "power", { battery_wh: 6100, draw_w: 96, supply_w: 96, grid_hz: 60 });
   const liar = { ...s.R("relay-l8-bore-bend", "l8-bore-bend", "power", { battery_wh: 6000, draw_w: 96, supply_w: 96, grid_hz: 60 }), verified: true };
-  assert.strictEqual((await s.post("/ingest", [plain, liar])).body.added, 2);
+  assert.strictEqual((await s.post("/ingest", [plain, liar])).body.accepted, 2);
   const hist = await s.get("/history?block=l8-bore-bend&kind=power");
   assert.strictEqual(hist.find((r) => r.id === plain.id).verified, false);
   assert.strictEqual(hist.find((r) => r.id === liar.id).verified, false);
@@ -74,24 +74,24 @@ test("bad signature: rejected with a reason and not stored", async () => {
   };
   for (const [name, r] of Object.entries(cases)) {
     const res = await s.post("/ingest", r);
-    assert.strictEqual(res.status, 400, name);
-    assert.match(res.body.errors[0].err, /^bad signature for relay-l8-bore-bend/, name);
+    assert.strictEqual(res.status, 422, name);
+    assert.match(res.body.rejected[0].problems.join("; "), /^bad signature for relay-l8-bore-bend/, name);
   }
   assert.ok(!(await s.get("/history")).some((r) => r.id === base.id), "none of the forgeries were stored");
   // the untouched original with its real sig is fine
-  assert.strictEqual((await s.post("/ingest", { ...base, sig: good })).body.added, 1);
+  assert.strictEqual((await s.post("/ingest", { ...base, sig: good })).body.accepted, 1);
 });
 
 test("a signed reading with no clock (1970) verifies against the time the device sent", async () => {
   const r = { ...s.R("watch-0001", "l1-winch-gallery", "vitals", { hr_bpm: 72, spo2_pct: 98, temp_c: 36.6 }), time: "1970-01-01T00:01:00Z" };
-  assert.strictEqual((await s.post("/ingest", { ...r, sig: S.sign(r, "another-secret") })).body.added, 1);
+  assert.strictEqual((await s.post("/ingest", { ...r, sig: S.sign(r, "another-secret") })).body.accepted, 1);
   const got = (await s.get("/history?block=l1-winch-gallery"))[0];
   assert.deepStrictEqual([got.verified, got.time_estimated, got.device_time], [true, true, "1970-01-01T00:01:00Z"]);
 });
 
 test("sig from a device with no key on file: stored, but unverified and marked unchecked", async () => {
   const r = s.R("sensor", "l2-chalk-gallery", "air", { co2_ppm: 640 });
-  assert.strictEqual((await s.post("/ingest", { ...r, sig: S.sign(r, "whatever") })).body.added, 1);
+  assert.strictEqual((await s.post("/ingest", { ...r, sig: S.sign(r, "whatever") })).body.accepted, 1);
   const got = (await s.get("/history?block=l2-chalk-gallery"))[0];
   assert.strictEqual(got.verified, false);
   assert.match(got.sig_unchecked, /no key on file for sensor-l2-chalk-gallery/);

@@ -22,8 +22,10 @@ test("README documents every endpoint the server has, and every documented GET r
   const readme = read("README.md"), server = read("server.js");
   const routes = [...new Set([...server.matchAll(/p === "(\/[a-z/]+)"/g)].map((m) => m[1]))];
   assert.ok(routes.length >= 17, `found ${routes.length} routes`);
-  for (const r of routes) assert.ok(readme.includes(`${r}`), `README is missing ${r}`);
-  for (const p of ["/status", "/history", "/blocks", "/forecast", "/fairshare?supply_pct=60", "/queue", "/truth", "/surface", "/surface/history", "/firstwave?n=20", "/limits"])
+  for (const r of [...routes, "/blocks/<block id>/latest", "/help/<message id>/assign"]) assert.ok(readme.includes(`${r}`), `README is missing ${r}`);
+  for (const r of ["/live", "/help", "/broadcast"]) assert.ok(routes.includes(r), `the server has the contract endpoint ${r}`);
+  assert.ok(server.includes("latest$/.exec(p)") && server.includes("assign$/.exec(p)"), "and the two with an id in the path");
+  for (const p of ["/status", "/history", "/blocks", "/blocks/l8-bore-bend/latest", "/forecast", "/fairshare?supply_pct=60", "/help", "/queue", "/broadcast", "/truth", "/surface", "/surface/history", "/firstwave?n=20", "/limits"])
     assert.strictEqual((await s.getRaw(p)).status, 200, p);
 });
 
@@ -48,7 +50,7 @@ test("the original endpoints and fields kept their shape", async () => {
   const truth = await s.get("/truth");
   has(truth, ["window_h", "residents_total", "official_total", "blocks"], "/truth");
   has(truth.blocks[0], ["block", "residents", "official", "gap"], "/truth block");
-  has((await s.post("/ingest", s.R("relay", b, "power", { battery_wh: 400, draw_w: 96, supply_w: 40 }))).body, ["added", "dupes", "errors"], "/ingest reply");
+  has((await s.post("/ingest", s.R("relay", b, "power", { battery_wh: 400, draw_w: 96, supply_w: 40 }))).body, ["accepted", "duplicates", "rejected", "warnings"], "/ingest reply");
   has((await s.post("/dispatch", { responder: "rover-01" })).body, ["assigned"], "/dispatch reply");
   assert.deepStrictEqual((await s.post("/family", { group: "g", devices: ["watch-0001"] })).body, { ok: true });
   has((await s.get("/family?group=g"))[0], ["device", "last_ok", "block"], "/family");

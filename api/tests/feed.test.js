@@ -66,7 +66,7 @@ test("restart after a crash that left half a line in the data file: nothing else
   await s.start();
   assert.strictEqual((await s.get("/history")).length, before, "the torn line is skipped, every whole line is kept");
   const next = air(30);
-  assert.strictEqual((await s.post("/ingest", next)).body.added, 1);
+  assert.strictEqual((await s.post("/ingest", next)).body.accepted, 1);
   await s.restart();
   const hist = await s.get("/history");
   assert.strictEqual(hist.length, before + 1, "the reading written after the torn line was not glued onto it");

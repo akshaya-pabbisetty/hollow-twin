@@ -27,7 +27,7 @@ test("zero dependencies: package.json has none and the code only requires Node b
 
 test("DATA in a folder that does not exist yet (a fresh persistent mount): the server creates it and persists there", async () => {
   await s.start();
-  assert.strictEqual((await s.post("/ingest", s.R("sensor", "l1-winch-gallery", "air", { co2_ppm: 700 }))).body.added, 1);
+  assert.strictEqual((await s.post("/ingest", s.R("sensor", "l1-winch-gallery", "air", { co2_ppm: 700 }))).body.accepted, 1);
   await s.restart();
   assert.strictEqual((await s.get("/history")).length, 1);
   assert.ok(fs.existsSync(path.join(dir, "nested", "data", "readings.jsonl")));

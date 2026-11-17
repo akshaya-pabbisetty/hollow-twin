@@ -48,8 +48,8 @@ const PEOPLE = JSON.parse(fs.readFileSync(process.env.PEOPLE || path.join(__dirn
 
 const readings = [];
 const seen = new Set();
-const clients = new Set();
-const dispatched = new Set();
+const clients = new Map();  // open event streams -> true when the client asked for /live (named events), false for /feed
+const assigned = new Map(); // help request (message id) -> { to, time }: who was sent, and when
 const families = {};   // group -> [devices]
 const official = {};   // block -> count
 const forecastTold = new Map(); // block -> the worst battery level its residents have been told about (1 = warn, 2 = alarm)
@@ -79,7 +79,8 @@ function load() {
   }
 }
 function applyMeta(m) {
-  if (m.dispatched) dispatched.add(m.dispatched);
+  if (m.dispatched) assigned.set(m.dispatched, { to: null, time: null }); // written before /help/<id>/assign existed
+  if (m.assigned) assigned.set(m.assigned.id, { to: m.assigned.to, time: m.assigned.time });
   if (m.family) families[m.family.group] = m.family.devices;
   if (m.official) official[m.official.block] = m.official.count;
 }
@@ -243,7 +244,9 @@ function blockSources() {
   return out;
 }
 
-const sse = (r) => `id: ${r.seq}\ndata: ${JSON.stringify(r)}\n\n`;
+// One server-sent event. GET /live (CONTRACT.md section 4) names its events: "reading" for a device message, "alert" for
+// one of ours. GET /feed is the older stream and sends the same data unnamed, so EventSource.onmessage keeps working.
+const sse = (r, named) => `id: ${r.seq}\n${named ? `event: ${r.kind === "alert" ? "alert" : "reading"}\n` : ""}data: ${JSON.stringify(r)}\n\n`;
 
 function store(r) {
   if (seen.has(r.id)) return false;
@@ -251,8 +254,7 @@ function store(r) {
   r.seq = ++lastSeq;
   readings.push(r); learn(r);
   fs.appendFileSync(DATA, JSON.stringify(r) + "\n");
-  const msg = sse(r);
-  for (const c of clients) c.write(msg);
+  for (const [c, named] of clients) c.write(sse(r, named));
   return true;
 }
 
@@ -260,7 +262,7 @@ function send(res, code, body) {
   res.writeHead(code, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
   res.end(JSON.stringify(body));
 }
-// Reads a JSON body. Answers 401 (wrong key) and 413 (too large) itself; bad JSON goes to cb("bad json").
+// Reads a JSON body. Answers 401 (wrong key) and 413 (too large) itself; bad JSON goes to cb("body is not JSON").
 function readBody(req, res, cb) {
   const chunks = []; let size = 0, tooBig = false;
   req.on("data", (c) => {
@@ -273,7 +275,7 @@ function readBody(req, res, cb) {
     if (INGEST_KEY && req.headers["x-api-key"] !== INGEST_KEY) return send(res, 401, { error: "missing or wrong x-api-key header" });
     if (tooBig) return send(res, 413, { error: `body too large: the limit is ${MAX_BODY} bytes. Split the backlog into smaller arrays.`, limit_bytes: MAX_BODY });
     let body;
-    try { body = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { return guard(res, () => cb("bad json")); }
+    try { body = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { return guard(res, () => cb("body is not JSON")); }
     guard(res, () => cb(null, body));
   });
 }
@@ -298,6 +300,15 @@ function overLimit(req, body, now) {
   return !Array.isArray(body) && w.count > RATE_LIMIT ? device : null;
 }
 
+// Marks a help request as assigned, remembers it across restarts, and tells the resident who is coming.
+function assign(item, to) {
+  const time = new Date().toISOString();
+  saveMeta({ assigned: { id: item.id, to, time } });
+  store(alert(readings.find((r) => r.id === item.id) || { id: item.id, block: item.block }, "info", `${to} sent to ${item.device} in ${item.block}`,
+    { to: [item.device], responder: to, why: `${to} was assigned to the help request ${item.id}` }, "dispatch"));
+  return { ...item, status: "assigned", assigned_to: to, assigned_at: time };
+}
+
 load();
 const server = http.createServer((req, res) => guard(res, () => route(req, res)));
 function route(req, res) {
@@ -317,20 +328,26 @@ function route(req, res) {
       res.setHeader("Retry-After", "1");
       return send(res, 429, { error: `rate limit: more than ${RATE_LIMIT} requests per second from ${limited}. Wait a second, or send the readings as one array.`, retry_after_s: 1 });
     }
-    let added = 0, dupes = 0; const errors = [];
-    // backlogs may arrive out of order: process oldest first so forecasts see true order
+    // The reply is CONTRACT.md section 4, in the same shape as tools/catcher.mjs: { accepted, duplicates, rejected }.
+    // `warnings` is ours: messages that were stored, with something the sender should fix.
+    let accepted = 0, duplicates = 0; const rejected = [], warnings = [];
+    // backlogs may arrive out of order: process oldest first so forecasts see true order (and /live replays the gap in order)
     const recs = [];
     for (const r of [].concat(body)) {
       const a = accept(r, now);
-      if (a.problems) errors.push({ id: a.id, err: a.problems.join("; ") }); else recs.push(a.rec);
+      if (a.problems) rejected.push({ id: a.id, problems: a.problems }); else recs.push(a.rec);
     }
     recs.sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
     for (const r of recs) {
-      if (store(r)) { added++; rules(r).forEach(store); } else dupes++;
+      if (!store(r)) { duplicates++; continue; }
+      accepted++;
+      if (r.warnings) warnings.push({ id: r.id, warnings: r.warnings });
+      rules(r).forEach(store);
     }
-    send(res, errors.length && !added ? 400 : 200, { added, dupes, errors });
+    send(res, rejected.length && !accepted ? 422 : 200, { accepted, duplicates, rejected, warnings });
   });
-  if (p === "/feed") {
+  if (p === "/live" || p === "/feed") {
+    const named = p === "/live";
     res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive", "Access-Control-Allow-Origin": "*",
       "X-Accel-Buffering": "no" }); // tells nginx-style proxies (Azure, Render) not to hold events back
@@ -345,9 +362,9 @@ function route(req, res) {
         res.write(`event: reset\ndata: ${JSON.stringify({ seq: lastSeq })}\n\n`);
         last = 0;
       }
-      for (const r of readings) if (r.seq > last) res.write(sse(r));
+      for (const r of readings) if (r.seq > last) res.write(sse(r, named));
     }
-    clients.add(res);
+    clients.set(res, named);
     const ping = setInterval(() => res.write(": ping\n\n"), LIM.val("feed_ping_s") * 1000); // keeps proxies from closing it
     req.on("close", () => { clients.delete(res); clearInterval(ping); });
     return;
@@ -357,6 +374,19 @@ function route(req, res) {
     return send(res, 200, readings
       .filter((r) => (!q.block || r.block === q.block) && (!q.kind || r.kind === q.kind) && Date.parse(r.time) >= since && r.seq > afterSeq)
       .sort((a, b) => Date.parse(a.time) - Date.parse(b.time)));
+  }
+  // CONTRACT.md section 4: the latest message of each kind for one block
+  const one = /^\/blocks\/([^/]+)\/latest$/.exec(p);
+  if (one) {
+    const id = decodeURIComponent(one[1]);
+    if (!B.known(id)) return send(res, 404, { error: B.problem(id) });
+    const latest = {};
+    for (const r of readings)
+      if (r.block === id && r.kind !== "alert" && (!latest[r.kind] || Date.parse(r.time) >= Date.parse(latest[r.kind].time))) latest[r.kind] = r;
+    const info = B.get(id), src = blockSources()[id];
+    return send(res, 200, { block: id, name: info ? info.name : "Surface", level: info ? info.level : null, people: info ? info.people : null,
+      source: src ? src.source : null, // is this block's newest message live hardware or simulated? null = nothing yet
+      latest });
   }
   if (p === "/blocks") {
     const latest = {};
@@ -382,16 +412,30 @@ function route(req, res) {
     if (q.policy) return send(res, 200, L.allocate(sector, supply, q.policy));
     return send(res, 200, { directorate: L.allocate(sector, supply, "directorate"), fair: L.allocate(sector, supply, "fair") });
   }
-  if (p === "/queue") return send(res, 200, L.queue(readings, dispatched));
+  // CONTRACT.md section 4: GET /help = open help requests, highest priority first. /queue is the same list under its old name.
+  // ?status=assigned or ?status=all also shows requests somebody was sent to; &to=rover-01 narrows to one responder.
+  if (p === "/help" || p === "/queue") {
+    const status = q.status || "open";
+    if (!["open", "assigned", "all"].includes(status)) return send(res, 400, { error: "status must be open, assigned or all" });
+    return send(res, 200, L.queue(readings, assigned, Date.now(), status).filter((x) => !q.to || x.assigned_to === q.to));
+  }
+  // CONTRACT.md section 4: POST /help/<message id>/assign with body { "to": "rover-01" }
+  const help = /^\/help\/([^/]+)\/assign$/.exec(p);
+  if (req.method === "POST" && help) return readBody(req, res, (e, b) => {
+    if (e || !b || typeof b !== "object") return send(res, 400, { error: e || "need a JSON object" });
+    if (typeof b.to !== "string" || !b.to) return send(res, 400, { error: 'body must be { "to": "<who is sent, for example rover-01>" }' });
+    const id = decodeURIComponent(help[1]);
+    const item = L.queue(readings, assigned, Date.now(), "all").find((x) => x.id === id);
+    if (!item) return send(res, 404, { error: `no help request with message id "${id}" (see GET /help)` });
+    if (item.status === "assigned") return send(res, 409, { error: `already assigned${item.assigned_to ? ` to ${item.assigned_to}` : ""}`, assigned: item });
+    send(res, 200, { assigned: assign(item, b.to) });
+  });
+  // The original way: send a responder to the top request (among equal scores, the one nearest the responder's level).
   if (req.method === "POST" && p === "/dispatch") return readBody(req, res, (e, b) => {
     if (e || !b || typeof b !== "object") return send(res, 400, { error: e || "need a JSON object" });
-    const pick = L.pickRequest(L.queue(readings, dispatched), b.block);
+    const pick = L.pickRequest(L.queue(readings, assigned), b.block);
     if (!pick) return send(res, 200, { assigned: null });
-    saveMeta({ dispatched: pick.id });
-    const a = alert(readings.find((r) => r.id === pick.id) || { id: pick.id, block: pick.block }, "info", `${b.responder || "responder"} sent to ${pick.device} in ${pick.block}`,
-      { to: [pick.device], responder: b.responder }, "dispatch");
-    store(a);
-    send(res, 200, { assigned: pick });
+    send(res, 200, { assigned: assign(pick, typeof b.responder === "string" && b.responder ? b.responder : "responder") });
   });
   if (req.method === "POST" && p === "/family") return readBody(req, res, (e, b) => {
     if (e || !b || !b.group || !Array.isArray(b.devices)) return send(res, 400, { error: "need group and devices[]" });
@@ -418,13 +462,15 @@ function route(req, res) {
     saveMeta({ official: { block: b.block, count: b.count } });
     send(res, 200, { ok: true });
   });
+  // CONTRACT.md section 4: everything the public broadcast page shows, in one call
+  if (p === "/broadcast") return send(res, 200, SURF.broadcast(readings));
   if (p === "/surface") return send(res, 200, SURF.surface(readings));
   if (p === "/surface/history") return send(res, 200, SURF.surfaceHistory(readings));
   if (p === "/firstwave") {
     const n = q.n === undefined ? LIM.val("firstwave_default_n") : Math.floor(Number(q.n));
     if (!(n >= 1)) return send(res, 400, { error: "n must be a whole number of 1 or more" });
     const sv = SURF.surface(readings);
-    const openHelp = new Set(L.queue(readings, dispatched).map((x) => x.device));
+    const openHelp = new Set(L.queue(readings, assigned).map((x) => x.device));
     // the list is always ranked, but it is only a go when the surface verdict allows people up at all
     const cleared = sv.verdict === SURF.VERDICTS[0] || sv.verdict === SURF.VERDICTS[1];
     return send(res, 200, { surface_verdict: sv.verdict, cleared,
@@ -435,7 +481,7 @@ function route(req, res) {
   if (p === "/status") {
     const now = Date.now(), windowMin = LIM.val("status_alert_window_min");
     const recent = readings.filter((r) => r.kind === "alert" && Date.parse(r.time) >= now - windowMin * 60e3);
-    const queue = L.queue(readings, dispatched, now);
+    const queue = L.queue(readings, assigned, now);
     const truth = L.truth(readings, official, now);
     const sv = SURF.surface(readings);
     const data = readings.filter((r) => r.kind !== "alert"); // what devices sent; alerts are ours
