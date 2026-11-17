@@ -1988,6 +1988,7 @@ function onForgery(f) {
 }
 
 function onReading(m, fresh) {
+  if (m.kind === 'alert') return; // /blocks lists the latest alert too: alerts are the API's words, not a device's reading
   // a reading the API judged impossible for the sensor (a jump, drift or impossible value): it is stored, but the
   // API leaves it out of everything, so it must not move this block's numbers or colours either
   if (m.plausible === false) {
@@ -2011,7 +2012,7 @@ function onReading(m, fresh) {
     if (e) { e.api = { status: m.values.status, reason: m.values.reason, m }; e.blocked = m.values.status === 'closed'; }
     if (fresh && a && b) log(m.values.status === 'closed' ? 'crit' : 'ok', `${escH(m.device)} checked the tunnel from ${a.name} to ${b.name}: ${escH(m.values.status)}${m.values.reason ? ', ' + escH(m.values.reason) : ''}.${e ? '' : ' (These two blocks share no tunnel in this model, so no tunnel is marked.)'}`, [a, b], prov(m));
   }
-  if (n && m.source === 'live') { n.liveMsg = m; srcTag(n); } // a real device is in this block, whatever it sent
+  if (n && m.source === 'live' && (!n.liveMsg || Date.parse(m.time) >= Date.parse(n.liveMsg.time))) { n.liveMsg = m; srcTag(n); } // a real device is in this block, whatever it sent
   if (m.kind === 'surface' || m.kind === 'button' || m.kind === 'vitals') refreshSoon();
   if (fresh) { feedPush(m); if (n) flash(n); }
   api.dirty = true;
