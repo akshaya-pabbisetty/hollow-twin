@@ -30,7 +30,7 @@ We stopped claiming the rest. The outbreak simulator, the water and flood layers
 
 ## Where things stand (Nov 17, early morning ET)
 
-- Done: the twin reads the API (live stream, forecasts, allocation, check-ins, alerts), uses the API's limits, tags where every number comes from, and has a 60-second guided story for someone who opens the link cold.
+- Done: the twin reads the API (live stream, forecasts, allocation, check-ins, alerts), uses the API's limits, tags where every number comes from, and has a 75-second guided story for someone who opens the link cold.
 - Done: the API (merged as PR #1), with scenario scripts that play each video beat through the real pipeline.
 - Not done: the API is not hosted. The public link therefore runs on the twin's built-in simulation and says so.
 - Not started: the video and the submission form.
