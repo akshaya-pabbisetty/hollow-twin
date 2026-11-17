@@ -147,8 +147,8 @@ Notes for lane 3:
   contract's three, the broadcast page says `not enough data` and names what is missing. If the rover has no
   oxygen or dust sensor, send simulated values for those two from a script (tagged `"source": "simulated"`) and
   the page will show the verdict as `mixed`.
-- **Every limit and its source** is in `shared/limits.json`, also served at `GET API/limits`. Several differ from
-  the numbers the twin uses today; the contract's section 6.1 lists both.
+- **Every limit and its source** is in `shared/limits.json`, also served at `GET API/limits`. The ones in the
+  contract's section 6.1 are agreed by the team, and the twin uses the same numbers.
 
 Old field names from before the contract (`hr`, `spo2`, button `type`) are still accepted and renamed, with a
 warning. Do not use them in new firmware.

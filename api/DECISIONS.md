@@ -419,3 +419,20 @@ since that branch was cut, so task 4 brings it over as it was, adapted where tas
 - Timing: the tests compare the receive time with a second of slack (two processes reading the clock), and an
   "honest" reading in the fast-clock test is never dated before the fast reading's stored time, so the run does
   not depend on which millisecond the server reads.
+
+## Task 2: contract section 6, agreed
+
+- Section 6 is now "Thresholds (agreed by the team)"; 6.1 is the agreed table with one column per row for the
+  limit and one for its status ("agreed by the team, source: ..."). The numbers are unchanged; only their status
+  changed. The twin's old table (CO2 2,000 / 4,000 ppm, air 39 / 43 °C dry, flood 25 / 45 cm) and the
+  "water is still open" line are removed, and the opening paragraph names the retired numbers once so a reader
+  of an old screenshot can tell what changed.
+- 6.2 (water) is left as lane 1's proposal: the brief agreed 6.1 only, and 6.2 still waits on lane 3 checking the
+  calibrated probe. Its heading lost "the open item above", which no longer exists.
+- The changelog said "Additions only. Nothing above was renamed or removed." That is no longer true, so it now
+  says removals are marked **Removed** in their row, and the column is "Change" instead of "Added".
+- The battery-hour limits' reasons in `shared/limits.json` said "the twin's warning/alarm level"; they now say
+  "CONTRACT.md section 6.1, agreed by the team". Values unchanged.
+- `tests/thresholds.test.js` parses the 6.1 table row by row and checks each limit cell against
+  `shared/limits.json`, each status cell for "agreed by the team" and its source, that the old rows are gone, and
+  that the changelog row is there. README, FIRMWARE.md and TWIN.md (lane 4) no longer describe two sets of numbers.

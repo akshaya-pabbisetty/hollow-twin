@@ -1,5 +1,5 @@
-// Task 5: the twin's thresholds (CONTRACT.md section 6) beside the API's sourced limits. The contract keeps the
-// twin's table untouched and lists every lane 1 proposal with its source; the numbers there match limits.json.
+// CONTRACT.md section 6: the sourced limits in 6.1 are agreed by the team, the twin's old table is gone, and every
+// number written there is the one the API (and, through GET /limits, the twin) really uses.
 const { test, before, after } = require("node:test");
 const assert = require("node:assert");
 const fs = require("fs");
@@ -15,33 +15,52 @@ before(() => s.start());
 after(() => s.cleanup());
 const alertsFor = async (b) => (await s.get(`/history?kind=alert&block=${b}`));
 
-test("CONTRACT.md section 6: the twin's table is untouched and every lane 1 proposal is marked with its source", () => {
-  for (const row of [
+test("CONTRACT.md section 6: the agreed table, every row sourced, and the twin's old table gone", () => {
+  const six = contract.slice(contract.indexOf("## 6. Thresholds"), contract.indexOf("### 6.2"));
+  const agreed = contract.slice(contract.indexOf("### 6.1 Agreed limits"), contract.indexOf("### 6.2"));
+  assert.ok(six.startsWith("## 6. Thresholds (agreed by the team)"), "section 6 says the limits are agreed");
+  assert.ok(agreed.length > 0, "6.1 is the agreed table");
+  // the old twin-numbers table and its open item are gone, and nothing in 6.1 is still only a proposal
+  for (const old of [
     "| Battery left (from `power`) | under 24 h, or brownout | dark, or under 8 h |",
     "| CO2 | over 2,000 ppm | over 4,000 ppm |",
     "| Air temperature | over 39 °C | over 43 °C |",
     "| Flood depth | over 25 cm | over 45 cm (tunnel closes) |",
-    "Water is still open: lanes 1 and 3 pick the `tds_ppm` and `turbidity_ntu` cut-offs after calibrating the probe with a clean cup and a salty cup.",
-  ]) assert.ok(contract.includes(row), `unchanged: ${row}`);
-  const proposals = contract.slice(contract.indexOf("### 6.1"), contract.indexOf("## Changelog (lane 1)"));
-  assert.ok(proposals.split("proposed by lane 1, source:").length - 1 >= 8, "each differing row says 'proposed by lane 1, source: ...'");
-  // the numbers written in the contract are the ones the API really uses
+    "Water is still open:",
+    "Thresholds the twin uses today",
+    "not agreed yet",
+    "Twin today",
+  ]) assert.ok(!contract.includes(old), `removed: ${old}`);
+  assert.ok(!agreed.includes("proposed by lane 1"), "no row in 6.1 is still a proposal");
+  // the agreed table, row by row: reading, limit (the number the API uses) and status (agreed, with its source)
   const n = (x) => x.toLocaleString("en-US");
-  for (const [key, text] of [
-    ["air_co2_stale_ppm", `over ${n(limits.air_co2_stale_ppm.value)} ppm`],
-    ["air_co2_danger_ppm", `over ${n(limits.air_co2_danger_ppm.value)} ppm`],
-    ["air_heat_warn_c", `heat index ${limits.air_heat_warn_c.value} °C or more`],
-    ["air_heat_danger_c", `heat index ${limits.air_heat_danger_c.value} °C or more`],
-    ["flood_depth_closed_cm", `tunnel closed over ${limits.flood_depth_closed_cm.value} cm`],
-    ["grid_band_hz", `more than ${limits.grid_band_hz.value} Hz from ${limits.grid_nominal_hz.value} Hz`],
-    ["water_tds_max_ppm", `over ${n(limits.water_tds_max_ppm.value)} ppm`],
-    ["water_turbidity_max_ntu", `over ${limits.water_turbidity_max_ntu.value} NTU`],
-    ["battery_warn_hours", `warning under ${limits.battery_warn_hours.value} h, alarm under ${limits.battery_alarm_hours.value} h or dark`],
-  ]) assert.ok(proposals.includes(text), `section 6 states ${key} as "${text}"`);
-  for (const source of ["Health Canada", "OSHA PEL / NIOSH REL", "US National Weather Service", "NERC", "WHO", "US EPA"]) assert.ok(proposals.includes(source), source);
-  // every sourced limit named there is a verified safety fact with a link
-  for (const key of ["air_co2_stale_ppm", "air_co2_danger_ppm", "air_heat_warn_c", "air_heat_danger_c", "flood_depth_closed_cm", "grid_band_hz", "water_tds_max_ppm", "water_turbidity_max_ntu"])
+  const rows = agreed.split("\n").filter((l) => l.startsWith("| ") && !l.startsWith("| Reading") && !l.startsWith("| ---"));
+  const table = rows.map((l) => l.slice(2, -2).split(" | "));
+  const expected = [
+    ["Battery left (`power`)", `warning under ${limits.battery_warn_hours.value} h, alarm under ${limits.battery_alarm_hours.value} h or dark`, "agreed by the team; a design choice"],
+    ["CO2, warning", `over ${n(limits.air_co2_stale_ppm.value)} ppm`, "agreed by the team, source: Health Canada"],
+    ["CO2, alarm", `over ${n(limits.air_co2_danger_ppm.value)} ppm`, "agreed by the team, source: OSHA PEL / NIOSH REL"],
+    ["Air temperature, warning", `heat index ${limits.air_heat_warn_c.value} °C or more`, "agreed by the team, source: US National Weather Service"],
+    ["Air temperature, alarm", `heat index ${limits.air_heat_danger_c.value} °C or more`, "agreed by the team, source: US National Weather Service"],
+    ["Flood depth", `tunnel closed over ${limits.flood_depth_closed_cm.value} cm (one level)`, "agreed by the team, source: US National Weather Service"],
+    ["Mains frequency", `power cut likely when more than ${limits.grid_band_hz.value} Hz from ${limits.grid_nominal_hz.value} Hz`, "agreed by the team, source: NERC"],
+  ];
+  assert.strictEqual(table.length, expected.length, rows.join("\n"));
+  for (const [i, [reading, limit, status]] of expected.entries()) {
+    const [r, l, st] = table[i];
+    assert.ok(r.replace("from ", "").startsWith(reading), `row ${i + 1}: ${r}`);
+    assert.strictEqual(l, limit, `row ${i + 1} (${reading}): the number the API uses`);
+    assert.ok(st.startsWith(status), `row ${i + 1} (${reading}): ${st}`);
+  }
+  // every sourced limit in the table is a verified safety fact with a link; battery hours are a design choice
+  for (const key of ["air_co2_stale_ppm", "air_co2_danger_ppm", "air_heat_warn_c", "air_heat_danger_c", "flood_depth_closed_cm", "grid_band_hz"])
     assert.deepStrictEqual([limits[key].type, limits[key].verified, /^https:/.test(limits[key].url)], ["safety fact", true, true], key);
+  for (const key of ["battery_warn_hours", "battery_alarm_hours"]) assert.match(limits[key].reason, /CONTRACT\.md section 6\.1, agreed by the team/, key);
+  // 6.2 water: still lane 1's proposal until lane 3 checks the calibrated probe, with its numbers right
+  const water = contract.slice(contract.indexOf("### 6.2"), contract.indexOf("## Changelog (lane 1)"));
+  for (const text of [`over ${n(limits.water_tds_max_ppm.value)} ppm`, `over ${limits.water_turbidity_max_ntu.value} NTU`, "WHO", "US EPA"]) assert.ok(water.includes(text), text);
+  // the change is in the changelog
+  assert.ok(contract.includes("| 2026-11-17 | 6, 6.1 | The sourced limits in 6.1 are agreed by the team; the twin reads them from `GET /limits`. **Removed:** the twin's old thresholds table"), "changelog row");
 });
 
 test("heat index: the NWS equation reproduces the NWS chart", () => {
@@ -75,7 +94,6 @@ test("air heat: warning at the NWS Danger level, top alert at Extreme Danger, on
 });
 
 test("every contract sample against the API's limits: what each one raises today", async () => {
-  // (the twin's numbers would say: air = CO2 warning + heat warning, flood = warning, power = alarm)
   const fresh = (name) => ({ ...sample(name), time: new Date().toISOString() });
   const r = await s.post("/ingest", ["air.json", "water.json", "flood.json", "power.json"].map(fresh));
   assert.strictEqual(r.body.accepted, 4);

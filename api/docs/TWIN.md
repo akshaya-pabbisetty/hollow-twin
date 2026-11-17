@@ -153,17 +153,17 @@ function tagFor(blockId, status) {
 
 Suggested colours for `values.level`: `info` blue, `warn` amber, `danger` red.
 
-**The API's limits are not the twin's numbers yet.** The twin colours a block from its own thresholds (the table in
-the contract's section 6); the API alerts from sourced limits (section 6.1). Until the team agrees one set, a
-block can be amber in the twin while the API has raised no alert, or the other way round. The cases:
+**One set of limits.** The team agreed the sourced limits in the contract's section 6.1, and the twin's old
+thresholds table is gone from the contract. Read every number from `GET /limits` (the twin already does), so a
+block is amber in the twin exactly when the API has raised a warning:
 
-| Reading | Twin | API |
-|---|---|---|
-| CO2 | warning over 2,000 ppm, alarm over 4,000 | warning over 1,000 ppm, alarm over 5,000 |
-| Air temperature | warning over 39 °C, alarm over 43 °C | heat index (temperature and humidity together) 39.4 °C and 51.7 °C |
-| Flood | warning over 25 cm, tunnel closes over 45 cm | tunnel closed over 15 cm |
-| Battery | warning under 24 h, alarm under 8 h or dark | the same |
-| Water | simulated contamination index 25 / 50 | `tds_ppm` over 1,000 or `turbidity_ntu` over 5 |
+| Reading | Agreed limit (section 6.1) |
+|---|---|
+| CO2 | warning over 1,000 ppm, alarm over 5,000 |
+| Air temperature | heat index (temperature and humidity together) 39.4 °C warning, 51.7 °C alarm |
+| Flood | tunnel closed over 15 cm |
+| Battery | warning under 24 h, alarm under 8 h or dark |
+| Water | `tds_ppm` over 1,000 or `turbidity_ntu` over 5 (section 6.2; lane 3 still checks them against the calibrated probe) |
 
 The simplest way to show one truth is to colour from the API's alerts and `forecast[].level` rather than from the
 raw values.

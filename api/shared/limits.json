@@ -229,11 +229,11 @@
     },
     "battery_warn_hours": {
       "value": 24, "unit": "h", "op": "<", "type": "design choice",
-      "reason": "CONTRACT.md section 6, the twin's warning level: a full day to plan around. No published limit exists for battery hours."
+      "reason": "CONTRACT.md section 6.1, agreed by the team: a full day to plan around. No published limit exists for battery hours."
     },
     "battery_alarm_hours": {
       "value": 8, "unit": "h", "op": "<", "type": "design choice",
-      "reason": "CONTRACT.md section 6, the twin's alarm level: one sleep or work shift, the last chance to charge watches, fill water and move people."
+      "reason": "CONTRACT.md section 6.1, agreed by the team: one sleep or work shift, the last chance to charge watches, fill water and move people."
     },
     "battery_rearm_margin_hours": {
       "value": 2, "unit": "h", "type": "design choice",

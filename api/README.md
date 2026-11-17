@@ -24,8 +24,8 @@ It needs Node 20 or newer and nothing else. There are no packages to install.
       (`docs/DEPLOY.md`), nothing has been deployed.
 - [x] The team's tools pass: `node tools/replay.mjs http://localhost:8787/ingest 1 3`, and every file in
       `contract/samples/` is accepted unchanged.
-- [ ] Agree the thresholds with the team. The API's sourced limits differ from the twin's numbers; both are listed
-      in `CONTRACT.md` section 6.1.
+- [x] Agree the thresholds with the team: the sourced limits in `CONTRACT.md` section 6.1 are agreed, and the twin
+      reads them from `GET /limits`.
 
 ## Guides
 
@@ -277,7 +277,7 @@ Rules create alerts automatically. They are stored like messages with `kind: "al
 | X sent to Y | a help request is assigned | info |
 | Surface verdict | the surface verdict changes (suits: info, domes: warn, outposts and stay: danger) | info / warn / danger |
 
-Several of these numbers differ from the ones the twin uses today. `CONTRACT.md` section 6.1 lists both.
+These are the limits the team agreed (`CONTRACT.md` section 6.1). The twin uses the same numbers, read from `GET /limits`.
 
 ### GET /live
 

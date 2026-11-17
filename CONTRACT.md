@@ -211,38 +211,28 @@ All optional to use. Details and examples are in [`api/README.md`](api/README.md
 
 What the API does with that array (lane 1): it sorts it by `time` before storing, drops any `id` it has already seen (counted in `duplicates`), and sends the rest out on `/live` oldest first. The backlog's older times never replace a fresher reading as the latest (section 1.3). `GET /history` always returns messages in `time` order (equal times by `seq`), so the gap can be replayed later as well. A `checkin` that arrives this way still reaches the watches in its `to` list and its family group, and the alert it produces carries the `hops` and `via` it travelled.
 
-## 6. Thresholds the twin uses today
+## 6. Thresholds (agreed by the team)
 
-| Reading | Warning | Alarm |
+The team agreed one set of limits: the sourced limits in 6.1. The API alerts on them, and the twin uses the same numbers, which it reads from `GET /limits` (kept in [`api/shared/limits.json`](api/shared/limits.json), each with its source and link). The twin's earlier numbers (CO2 over 2,000 / 4,000 ppm, air temperature over 39 / 43 °C, flood over 25 / 45 cm) are retired.
+
+### 6.1 Agreed limits
+
+| Reading | Limit | Status |
 | --- | --- | --- |
-| Battery left (from `power`) | under 24 h, or brownout | dark, or under 8 h |
-| CO2 | over 2,000 ppm | over 4,000 ppm |
-| Air temperature | over 39 °C | over 43 °C |
-| Flood depth | over 25 cm | over 45 cm (tunnel closes) |
-
-Water is still open: lanes 1 and 3 pick the `tds_ppm` and `turbidity_ntu` cut-offs after calibrating the probe with a clean cup and a salty cup.
-
-### 6.1 Limits proposed by lane 1 (not agreed yet)
-
-The table above is what the twin uses and is unchanged. The API (lane 1) alerts on the limits below instead, each taken from a published source. Until the team agrees one set, the twin and the API can disagree about the same reading, so every row is marked. All of them, with links, are served by `GET /limits` and kept in [`api/shared/limits.json`](api/shared/limits.json).
-
-| Reading | Twin today (table above) | API today | Status |
-| --- | --- | --- | --- |
-| Battery left (from `power`) | warning under 24 h, alarm under 8 h or dark | the same: warning under 24 h, alarm under 8 h or dark | same numbers; no published limit exists for battery hours |
-| CO2, warning | over 2,000 ppm | over 1,000 ppm | proposed by lane 1, source: Health Canada, Residential indoor air quality guidelines: Carbon dioxide (2021), long-term exposure limit |
-| CO2, alarm | over 4,000 ppm | over 5,000 ppm | proposed by lane 1, source: OSHA PEL / NIOSH REL for carbon dioxide (NIOSH Pocket Guide), 8-hour limit for workers |
-| Air temperature, warning | over 39 °C | heat index 39.4 °C or more | proposed by lane 1, source: US National Weather Service, heat index classification: Danger (103 °F) |
-| Air temperature, alarm | over 43 °C | heat index 51.7 °C or more | proposed by lane 1, source: US National Weather Service, heat index classification: Extreme Danger (125 °F) |
-| Flood depth | warning over 25 cm, alarm over 45 cm (tunnel closes) | tunnel closed over 15 cm (one level) | proposed by lane 1, source: US National Weather Service, Flood Safety ("six inches of fast-moving water can knock over and carry off an adult") |
-| Mains frequency (`grid_hz`, optional) | not used | power cut likely when more than 0.036 Hz from 60 Hz | proposed by lane 1, source: NERC, Reliability Guideline: Primary Frequency Control (2023), maximum governor deadband |
+| Battery left (from `power`) | warning under 24 h, alarm under 8 h or dark | agreed by the team; a design choice, because no published limit exists for battery hours |
+| CO2, warning | over 1,000 ppm | agreed by the team, source: Health Canada, Residential indoor air quality guidelines: Carbon dioxide (2021), long-term exposure limit |
+| CO2, alarm | over 5,000 ppm | agreed by the team, source: OSHA PEL / NIOSH REL for carbon dioxide (NIOSH Pocket Guide), 8-hour limit for workers |
+| Air temperature, warning | heat index 39.4 °C or more | agreed by the team, source: US National Weather Service, heat index classification: Danger (103 °F) |
+| Air temperature, alarm | heat index 51.7 °C or more | agreed by the team, source: US National Weather Service, heat index classification: Extreme Danger (125 °F) |
+| Flood depth | tunnel closed over 15 cm (one level) | agreed by the team, source: US National Weather Service, Flood Safety ("six inches of fast-moving water can knock over and carry off an adult") |
+| Mains frequency (`grid_hz`, optional) | power cut likely when more than 0.036 Hz from 60 Hz | agreed by the team, source: NERC, Reliability Guideline: Primary Frequency Control (2023), maximum governor deadband |
 
 Notes on the rows:
 
-- **Air temperature.** The API does not compare the thermometer reading alone. It works out the heat index (how hot the air feels) from `temp_c` and `humidity_pct` with the National Weather Service equation, because humid air is dangerous at a much lower temperature than dry air. Example: the sample `air` message (40.2 °C at 71 % humidity) has a heat index far above 51.7 °C, so the API raises its top heat alert, while the twin's dry-air rule shows a warning (over 39 °C, under 43 °C). If a sensor sends no `humidity_pct`, the API compares `temp_c` itself.
-- **Flood.** The API has one level, at 15 cm, and calls it "tunnel closed". The twin warns at 25 cm and closes at 45 cm.
-- **CO2.** The API warns earlier than the twin (1,000 against 2,000 ppm) and raises its alarm later (5,000 against 4,000 ppm).
+- **Air temperature.** The thermometer reading alone is not compared. The heat index (how hot the air feels) is worked out from `temp_c` and `humidity_pct` with the National Weather Service equation, because humid air is dangerous at a much lower temperature than dry air. Example: the sample `air` message (40.2 °C at 71 % humidity) has a heat index far above 51.7 °C, so it raises the top heat alert. If a sensor sends no `humidity_pct`, `temp_c` itself is compared.
+- **Flood.** One level, at 15 cm, called "tunnel closed".
 
-### 6.2 Water cut-offs (the open item above, filled in by lane 1)
+### 6.2 Water cut-offs (filled in by lane 1)
 
 Proposed by lane 1. Lane 3 still has to confirm them against the probe once it is calibrated with the clean cup and the salty cup.
 
@@ -255,9 +245,9 @@ Either reading over its cut-off raises one alert, "Do not drink", for the block.
 
 ## Changelog (lane 1)
 
-Additions only. Nothing above was renamed or removed. Each row says where the addition is written down.
+Additions, except the rows marked **Removed**, which say what was taken out and why. Each row says where the change is written down.
 
-| Date | Section | Added |
+| Date | Section | Change |
 | --- | --- | --- |
 | 2026-11-16 | 1.1 | Optional message fields `source` (`live` or `simulated`) and `sig` (device signature). |
 | 2026-11-16 | 1.2 | Fields the API adds on the way out: `seq`, `source`, `verified`, `time_estimated`, `device_time`, `warnings`, `sig_unchecked`. |
@@ -278,3 +268,4 @@ Additions only. Nothing above was renamed or removed. Each row says where the ad
 | 2026-11-17 | 4.1, 4.3 | Surface verdict covers all four return options (`sealed outposts needed` added); only the contract's three surface readings are required, `o2_pct` and `pm25_ugm3` are optional and listed in `not_measured`; each limit says which option it leads to. |
 | 2026-11-17 | 4.2 | `GET /fairshare`: one per-person model for the table, `levels` summary, and a separate `measured` section for blocks with a real relay. |
 | 2026-11-17 | 1.2, 1.3, 5 | Clock rule: any `time` ahead of the receive time (not only more than 5 minutes ahead) is replaced by the receive time, with `time_estimated: true` and `device_time`. "Latest" per block and kind is the greatest stored `time`, ties broken by `seq`; a late relay backlog never replaces a fresher reading. |
+| 2026-11-17 | 6, 6.1 | The sourced limits in 6.1 are agreed by the team; the twin reads them from `GET /limits`. **Removed:** the twin's old thresholds table (CO2 2,000 / 4,000 ppm, air temperature 39 / 43 °C, flood 25 / 45 cm) and the "water is still open" line (6.2 fills it in). |
