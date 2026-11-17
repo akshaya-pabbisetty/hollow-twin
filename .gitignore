@@ -5,3 +5,4 @@ node_modules/
 inspo/
 tools/received.ndjson
 .playwright-mcp/
+.claude/
