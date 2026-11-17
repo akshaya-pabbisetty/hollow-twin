@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#05070a">
+<title>Hollow watch</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #05070a; --face: #0d1117; --ring: #1f2937; --text: #e6edf3; --dim: #8b949e;
+    --ok: #2ea043; --ok-hi: #3fb950; --warn: #d29922; --danger: #f85149; --info: #58a6ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 15px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 16px; }
+
+  /* the watch face */
+  .face { position: relative; width: min(86vw, 360px); aspect-ratio: 1; border-radius: 50%;
+    background: radial-gradient(circle at 50% 35%, #161b22, var(--face) 70%);
+    border: 10px solid var(--ring); box-shadow: 0 0 0 2px #000, 0 20px 60px rgba(0,0,0,.6);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; overflow: hidden; }
+  .face.cut { border-color: #3a1d1d; }
+  .clock { font-size: clamp(20px, 6vw, 26px); font-weight: 600; letter-spacing: .5px; }
+  .where { font-size: 12px; color: var(--dim); margin-top: 2px; text-transform: uppercase; letter-spacing: 1px; }
+  .okbtn { margin: 12px 0 10px; width: 44%; aspect-ratio: 1; border-radius: 50%; border: 0; cursor: pointer;
+    background: radial-gradient(circle at 50% 35%, var(--ok-hi), var(--ok)); color: #fff;
+    font-size: clamp(20px, 6.5vw, 28px); font-weight: 800; letter-spacing: .5px;
+    box-shadow: 0 0 0 6px rgba(46,160,67,.18), 0 8px 24px rgba(46,160,67,.35); transition: transform .08s; }
+  .okbtn:active { transform: scale(.94); }
+  .okbtn.held { background: radial-gradient(circle at 50% 35%, #e3b341, var(--warn)); box-shadow: 0 0 0 6px rgba(210,153,34,.2); }
+  .status { min-height: 2.6em; max-width: 72%; font-size: 13px; color: var(--dim); }
+  .status b { color: var(--text); }
+
+  /* an alert coming down from the API covers the face until tapped */
+  .alert { position: absolute; inset: 0; border-radius: 50%; display: none; flex-direction: column; align-items: center;
+    justify-content: center; padding: 18%; text-align: center; cursor: pointer; background: rgba(5,7,10,.94); }
+  .alert.show { display: flex; }
+  .alert .lvl { font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px; }
+  .alert .txt { font-size: clamp(15px, 4.6vw, 19px); font-weight: 600; }
+  .alert .tap { font-size: 11px; color: var(--dim); margin-top: 12px; }
+  .alert.info .lvl { color: var(--info); } .alert.warn .lvl { color: var(--warn); } .alert.danger .lvl { color: var(--danger); }
+  .alert.danger { box-shadow: inset 0 0 0 4px var(--danger); } .alert.warn { box-shadow: inset 0 0 0 4px var(--warn); }
+
+  /* controls under the watch, for the demo operator */
+  .bar { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .bar button { background: #161b22; color: var(--text); border: 1px solid #30363d; border-radius: 999px;
+    padding: 8px 14px; font: inherit; font-size: 13px; cursor: pointer; }
+  .bar button.on { background: #3a1d1d; border-color: var(--danger); color: #ffb4ad; }
+  .net { font-size: 12px; color: var(--dim); text-align: center; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--dim); vertical-align: 1px; }
+  .dot.up { background: var(--ok-hi); } .dot.down { background: var(--danger); } .dot.none { background: var(--warn); }
+  .note { font-size: 11px; color: #6e7681; text-align: center; max-width: 360px; }
+
+  dialog { background: #0d1117; color: var(--text); border: 1px solid #30363d; border-radius: 12px; width: min(92vw, 420px); padding: 18px; }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  dialog h2 { margin: 0 0 12px; font-size: 16px; }
+  dialog label { display: block; font-size: 12px; color: var(--dim); margin: 10px 0 4px; }
+  dialog input, dialog select { width: 100%; padding: 8px 10px; background: #010409; color: var(--text);
+    border: 1px solid #30363d; border-radius: 8px; font: inherit; }
+  dialog .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  dialog .row button { padding: 8px 14px; border-radius: 8px; border: 1px solid #30363d; background: #21262d; color: var(--text); font: inherit; cursor: pointer; }
+  dialog .row button.primary { background: var(--ok); border-color: var(--ok); }
+  dialog small { color: #6e7681; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<div class="face" id="face">
+  <div class="clock" id="clock">--:--</div>
+  <div class="where" id="where">—</div>
+  <button class="okbtn" id="ok" aria-label="Send I'm OK to my family">I'M OK</button>
+  <div class="status" id="status">Tap to tell your family you're safe.</div>
+  <div class="alert" id="alert" role="alert">
+    <div class="lvl" id="alert-lvl"></div>
+    <div class="txt" id="alert-txt"></div>
+    <div class="tap">tap to dismiss</div>
+  </div>
+</div>
+
+<div class="net" id="net"><span class="dot"></span>…</div>
+<div class="bar">
+  <button id="cut" title="Simulates the Directorate switching the network off: nothing leaves this watch until it is back on.">Cut network</button>
+  <button id="cfg">Settings</button>
+</div>
+<div class="note">Hollow Twin watch, prototyped on a phone. It sends the same <code>checkin</code> message a real watch would (CONTRACT.md).</div>
+
+<dialog id="dlg">
+  <form method="dialog" id="form">
+    <h2>Watch settings</h2>
+    <label for="f-api">API address</label>
+    <input id="f-api" placeholder="http://localhost:8787" autocomplete="off" inputmode="url">
+    <small>Leave empty to try the watch without an API: check-ins are held until you add one.</small>
+    <label for="f-key">API key (only if the API was started with INGEST_KEY)</label>
+    <input id="f-key" autocomplete="off">
+    <label for="f-device">This watch</label>
+    <input id="f-device" placeholder="watch-0071" autocomplete="off">
+    <label for="f-block">Where I am</label>
+    <select id="f-block"></select>
+    <label for="f-family">Family group</label>
+    <input id="f-family" placeholder="fam-0071" autocomplete="off">
+    <label for="f-to">Family watches to reach (comma separated)</label>
+    <input id="f-to" placeholder="watch-0011" autocomplete="off">
+    <div class="row">
+      <button value="cancel">Cancel</button>
+      <button value="save" class="primary" id="f-save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+// Hollow Twin, lane 2: the watch, prototyped as a web page.
+// It speaks CONTRACT.md: a "checkin" message to POST /ingest, alerts back from GET /inbox.
+// While the network is cut (by the button, or for real), check-ins are held here with their
+// original time and posted as one array when it comes back (CONTRACT.md section 5).
+
+// Block ids from contract/blocks.json.
+const BLOCKS = ['l0-rail-wells','l0-rail-steps','l0-drift-yard','l0-rivet-gallery','l1-winch-gallery','l1-ash-hollow','l1-rail-bend','l1-ember-heading','l1-rivet-heading','l1-bore-steps','l2-damp-bend','l2-chalk-gallery','l2-slag-wells','l2-tipple-junction','l2-ember-junction','l2-tallow-wells','l2-rail-hollow','l3-ember-yard','l3-flint-row','l3-sump-steps','l3-damp-steps','l3-flint-heading','l3-bore-face','l3-pylon-steps','l4-bore-heading','l4-tallow-gallery','l4-pitch-row','l4-flint-gallery','l4-coke-yard','l4-gantry-court','l4-rivet-face','l4-lantern-face','l5-ash-court','l5-cinder-court','l5-pylon-heading','l5-ash-yard','l5-winch-heading','l5-coke-wells','l5-seam-row','l5-sump-bend','l5-rail-face','l6-seam-wells','l6-damp-court','l6-pitch-face','l6-flint-face','l6-slag-face','l6-rail-row','l6-lantern-heading','l6-ember-gallery','l6-chalk-bend','l7-pylon-yard','l7-rivet-row','l7-ember-wells','l7-flint-yard','l7-drift-heading','l7-tipple-court','l7-chalk-cut','l7-ash-wells','l7-pitch-gallery','l7-gantry-yard','l8-bore-bend','l8-gantry-bend','l8-winch-wells','l8-canary-bend','l8-lamp-cut','l8-sump-row','l8-slag-yard','l8-canary-row','l8-rail-junction','l8-drift-hollow'];
+
+// Defaults match the network-cut beat in api/tools/scenario.js: a resident on L7 Chalk Cut, a relative on L1.
+const DEFAULTS = { api: '', key: '', device: 'watch-0071', block: 'l7-chalk-cut', family: 'fam-0071', to: 'watch-0011' };
+
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('hollow.watch.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('hollow.watch.' + k, JSON.stringify(v)); } catch (e) { /* storage blocked: kept in memory only */ } },
+};
+
+// ?api=…&device=…&block=…&family=…&to=… set things up from a link (handy for putting it on a phone).
+const cfg = { ...DEFAULTS, ...store.get('cfg', {}) };
+const q = new URLSearchParams(location.search);
+for (const k of Object.keys(DEFAULTS)) if (q.has(k)) cfg[k] = q.get(k);
+store.set('cfg', cfg);
+
+let queue = store.get('queue', []);   // check-ins not yet accepted by the API
+let cut = store.get('cut', false);     // the demo "network cut" switch
+let reachable = null;                  // last result of talking to the API: true, false or null (unknown)
+let lastSeq = store.get('seq.' + cfg.device, 0);
+let flushing = false;
+let caughtUp = lastSeq > 0;          // seen this API's inbox before?
+
+const api = () => (cfg.api || '').trim().replace(/\/+$/, '');
+const pretty = b => { const [lvl, ...rest] = b.split('-'); return lvl.toUpperCase() + ' · ' + rest.map(w => w[0].toUpperCase() + w.slice(1)).join(' '); };
+const hhmm = iso => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const toList = () => cfg.to.split(',').map(s => s.trim()).filter(Boolean);
+
+// Message ids must be unique per watch (CONTRACT.md section 1). The counter starts from the clock
+// so a cleared phone never reuses an id the API has already seen and silently drops.
+function nextId() {
+  let n = store.get('counter.' + cfg.device, 0);
+  n = Math.max(n + 1, Math.floor(Date.now() / 1000) % 1000000);
+  store.set('counter.' + cfg.device, n);
+  return `${cfg.device}-${String(n).padStart(6, '0')}`;
+}
+
+function headers() {
+  const h = { 'Content-Type': 'application/json' };
+  if (cfg.key) h['x-api-key'] = cfg.key;
+  return h;
+}
+
+// ---------- sending ----------
+function pressOk() {
+  const msg = {
+    id: nextId(), device: cfg.device, block: cfg.block, time: new Date().toISOString(),
+    kind: 'checkin', values: { status: 'ok', family: cfg.family, to: toList() },
+    hops: 0, via: [], source: 'live',   // a real person pressed a real button
+  };
+  queue.push(msg); store.set('queue', queue);
+  if (navigator.vibrate) navigator.vibrate(40);
+  paint();
+  flush();
+}
+
+// Post everything held as ONE array, oldest first, with original times (CONTRACT.md section 5).
+async function flush() {
+  if (flushing || !queue.length || cut || !api()) return paint();
+  flushing = true;
+  const batch = queue.slice();
+  try {
+    const r = await fetch(api() + '/ingest', { method: 'POST', headers: headers(), body: JSON.stringify(batch.length === 1 ? batch[0] : batch) });
+    reachable = true;
+    if (r.status === 429) { setTimeout(flush, 1200); return; }
+    if (r.status === 401) { say('<b>API key needed.</b> Add it in Settings.'); return; }
+    const body = await r.json().catch(() => ({}));
+    if (r.ok || r.status === 422) {
+      const rejected = new Map((body.rejected || []).map(x => [x.id, x.problems]));
+      const sent = batch.filter(m => !rejected.has(m.id)).length;
+      queue = queue.filter(m => !batch.includes(m)); store.set('queue', queue);
+      if (rejected.size) say('<b>Not accepted:</b> ' + [...rejected.values()][0].join('; '));
+      else if (batch.length > 1) say(`<b>Delivered ${sent} held check-ins</b><br>with their original times.`);
+      else say(`<b>Sent ✓</b> ${hhmm(batch[0].time)}<br>Your family will be told you're OK.`);
+      registerFamily();
+    } else {
+      say(`<b>API error ${r.status}.</b> Holding your check-in and retrying.`);
+    }
+  } catch (e) {
+    reachable = false;   // the network really is down: keep holding
+  } finally {
+    flushing = false;
+    paint();
+  }
+}
+
+// Let the API know this watch belongs to the family group, so GET /family lists it (once per setup).
+async function registerFamily() {
+  const key = `fam.${cfg.family}.${cfg.device}.${cfg.to}`;
+  if (!cfg.family || store.get(key, false)) return;
+  try {
+    const r = await fetch(api() + '/family', { method: 'POST', headers: headers(), body: JSON.stringify({ group: cfg.family, devices: [cfg.device, ...toList()] }) });
+    if (r.ok) store.set(key, true);
+  } catch (e) { /* not essential: a check-in naming the group already joins it */ }
+}
+
+// ---------- receiving: alerts for this watch, the way a relay would fetch them ----------
+async function poll() {
+  if (cut || !api()) return;
+  try {
+    const r = await fetch(`${api()}/inbox?device=${encodeURIComponent(cfg.device)}&after_seq=${lastSeq}`);
+    reachable = r.ok;
+    if (!r.ok) return;
+    const list = await r.json();
+    // first contact with this API: catch up silently instead of replaying old alerts
+    const quiet = !caughtUp; caughtUp = true;
+    for (const a of list) {
+      lastSeq = Math.max(lastSeq, a.seq || 0);
+      if (quiet) continue;
+      // the alert our own check-in caused is not news to us; anything else (warnings, family) is
+      const cause = (a.values && a.values.cause) || '';
+      if (a.values && a.values.family && cause.startsWith(cfg.device + '-')) continue;
+      showAlert(a.values || {});
+    }
+    store.set('seq.' + cfg.device, lastSeq);
+  } catch (e) { reachable = false; }
+  finally { paint(); }
+}
+
+function showAlert(v) {
+  const el = $('alert');
+  el.className = 'alert show ' + (['info', 'warn', 'danger'].includes(v.level) ? v.level : 'info');
+  $('alert-lvl').textContent = v.level === 'danger' ? 'Danger' : v.level === 'warn' ? 'Warning' : 'Message';
+  $('alert-txt').textContent = v.text || '';
+  if (navigator.vibrate) navigator.vibrate(v.level === 'danger' ? [300, 120, 300, 120, 300] : [200, 100, 200]);
+}
+$('alert').addEventListener('click', () => $('alert').classList.remove('show'));
+
+// ---------- screen ----------
+let statusHtml = null;
+function say(html) { statusHtml = html; paint(); }
+
+function paint() {
+  $('clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  $('where').textContent = pretty(cfg.block) + ' · ' + cfg.device;
+  $('face').classList.toggle('cut', cut);
+  $('cut').classList.toggle('on', cut);
+  $('cut').textContent = cut ? 'Restore network' : 'Cut network';
+  $('ok').classList.toggle('held', queue.length > 0);
+
+  const net = $('net');
+  if (!api()) net.innerHTML = '<span class="dot none"></span>No API set · check-ins are held';
+  else if (cut) net.innerHTML = '<span class="dot down"></span>Network cut by the Directorate';
+  else if (reachable === false) net.innerHTML = '<span class="dot down"></span>Can\'t reach the API · holding';
+  else net.innerHTML = `<span class="dot up"></span>Connected · ${api().replace(/^https?:\/\//, '')}`;
+
+  if (queue.length && (cut || !api() || reachable === false)) {
+    $('status').innerHTML = `<b>Holding ${queue.length} check-in${queue.length > 1 ? 's' : ''}</b><br>Sends when the network is back.`;
+  } else if (statusHtml) {
+    $('status').innerHTML = statusHtml;
+  }
+}
+
+// ---------- controls ----------
+$('ok').addEventListener('click', pressOk);
+$('cut').addEventListener('click', () => {
+  cut = !cut; store.set('cut', cut);
+  statusHtml = cut ? 'Network is down.<br>You can still press <b>I\'M OK</b>.' : null;
+  paint();
+  if (!cut) { flush(); poll(); }
+});
+
+const sel = $('f-block');
+for (const b of BLOCKS) { const o = document.createElement('option'); o.value = b; o.textContent = pretty(b); sel.appendChild(o); }
+$('cfg').addEventListener('click', () => {
+  $('f-api').value = cfg.api; $('f-key').value = cfg.key; $('f-device').value = cfg.device;
+  sel.value = cfg.block; $('f-family').value = cfg.family; $('f-to').value = cfg.to;
+  $('dlg').showModal();
+});
+$('dlg').addEventListener('close', () => {
+  if ($('dlg').returnValue !== 'save') return;
+  const device = $('f-device').value.trim() || DEFAULTS.device;
+  if (device !== cfg.device) lastSeq = store.get('seq.' + device, 0);
+  Object.assign(cfg, { api: $('f-api').value.trim(), key: $('f-key').value.trim(), device, block: sel.value,
+    family: $('f-family').value.trim(), to: $('f-to').value.trim() });
+  store.set('cfg', cfg);
+  reachable = null; statusHtml = null; caughtUp = lastSeq > 0;
+  paint(); flush(); poll();
+});
+
+// A real outage counts too: retry when the phone says it's back online, and every few seconds.
+window.addEventListener('online', () => { flush(); poll(); });
+setInterval(() => { flush(); poll(); }, 3000);
+setInterval(paint, 15000);
+paint(); flush(); poll();
+</script>
+</body>
+</html>
