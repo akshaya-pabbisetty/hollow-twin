@@ -1,55 +1,89 @@
 # Hollow Twin
 
+**When the power fails in the Hollow, the deep levels go dark first, and when the Directorate cuts the network, nobody can tell their family they are alive. Hollow Twin warns each block before it goes dark, shares the power that is left fairly, and gets "I'm OK" through anyway.**
+
 Patriot HackFest Fall 2026, Life Underground track.
 
-A live 3D model of one sector of the Hollow, fed by residents' own devices: watches, relay boxes, sensor nodes and scout robots. It warns people before blackouts and air cuts, shares power fairly, tracks the real outbreak against the Directorate's numbers, and keeps working when the network is cut.
+**Try it: https://hollow-twin.vercel.app** and press **Play the 60-second story**.
 
-Live twin: **https://hollow-twin.vercel.app**
+![Under the Directorate's rule, all ten blocks of Deepwell are dark by hour 30](docs/img/directorate-rule.jpg)
 
-**Deadline: Fri Nov 20, 11:00 PM ET. No extensions. We aim to submit by 6 PM ET.**
+## The problem we picked
 
-## Who owns what
+Four problems from the track, because they are one event seen from four sides: a power failure in a place where the government controls both the power and the news.
 
-Four lanes, one folder each. Only edit your own folder. The one shared file is [`CONTRACT.md`](CONTRACT.md), and only the lane 1 owner edits it.
+| Track problem | What Hollow Twin does about it |
+| --- | --- |
+| 1. Blackouts last for days and nobody knows when the next one hits | Forecasts every block's battery, hours ahead, and warns the blocks that will run dry before their lights go out |
+| 2. The Directorate decides who keeps the lights, and the deep levels always lose | Replaces "upper levels first" with a rule anyone can check: every block's air, pumps and medical load first, then the rest per person |
+| 7. The Directorate can shut the network down whenever it wants | Relay boxes in each block store messages and pass them block to block, then upload the backlog when any relay gets through |
+| 8. Families split across levels cannot tell if each other are OK | One "I'm OK" press travels over those relays to the family's watches, with the route it took |
 
-| Lane | Folder | Builds | Owner |
-| --- | --- | --- | --- |
-| 1. Backend | [`api/`](api/), `CONTRACT.md` | Ingest, live feed, history, the forecast, fair-share and outbreak logic | pick at the next call |
-| 2. Watch and relay | [`firmware/watch/`](firmware/watch/), [`firmware/relay/`](firmware/relay/) | Bluetooth watch to relay, radio relay to relay, store-and-forward, family check-ins | pick at the next call |
-| 3. Sensors and robot | [`firmware/sensor/`](firmware/sensor/), [`robot/`](robot/) | Water, CO2 and flood node; rover that checks tunnels | pick at the next call |
-| 4. Twin and broadcast | [`twin/`](twin/), [`broadcast/`](broadcast/) | 3D twin on live data, help queue, public broadcast page, demo video | anudeep-bonagiri |
+In the story's scenario a geothermal unit fails. Under the Directorate's rule, 12 deep blocks are dark by hour 30 and 8.5 million people have no fans or scrubbers. With the same supply shared fairly, no block goes dark.
 
-Each folder has a README with its task list.
+## What you are looking at
 
-## Start without waiting on anyone
+One sector of the Hollow in the year 2124, 37 years after the collapse: nine levels, 70 blocks, 32 million people, from the surface down to a geothermal plant 2,560 m underground.
 
-You need Node 18 or newer. No installs.
+- **Play the story** for the pitch in a minute.
+- **Click any block** (or search for one, such as Rivet Gallery) to step inside: its readings, its forecast, its history, and what you can do for it.
+- **Switch the power rule** between Directorate and Fair share and watch who goes dark.
+- **Cut the Directorate network** and watch the block relays take over.
 
-```sh
-# A stand-in API on http://localhost:8788 (POST /ingest, GET /live)
-node tools/catcher.mjs
+## How it works
 
-# In another terminal: send every sample message every 2 seconds
-node tools/replay.mjs
+```mermaid
+flowchart LR
+  W["Watch<br/>(not built yet)"] -.-> R["Relay box in each block<br/>(not built yet)"]
+  S["Sensor node<br/>(not built yet)"] -.-> R
+  R -. "stores and forwards<br/>when the network is cut" .-> A
+  X["Scenario scripts<br/>(scripted data)"] --> A["API<br/>ingest, forecast, fair share,<br/>alerts, check-ins"]
+  A -- "live stream" --> T["3D twin"]
+  A -. "alerts back down" .-> R
 ```
 
-- **Firmware lanes:** point your device at `http://<laptop ip>:8788/ingest`. The catcher prints each message and rejects bad ones with the reason.
-- **Twin lane:** subscribe to `http://localhost:8788/live` and run `replay.mjs` for fake traffic.
-- **Backend lane:** `replay.mjs` takes any URL, so aim it at your API to test it.
+- **`api/`**: a Node API with no dependencies. It takes messages in one shared format ([`CONTRACT.md`](CONTRACT.md)), forecasts each block's battery, computes who gets power under each rule, raises alerts, delivers family check-ins, and streams everything out live. A backlog that arrives late after a network cut is stored in the order it was measured, with the route it travelled.
+- **`twin/`**: one HTML page. Connected to the API, it shows what the API knows, block by block, and lets the API decide the power allocation. On its own, it runs a built-in simulation of the same sector.
+- **Every alert cites its limit.** CO2, heat, flood depth and water limits come from published standards (Health Canada, OSHA, the US National Weather Service, WHO, US EPA). The battery warning levels (24 h and 8 h) are our own choice, and the screen says so.
 
-## Dates
+![A check-in sent during a network cut arrives through the API and is drawn travelling to the family's block](docs/img/check-in-through-the-api.jpg)
 
-| When (ET) | What |
+## What is real and what is simulated
+
+We would rather tell you than have you find out.
+
+| Part | Status |
 | --- | --- |
-| Mon Nov 16, morning | 30-minute call: lock `CONTRACT.md`, pick lanes, list parts to order |
-| Wed Nov 18, 8 PM | Integration 1: one real device, through the API, lights up one block in the twin |
-| Thu Nov 19, noon | Integration 2: full demo run-through |
-| Thu Nov 19, 6 PM | Feature freeze |
-| Fri Nov 20 | Record and edit the video, submit by 6 PM |
+| The 3D twin, the guided story, block cards, the power rules | Real and running at the link above |
+| The API: ingest, live stream, forecast, fair share, alerts, check-in delivery, replay after a network cut | Real code, with tests. Run it locally (below). It is not hosted yet, so the public link runs on the twin's built-in simulation |
+| Sensor readings, populations, the failure scenario | Simulated. The screen tags every reading as twin simulation, scripted data through the API, or a device |
+| Watches, relay boxes, sensors | Not built. The message format and firmware notes are ready for them ([`api/docs/FIRMWARE.md`](api/docs/FIRMWARE.md)); the relays in the demo are scripted |
+| Radio links between relays | Simulated. What is real is the store, forward, de-duplicate and replay logic the relays' messages go through |
 
-## Rules that matter
+## Run it yourself
 
-- Only the four of us contribute. AI tools are allowed.
-- No coding after 11 PM ET on Nov 20.
-- Pull requests touch only your own folder. Contract changes go through lane 1.
-- `inspo/` reference images stay out of the repo; they are other people's work.
+Needs Node 20 or newer and Python 3. Nothing to install.
+
+```sh
+# 1. The API, on http://localhost:8787
+cd api && npm start
+
+# 2. The twin, in a second terminal
+cd twin && python3 -m http.server 8080
+# open http://localhost:8080/?api=http://localhost:8787
+
+# 3. Play a scripted network cut through the API and watch it arrive in the twin
+cd api && npm run scenario -- networkcut
+```
+
+Other scenarios: `blackout`, `fairshare`, `water`, `outbreak`, `care`, `surface`. API tests: `cd api && npm test`.
+
+## Also in the prototype
+
+Built while exploring the track, and working, but not part of the claim above: an outbreak simulator that spreads a disease along tunnels, lifts and water lines and lets you quarantine blocks; water and flood layers; a count of sickness reported by residents against the Directorate's number; and a surface-safety verdict in the API.
+
+## Team
+
+`anudeep-bonagiri`, `SandeepMadhavarapu`, `akshaya-pabbisetty`, `Fundamental333`. Built during the event, Nov 14 to 20, 2026.
+
+How we work together: [`TEAM.md`](TEAM.md). The plan to the deadline: [`docs/PLAN.md`](docs/PLAN.md).
