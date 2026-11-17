@@ -1,0 +1,1007 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>
+  // The page loads rover.js and cad/ by relative path, so it must be addressed as a folder: /scout/, not /scout.
+  if (!location.pathname.endsWith('/') && !location.pathname.endsWith('.html')) location.replace(location.pathname + '/' + location.search + location.hash);
+  // If a script or file fails to load, say so instead of showing "Loading" forever.
+  addEventListener('error', e => { const l = document.getElementById('loading'); if (l) l.textContent = 'Something did not load (' + (e.message || (e.target && (e.target.src || e.target.href)) || 'unknown') + '). Try reloading the page.'; }, true);
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scout Rover</title>
+<meta name="description" content="The rover Hollow Twin would send down a tunnel to see if it is open: a six-wheel rocker-bogie scout, designed in CAD and driven here in a simulated tunnel. Design only, not built.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%231A1C1E'/%3E%3Crect x='7' y='11' width='18' height='7' rx='2' fill='%23D2A01E'/%3E%3Ccircle cx='9' cy='22' r='3' fill='%23ECEDE9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%23ECEDE9'/%3E%3Ccircle cx='23' cy='22' r='3' fill='%23ECEDE9'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  /* Same control-room palette as the twin: greys for normal, colour only for warnings and alarms. */
+  :root {
+    --app: #D3D4D0; --panel: #E2E3DF; --well: #ECEDE9; --line: #BABCB7; --line-2: #9DA09B;
+    --ink: #1F2326; --dim: #565B60; --faint: #85898D; --alarm: #C8102E; --warn: #E5A100; --warn-ink: #8A5F00;
+    --ok: #3F7D4F; --sel: #33383D; --scene: #0E0F10;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--app); color: var(--ink); }
+  body { font: 13px/1.45 'IBM Plex Sans', system-ui, sans-serif; font-variant-numeric: tabular-nums; overflow: hidden; }
+  a { color: inherit; }
+  button { font: inherit; font-size: 12px; color: var(--ink); background: var(--well); border: 1px solid var(--line-2); padding: 5px 8px; cursor: pointer; border-radius: 2px; }
+  button:hover { border-color: var(--sel); }
+  button.on { background: var(--sel); color: #fff; border-color: var(--sel); }
+  button.big { font-size: 13px; padding: 7px 14px; font-weight: 600; }
+
+  #app { display: grid; grid-template-columns: 270px 1fr 340px; grid-template-rows: 44px 1fr 74px; height: 100vh; }
+  header { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px; padding: 0 16px; background: var(--panel); border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; }
+  .brand { font-weight: 600; font-size: 15px; }
+  .brand a { text-decoration: none; color: var(--dim); font-weight: 400; }
+  .brand a:hover { color: var(--ink); text-decoration: underline; }
+  .pill { padding: 1px 8px; border-radius: 2px; font-weight: 600; font-size: 12px; border: 1px solid var(--line-2); background: var(--well); }
+  .pill.warn { background: #F6E7BF; border-color: var(--warn); color: var(--warn-ink); }
+  .tabs { display: flex; gap: 4px; }
+  .spacer { flex: 1; }
+  .hstat { color: var(--dim); font-size: 12px; }
+  .hstat b { color: var(--ink); font-weight: 600; }
+
+  aside { background: var(--panel); overflow-y: auto; padding: 12px 14px; }
+  aside#left { border-right: 1px solid var(--line); }
+  aside#right { border-left: 1px solid var(--line); }
+  h3 { margin: 18px 0 6px; font-size: 12px; font-weight: 600; color: var(--dim); display: flex; justify-content: space-between; align-items: baseline; }
+  h3:first-child { margin-top: 0; }
+  h3 small { font-weight: 400; color: var(--faint); }
+  .row { display: flex; gap: 4px; flex-wrap: wrap; }
+  .row button { flex: 1; }
+  .note { color: var(--dim); font-size: 12px; margin-top: 6px; }
+  .kv { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; font-size: 12px; }
+  .kv span:nth-child(odd) { color: var(--dim); }
+  .kv span:nth-child(even) { text-align: right; font-weight: 500; }
+  .s1 { color: var(--warn-ink); font-weight: 600; }
+  .s2 { color: var(--alarm); font-weight: 600; }
+  .sok { color: var(--ok); font-weight: 600; }
+  .mode-only { display: none; }
+  body[data-mode="mission"] .m-mission, body[data-mode="parts"] .m-parts { display: block; }
+
+  main { position: relative; background: var(--scene); overflow: hidden; }
+  main canvas { display: block; width: 100%; height: 100%; }
+  #inset-frame { position: absolute; right: 12px; bottom: 12px; width: 256px; height: 160px; border: 1px solid #5b5f63; pointer-events: none; }
+  #inset-frame span { position: absolute; left: 6px; top: 4px; font-size: 11px; color: #E9EAE6; text-shadow: 0 1px 2px #000; }
+  #inset-frame.rec span::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--alarm); margin-right: 5px; }
+  #tip { position: absolute; pointer-events: none; background: rgba(31,35,38,.92); color: #fff; padding: 5px 8px; font-size: 12px; border-radius: 2px; display: none; max-width: 260px; }
+  #tip b { font-weight: 600; }
+  #tip i { font-style: normal; color: #C9CBC6; display: block; }
+  #loading { position: absolute; inset: 0; display: grid; place-items: center; color: #C9CBC6; font-size: 13px; }
+  #scale { position: absolute; left: 12px; bottom: 12px; color: #C9CBC6; font-size: 11px; text-shadow: 0 1px 2px #000; pointer-events: none; }
+
+  footer { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; padding: 0 16px; background: var(--panel); border-top: 1px solid var(--line); }
+  #caption { flex: 1; font-size: 14px; line-height: 1.4; max-width: 980px; }
+  #clock { color: var(--dim); font-size: 12px; white-space: nowrap; }
+
+  /* telemetry */
+  .bars { display: grid; grid-template-columns: 26px 1fr 52px; gap: 3px 8px; align-items: center; font-size: 12px; }
+  .bars .lbl { color: var(--dim); }
+  .bar { height: 8px; background: var(--well); border: 1px solid var(--line); position: relative; }
+  .bar i { position: absolute; inset: 0 auto 0 0; background: var(--line-2); }
+  .bar i.w { background: var(--warn); }
+  .bars .v { text-align: right; }
+  svg.sus { width: 100%; height: 108px; background: var(--well); border: 1px solid var(--line); display: block; }
+  .msg { border: 1px solid var(--line); background: var(--well); margin-top: 6px; }
+  .msg .hd { display: flex; justify-content: space-between; padding: 4px 8px; font-size: 12px; border-bottom: 1px solid var(--line); }
+  .msg pre { margin: 0; padding: 6px 8px; font: 11px/1.4 'IBM Plex Mono', ui-monospace, monospace; white-space: pre-wrap; word-break: break-all; color: var(--dim); max-height: 190px; overflow: auto; }
+  .photo { margin-top: 6px; }
+  .photo canvas { width: 100%; display: block; border: 1px solid var(--line-2); }
+  .photo div { font-size: 11px; color: var(--dim); margin-top: 2px; }
+  .sig { display: inline-flex; gap: 2px; align-items: flex-end; height: 12px; vertical-align: -1px; }
+  .sig i { width: 4px; background: var(--line); }
+  .sig i.on { background: var(--ink); }
+
+  /* parts */
+  table.bom { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.bom td { padding: 3px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.bom td.n { text-align: right; white-space: nowrap; }
+  table.bom tr.g td { font-weight: 600; color: var(--dim); padding-top: 10px; border-bottom: 1px solid var(--line-2); }
+  table.bom tr.p { cursor: pointer; }
+  table.bom tr.p:hover td { background: var(--well); }
+  table.bom tr.p.on td { background: var(--sel); color: #fff; }
+  table.bom tr.t td { font-weight: 600; border-bottom: 0; padding-top: 8px; }
+  .slider { display: grid; grid-template-columns: 1fr 46px; gap: 0 6px; font-size: 12px; margin-top: 6px; }
+  .slider label { color: var(--dim); }
+  .slider output { text-align: right; }
+  .slider input { grid-column: 1 / -1; width: 100%; margin: 2px 0 0; accent-color: var(--sel); }
+  .slider small { grid-column: 1 / -1; color: var(--faint); font-size: 11px; }
+  .chk { display: flex; gap: 6px; align-items: center; font-size: 12px; margin-top: 6px; color: var(--dim); }
+  .dl a { display: block; font-size: 12px; margin-top: 3px; }
+
+  @media (max-width: 900px) {
+    body { overflow: auto; }
+    #app { grid-template-columns: 1fr; grid-template-rows: auto 58vh auto auto auto; height: auto; }
+    header { gap: 8px 10px; padding: 8px 10px; flex-wrap: wrap; white-space: normal; }
+    .hstat { display: none; }
+    main { grid-row: 2; }
+    footer { grid-row: 3; padding: 10px 16px; flex-wrap: wrap; }
+    aside#left { grid-row: 4; border-right: 0; border-top: 1px solid var(--line); }
+    aside#right { grid-row: 5; border-left: 0; border-top: 1px solid var(--line); }
+    #inset-frame { width: 160px; height: 100px; }
+  }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body data-mode="mission">
+<div id="app">
+  <header>
+    <div class="brand"><a href="../">Hollow Twin</a> / Scout rover</div>
+    <span class="pill warn" title="Nothing on this page has been built or tested. The model comes from a CAD file; the tunnel and the readings are simulated.">Design only, not built</span>
+    <div class="tabs">
+      <button id="tab-mission" class="on">Mission</button>
+      <button id="tab-parts">Parts</button>
+    </div>
+    <div class="spacer"></div>
+    <span class="hstat">Device <b>rover-01</b></span>
+    <span class="hstat" id="h-api">API <b>not connected</b></span>
+  </header>
+
+  <aside id="left">
+    <div class="mode-only m-mission">
+      <h3>Mission</h3>
+      <div class="row"><button id="play" class="on big">Play</button><button id="restart">Restart</button></div>
+      <h3>Speed</h3>
+      <div class="row" id="speeds"><button data-s="1">1x</button><button data-s="2">2x</button><button data-s="4" class="on">4x</button></div>
+      <h3>View</h3>
+      <div class="row" id="views"><button data-v="follow" class="on">Follow</button><button data-v="side">Side</button><button data-v="eye">Rover camera</button></div>
+      <label class="chk"><input type="checkbox" id="c-lidar" checked> Lidar points</label>
+      <label class="chk"><input type="checkbox" id="c-edges"> CAD edges</label>
+      <p class="note">Drag to look around, scroll to zoom. Space plays and pauses.</p>
+
+      <h3>Where this is</h3>
+      <p class="note" style="margin-top:0" id="where"></p>
+      <p class="note"><a href="../" target="hollow-twin">Open the twin</a> beside this page: the report shows up there when the scout is back in range. To send the scout down another tunnel, open a block in the twin and pick one under "Send the scout rover".</p>
+
+      <h3>The rover</h3>
+      <div class="kv" id="spec"></div>
+      <p class="note">Runtime and range come from the motor model on this page, on a flat floor. They are estimates for a design, not measurements.</p>
+      <h3>Files</h3>
+      <div class="dl">
+        <a href="cad/scout.step" download>scout.step <small>(whole assembly, any CAD program)</small></a>
+        <a href="cad/scout.urdf" download>scout.urdf <small>(links and joints, for a robot simulator)</small></a>
+        <a href="cad/scout.json" download>scout.json <small>(what this page reads)</small></a>
+      </div>
+      <p class="note">All three come from one script, <code>robot/cad/scout.py</code> (CadQuery).</p>
+    </div>
+
+    <div class="mode-only m-parts">
+      <h3>View</h3>
+      <div class="slider"><label for="explode">Pull apart</label><output id="o-explode">0%</output><input id="explode" type="range" min="0" max="1" step="0.01" value="0"></div>
+      <label class="chk"><input type="checkbox" id="c-xray"> See inside the body</label>
+      <label class="chk"><input type="checkbox" id="c-edges2" checked> CAD edges</label>
+      <label class="chk"><input type="checkbox" id="c-turn" checked> Turn slowly</label>
+      <h3>Joints <small id="j-count"></small></h3>
+      <div id="joints"></div>
+      <div class="row" style="margin-top:8px"><button id="j-reset">Reset joints</button></div>
+      <p class="note">The rockers and bogies have no motors: they pivot freely, and the differential ties the two rockers so one goes up as the other goes down.</p>
+    </div>
+  </aside>
+
+  <main id="view">
+    <div id="loading">Loading the CAD model…</div>
+    <div id="inset-frame"><span>Rover camera</span></div>
+    <div id="scale"></div>
+    <div id="tip"></div>
+  </main>
+
+  <aside id="right">
+    <div class="mode-only m-mission">
+      <h3>Status <small id="t-step"></small></h3>
+      <div class="kv">
+        <span>Doing</span><span id="t-doing">Parked</span>
+        <span>Speed</span><span id="t-speed">0.00 m/s</span>
+        <span>Distance driven</span><span id="t-dist">0.0 m</span>
+        <span>Battery</span><span id="t-batt"></span>
+        <span>Drawing</span><span id="t-power"></span>
+        <span id="t-link-label">Link to the dock relay</span><span id="t-link"></span>
+        <span>Held on memory card</span><span id="t-held">0 messages</span>
+      </div>
+      <h3>Wheels <small>motor current</small></h3>
+      <div class="bars" id="wheels"></div>
+      <h3>Suspension <small>left side</small></h3>
+      <svg class="sus" id="sus" viewBox="0 0 300 108"></svg>
+      <div class="kv" style="margin-top:6px">
+        <span>Rocker left / right</span><span id="t-rock"></span>
+        <span>Bogie left / right</span><span id="t-bog"></span>
+        <span>Body pitch / roll</span><span id="t-pr"></span>
+      </div>
+      <h3>Sensors</h3>
+      <div class="kv">
+        <span>CO2</span><span id="t-co2"></span>
+        <span>Air temperature</span><span id="t-temp"></span>
+        <span>Humidity</span><span id="t-hum"></span>
+        <span>Tunnel width (lidar)</span><span id="t-width"></span>
+        <span>Water at the front axle</span><span id="t-depth"></span>
+      </div>
+      <h3>Reports</h3>
+      <div id="msgs"><p class="note" style="margin-top:0">None yet. The scout sends a <code>tunnel</code> message when it knows whether the tunnel is open.</p></div>
+    </div>
+
+    <div class="mode-only m-parts">
+      <h3>Parts list <small>click a row to show it</small></h3>
+      <table class="bom" id="bom"></table>
+      <p class="note">Masses: worked out from the CAD volume and the material for made parts, typical catalogue figures for bought ones. Costs: typical prices for one rover, not quotes.</p>
+    </div>
+  </aside>
+
+  <footer>
+    <div id="caption">Loading…</div>
+    <div id="clock"></div>
+  </footer>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { loadRover } from './rover.js';
+
+const $ = id => document.getElementById(id);
+const Q = new URLSearchParams(location.search);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const smooth = t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+const deg = r => (r * 180 / Math.PI);
+const fmt = (v, d = 0) => (+v || 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+// ------------------------------------------------------------------ renderer
+const view = $('view');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+view.prepend(renderer.domElement);
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envTex = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.03, 120);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+const fill = new THREE.PointLight(0xd6dde6, 2.2, 7, 2); camera.add(fill);
+
+// ------------------------------------------------------------------ noise
+const hash = (i, j, k) => { let h = Math.imul(i, 374761393) ^ Math.imul(j, 668265263) ^ Math.imul(k, 1440662683); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+function vnoise(x, y, z) {
+  const i = Math.floor(x), j = Math.floor(y), k = Math.floor(z), fx = x - i, fy = y - j, fz = z - k;
+  const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy), w = fz * fz * (3 - 2 * fz), L = (a, b, t) => a + (b - a) * t;
+  return L(L(L(hash(i, j, k), hash(i + 1, j, k), u), L(hash(i, j + 1, k), hash(i + 1, j + 1, k), u), v),
+           L(L(hash(i, j, k + 1), hash(i + 1, j, k + 1), u), L(hash(i, j + 1, k + 1), hash(i + 1, j + 1, k + 1), u), v), w);
+}
+const fbm = (x, y, z) => vnoise(x, y, z) * 0.5 + vnoise(x * 2.1 + 7, y * 2.1, z * 2.1) * 0.27 + vnoise(x * 4.4, y * 4.4 + 3, z * 4.4) * 0.15 + vnoise(x * 9, y * 9, z * 9 + 5) * 0.08;
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+// ------------------------------------------------------------------ the tunnel
+// X runs from the dock at the starting block (0) toward the far block (48). The rover drives in the lane at z = LANE; the old rail
+// line runs on the other side. Everything the wheels touch comes from ground(); the meshes are drawn from it too.
+const W = 2.2, SPRING = 1.75, X0 = -6, X1 = 50, LANE = 0.7, WATER_Y = -0.015;
+const RUBBLE = [10, 15.6], DUCT_X = 22, RELAY_RANGE = 15;
+const R1 = rng(11), BUMPS = [];
+for (let i = 0; i < 30; i++) BUMPS.push({ x: RUBBLE[0] + 0.4 + R1() * 4.6, z: -0.2 + R1() * 1.9, r: 0.16 + R1() * 0.22, h: 0.04 + R1() * (i < 6 ? 0.13 : 0.09) });
+function rubble(x, z) {
+  if (x < RUBBLE[0] - 1 || x > RUBBLE[1] + 1) return 0;
+  let h = 0.05 * Math.exp(-(((x - 12.8) / 1.7) ** 2)) * Math.exp(-(((z - 0.6) / 1.3) ** 2));
+  for (const b of BUMPS) { const d2 = ((x - b.x) ** 2 + (z - b.z) ** 2) / (b.r * b.r); if (d2 < 5) { const v = b.h * Math.exp(-d2 * 1.4); if (v > h) h = v; } }
+  return h;
+}
+function sump(x) {
+  if (x < 31 || x > 44.5) return 0;
+  if (x < 35.5) return -0.36 * smooth((x - 31) / 4.5);
+  if (x < 41) return -0.36;
+  return -0.36 * (1 - smooth((x - 41) / 3.5));
+}
+const ground = (x, z) => 0.011 * Math.sin(x * 1.9 + z * 2.7) + 0.007 * Math.sin(x * 4.3 - z * 3.1) + 0.006 * (vnoise(x * 6, z * 6, 1) - 0.5)
+  + rubble(x, z) + sump(x) + 0.22 * smooth((Math.abs(z) - 1.95) / 0.5);
+const wallDisp = (x, y, z) => fbm(x * 0.7, y * 0.9, z * 0.5) * 0.34 + 0.02;
+
+// signal through rock: full near the dock relay, gone past RELAY_RANGE
+const linkBars = x => x > RELAY_RANGE ? 0 : Math.max(1, Math.ceil(4 * (1 - x / RELAY_RANGE)));
+// the air: stale and warm toward the flooded end, where nothing moves it
+const air = x => ({ co2: 880 + 1350 * smooth((x - 6) / 26) + 40 * Math.sin(x * 0.9), temp: 29.5 + 4.2 * smooth((x - 4) / 28), hum: 72 + 21 * smooth((x - 10) / 22) });
+
+// Which tunnel: ?from=<block id>&to=<block id>, both from contract/blocks.json. Names come from the ids
+// (every block name is its id without the level, in title case). The default is a tunnel that exists in the twin.
+const LEVEL_INFO = { l0: ['Gatehouse', 60], l1: ['Crown', 240], l2: ['Arcade', 480], l3: ['Foundry', 760], l4: ['Cistern', 1050], l5: ['Millrace', 1380], l6: ['Undercroft', 1720], l7: ['Marrow', 2110], l8: ['Deepwell', 2560] };
+const okId = id => /^l[0-8]-[a-z]+(-[a-z]+)*$/.test(id || '');
+const ROUTE = (() => {
+  let from = Q.get('from'), to = Q.get('to');
+  if (!okId(from) || !okId(to) || from === to) { from = 'l6-flint-face'; to = 'l6-damp-court'; }
+  const name = id => id.slice(3).split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+  const lv = LEVEL_INFO[from.slice(0, 2)];
+  return { from, to, fromName: name(from), toName: name(to), level: `${from.slice(0, 2).toUpperCase()} ${lv[0]}`, depth: lv[1], relay: `relay-${from}` };
+})();
+$('where').textContent = `The tunnel from ${ROUTE.fromName} to ${ROUTE.toName} on ${ROUTE.level}, ${fmt(ROUTE.depth)} m down: one of the tunnels in the twin. Since the blackout nobody knows if it is open. The scout goes to look, and its report reaches the twin in the same message format as every other device.`;
+$('t-link-label').textContent = `Link to ${ROUTE.fromName} relay`;
+document.title = `Scout Rover: ${ROUTE.fromName} to ${ROUTE.toName}`;
+
+const tunnel = new THREE.Scene();
+tunnel.background = new THREE.Color(0x0b0c0d);
+tunnel.fog = new THREE.FogExp2(0x0b0c0d, 0.055);
+tunnel.environment = envTex;
+tunnel.add(new THREE.HemisphereLight(0x8d939a, 0x2b2723, 0.55));
+
+const col = h => new THREE.Color(h);
+function setCol(arr, i, c) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; }
+
+function buildFloor() {
+  const g = new THREE.PlaneGeometry(X1 - X0, 2 * W + 0.8, Math.round((X1 - X0) / 0.06), 88);
+  g.rotateX(-Math.PI / 2); g.translate((X0 + X1) / 2, 0, 0);
+  const p = g.attributes.position, c = new Float32Array(p.count * 3);
+  const dirt = col(0x4a433b), stone = col(0x6c655c), ballast = col(0x55514b), wet = col(0x26231f), tmp = new THREE.Color();
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), z = p.getZ(i), y = ground(x, z); p.setY(i, y);
+    const n = vnoise(x * 3, z * 3, 0), r = rubble(x, z);
+    tmp.copy(z < -0.7 && z > -1.95 ? ballast : dirt).lerp(stone, clamp(r * 7, 0, 1)).multiplyScalar(0.8 + 0.4 * n);
+    if (y < WATER_Y + 0.03 || (x > 29 && x < 46)) tmp.lerp(wet, 0.55);
+    setCol(c, i, tmp);
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(c, 3)); g.computeVertexNormals();
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.93, envMapIntensity: 0.15 }));
+  m.receiveShadow = true; tunnel.add(m);
+}
+
+// the cross-section: two walls and an arch, as points with their outward normals, by arc length
+const PROFILE = (() => {
+  const pts = [], wall = SPRING + 0.6, arc = Math.PI * W, total = 2 * wall + arc, n = 110;
+  for (let i = 0; i <= n; i++) {
+    let s = i / n * total, z, y, nz, ny;
+    if (s < wall) { z = -W; y = -0.6 + s; nz = -1; ny = 0; }
+    else if (s < wall + arc) { const a = Math.PI - (s - wall) / W; z = W * Math.cos(a); y = SPRING + W * Math.sin(a); nz = Math.cos(a); ny = Math.sin(a); }
+    else { z = W; y = SPRING - (s - wall - arc); nz = 1; ny = 0; }
+    pts.push({ z, y, nz, ny });
+  }
+  return pts;
+})();
+
+function buildWalls() {
+  const step = 0.16, nx = Math.round((X1 - X0) / step) + 1, np = PROFILE.length;
+  const pos = new Float32Array(nx * np * 3), c = new Float32Array(nx * np * 3), idx = [];
+  const bands = [0x5d554c, 0x6b6156, 0x4b4641, 0x625a50, 0x544e48].map(col), tmp = new THREE.Color(), soot = col(0x2e2b28);
+  for (let i = 0; i < nx; i++) {
+    const x = X0 + i * step;
+    for (let j = 0; j < np; j++) {
+      const P = PROFILE[j], d = wallDisp(x, P.y, P.z), k = i * np + j;
+      pos[k * 3] = x; pos[k * 3 + 1] = P.y + P.ny * d; pos[k * 3 + 2] = P.z + P.nz * d;
+      const band = Math.floor((P.y * 2.3 + fbm(x * 0.4, P.y * 0.6, 2) * 3 + 10)) % bands.length;
+      tmp.copy(bands[band]).multiplyScalar(0.75 + 0.5 * vnoise(x * 2.5, P.y * 2.5, P.z * 2.5));
+      if (P.ny > 0.7) tmp.lerp(soot, 0.35);
+      setCol(c, k, tmp);
+      if (i && j) { const a = (i - 1) * np + j - 1, b = (i - 1) * np + j, cc = i * np + j - 1, dd = i * np + j; idx.push(a, cc, b, b, cc, dd); }
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+  g.setIndex(idx); g.computeVertexNormals();
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, side: THREE.DoubleSide, envMapIntensity: 0.1 }));
+  m.receiveShadow = true; tunnel.add(m);
+  // steel arch sets every 3 m, set in from the rock
+  const ribMat = new THREE.MeshStandardMaterial({ color: 0x4f3f33, roughness: 0.7, metalness: 0.55, envMapIntensity: 0.3 });
+  const ribPts = PROFILE.filter((_, i) => i % 2 === 0).map(P => new THREE.Vector3(0, P.y - P.ny * 0.04, P.z - P.nz * 0.04));
+  const ribGeo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(ribPts), 120, 0.05, 4, false);
+  for (let x = 1.5; x < X1 - 1; x += 3) { const r = new THREE.Mesh(ribGeo, ribMat); r.position.x = x; r.castShadow = true; r.receiveShadow = true; tunnel.add(r); }
+}
+
+function buildRails() {
+  const steel = new THREE.MeshStandardMaterial({ color: 0x5a524c, metalness: 0.7, roughness: 0.55, envMapIntensity: 0.4 });
+  const wood = new THREE.MeshStandardMaterial({ color: 0x3b3027, roughness: 0.9 });
+  for (const z of [-1.0, -1.6]) {
+    const pts = []; for (let x = X0 + 0.5; x <= X1 - 0.5; x += 0.5) pts.push(new THREE.Vector3(x, ground(x, z) + 0.07, z));
+    const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), pts.length * 2, 0.025, 4, false), steel);
+    m.castShadow = true; m.receiveShadow = true; tunnel.add(m);
+  }
+  const sleeper = new THREE.BoxGeometry(0.15, 0.06, 0.95), n = Math.floor((X1 - X0 - 1) / 0.7);
+  const im = new THREE.InstancedMesh(sleeper, wood, n), M = new THREE.Matrix4(), R2 = rng(4);
+  for (let i = 0; i < n; i++) { const x = X0 + 0.6 + i * 0.7; M.makeRotationY((R2() - 0.5) * 0.08).setPosition(x, ground(x, -1.3) + 0.03, -1.3); im.setMatrixAt(i, M); }
+  im.receiveShadow = true; tunnel.add(im);
+  // a mine cart left on the line, standing in the water
+  const cart = new THREE.Group(), rust = new THREE.MeshStandardMaterial({ color: 0x5c3a26, roughness: 0.8, metalness: 0.4 });
+  const tub = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.55, 0.78), rust); tub.position.y = 0.42; cart.add(tub);
+  for (const [x, z] of [[-0.4, -0.3], [0.4, -0.3], [-0.4, 0.3], [0.4, 0.3]]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.05, 16), steel); w.rotation.x = Math.PI / 2; w.position.set(x, 0.12, z); cart.add(w);
+  }
+  cart.position.set(38.4, ground(38.4, -1.3) + 0.06, -1.3); cart.rotation.y = 0.05;
+  cart.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); tunnel.add(cart);
+}
+
+function rockGeo(seed) {
+  const g = new THREE.IcosahedronGeometry(1, 1), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { const v = new THREE.Vector3().fromBufferAttribute(p, i); v.multiplyScalar(0.72 + 0.5 * vnoise(v.x * 1.7 + seed, v.y * 1.7, v.z * 1.7)); p.setXYZ(i, v.x, v.y, v.z); }
+  g.computeVertexNormals(); return g;
+}
+function buildRubble() {
+  const mat = new THREE.MeshStandardMaterial({ color: 0x6b645b, roughness: 0.9, flatShading: true, envMapIntensity: 0.15 });
+  const geos = [0, 1, 2, 3].map(rockGeo);
+  BUMPS.forEach((b, i) => {
+    const m = new THREE.Mesh(geos[i % 4], mat);
+    m.scale.set(b.r * 0.85, b.h * 0.7, b.r * 0.8); m.rotation.y = i * 1.3;
+    m.position.set(b.x, ground(b.x, b.z) - b.h * 0.62, b.z); m.castShadow = true; m.receiveShadow = true; tunnel.add(m);
+  });
+  // loose stones, kept off the two wheel tracks so the wheels never pass through one
+  const R3 = rng(5), n = 260, im = new THREE.InstancedMesh(geos[0], mat, n), M = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+  for (let i = 0; i < n; i++) {
+    let x, z;
+    do { x = X0 + 1 + R3() * (X1 - X0 - 2); z = -2.0 + R3() * 4.0; } while (Math.abs(z - (LANE - 0.235)) < 0.12 || Math.abs(z - (LANE + 0.235)) < 0.12);
+    const s = 0.015 + R3() ** 2 * (x > RUBBLE[0] && x < RUBBLE[1] ? 0.12 : 0.05);
+    q.setFromEuler(e.set(R3() * 3, R3() * 3, R3() * 3));
+    M.compose(new THREE.Vector3(x, ground(x, z) + s * 0.3, z), q, new THREE.Vector3(s, s * 0.7, s)); im.setMatrixAt(i, M);
+  }
+  im.castShadow = true; im.receiveShadow = true; tunnel.add(im);
+}
+
+// a vent duct that came down across the tunnel: lower on the right, where the rover drives
+const DUCT_TILT = 0.109, DUCT_R = 0.28, DUCT_Y = 0.94;
+const ductBottom = z => DUCT_Y - DUCT_R / Math.cos(DUCT_TILT) - z * Math.tan(DUCT_TILT);
+function buildDuct() {
+  const g = new THREE.Group(); g.position.set(DUCT_X, DUCT_Y, 0); g.rotation.x = DUCT_TILT;
+  const sheet = new THREE.MeshStandardMaterial({ color: 0x7d8186, metalness: 0.75, roughness: 0.45, envMapIntensity: 0.6 });
+  const tube = new THREE.Mesh(new THREE.CylinderGeometry(DUCT_R, DUCT_R, 2 * W + 0.4, 28, 1, true), sheet);
+  tube.rotation.x = Math.PI / 2; g.add(tube);
+  for (let z = -W; z <= W; z += 0.55) { const r = new THREE.Mesh(new THREE.TorusGeometry(DUCT_R + 0.008, 0.012, 6, 28), sheet); r.position.z = z; g.add(r); }
+  g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  tunnel.add(g);
+  const chain = new THREE.MeshStandardMaterial({ color: 0x3d3833, metalness: 0.6, roughness: 0.6 });
+  const hang = (z, len, top) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, len, 5), chain); c.position.set(DUCT_X, top - len / 2, z); tunnel.add(c); };
+  hang(-1.6, 1.6, SPRING + 1.45); hang(1.5, 0.9, SPRING + 1.5);   // one hanger held, the other snapped and hangs short
+}
+
+function buildWater() {
+  const g = new THREE.PlaneGeometry(15, 2 * W + 0.6, 1, 1); g.rotateX(-Math.PI / 2); g.translate(37.5, WATER_Y, 0);
+  const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d'), img = x.createImageData(256, 256);
+  for (let j = 0; j < 256; j++) for (let i = 0; i < 256; i++) {
+    const hx = vnoise(i / 18, j / 18, 3) - vnoise((i + 1) / 18, j / 18, 3), hy = vnoise(i / 18, j / 18, 3) - vnoise(i / 18, (j + 1) / 18, 3), k = (j * 256 + i) * 4;
+    img.data[k] = 128 + hx * 900; img.data[k + 1] = 128 + hy * 900; img.data[k + 2] = 255; img.data[k + 3] = 255;
+  }
+  x.putImageData(img, 0, 0);
+  const n = new THREE.CanvasTexture(c); n.wrapS = n.wrapT = THREE.RepeatWrapping; n.repeat.set(6, 2);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x1f2b2b, roughness: 0.06, metalness: 0.1, transparent: true, opacity: 0.86, normalMap: n, normalScale: new THREE.Vector2(0.25, 0.25), envMapIntensity: 0.5 });
+  const m = new THREE.Mesh(g, mat); m.receiveShadow = true; tunnel.add(m);
+  return n;
+}
+
+function paint(lines, w, h, opt = {}) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+  x.fillStyle = opt.bg || '#d9d4c3'; x.fillRect(0, 0, w, h);
+  x.fillStyle = opt.ink || '#1d1d1b'; x.textBaseline = 'middle';
+  lines.forEach(([t, size, y, align]) => { x.font = `600 ${size}px "IBM Plex Sans", sans-serif`; x.textAlign = align || 'center'; x.fillText(t, align === 'left' ? 20 : w / 2, y); });
+  // worn: speckle and scrape the paint
+  const R = rng(w + h); for (let i = 0; i < w * h / 90; i++) { x.fillStyle = `rgba(40,36,32,${R() * 0.35})`; x.fillRect(R() * w, R() * h, 1 + R() * 3, 1 + R() * 2); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+}
+function sign(tex, w, h, x, y, z, ry) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }));
+  m.position.set(x, y, z); m.rotation.y = ry; m.receiveShadow = true; tunnel.add(m); return m;
+}
+
+function buildPlaces() {
+  // the two ends: a bulkhead with a door into each block
+  for (const [x, name, face] of [[X0 + 0.02, ROUTE.fromName.toUpperCase(), 1], [X1 - 0.02, ROUTE.toName.toUpperCase(), -1]]) {
+    const s = new THREE.Shape(); PROFILE.forEach((P, i) => i ? s.lineTo(P.z * 1.1, P.y + P.ny * 0.2) : s.moveTo(P.z * 1.1, P.y));
+    const door = new THREE.Path(); door.moveTo(-0.6, -0.1); door.lineTo(0.6, -0.1); door.lineTo(0.6, 2.1); door.lineTo(-0.6, 2.1); door.lineTo(-0.6, -0.1); s.holes.push(door);
+    const m = new THREE.Mesh(new THREE.ShapeGeometry(s), new THREE.MeshStandardMaterial({ color: 0x5e5d58, roughness: 0.9, side: THREE.DoubleSide }));
+    m.position.x = x; m.rotation.y = face * Math.PI / 2; m.receiveShadow = true; tunnel.add(m);
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 2.3), new THREE.MeshBasicMaterial({ color: 0x050505 }));
+    back.position.set(x - face * 0.4, 1, 0); back.rotation.y = face * Math.PI / 2; tunnel.add(back);
+    sign(paint([[name, name.length > 13 ? 52 : 64, 52], [ROUTE.level.toUpperCase(), 30, 108]], 512, 150), 1.6, 0.47, x + face * 0.03, 2.5, 0, face * Math.PI / 2);
+  }
+  sign(paint([[ROUTE.toName.toUpperCase() + '  48 m', ROUTE.toName.length > 12 ? 36 : 44, 64]], 512, 128, { bg: '#cfc8b4' }), 1.1, 0.27, 3.2, 1.5, W - 0.06, -Math.PI / 2);
+  sign(paint([[ROUTE.fromName.toUpperCase() + '  ' + (X1 - 6) + ' m', ROUTE.fromName.length > 12 ? 36 : 44, 64]], 512, 128, { bg: '#cfc8b4' }), 1.1, 0.27, X1 - 5, 1.5, -W + 0.06, Math.PI / 2);
+  sign(paint([['SCOUT DOCK', 46, 50], ['rover-01', 30, 104]], 512, 150, { bg: '#d2a01e' }), 0.8, 0.24, -0.6, 1.0, W - 0.07, -Math.PI / 2);
+  // depth marks painted on the wall in the sump, 0 at the floor's normal level
+  const gauge = document.createElement('canvas'); gauge.width = 128; gauge.height = 512; const gx = gauge.getContext('2d');
+  gx.fillStyle = '#d8d2bf'; gx.fillRect(0, 0, 128, 512); gx.fillStyle = '#1d1d1b'; gx.font = '600 30px "IBM Plex Sans", sans-serif';
+  for (let cm = 0; cm <= 50; cm += 5) { const y = 512 - cm / 50 * 512; gx.fillRect(0, y - 2, cm % 10 ? 40 : 70, 4); if (cm % 10 === 0 && cm) gx.fillText(String(cm), 76, y + 10); }
+  const gt = new THREE.CanvasTexture(gauge); gt.colorSpace = THREE.SRGBColorSpace;
+  const gm = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.64), new THREE.MeshStandardMaterial({ map: gt, roughness: 0.8 }));
+  gm.position.set(34, -0.36 + 0.32, W - 0.06); gm.rotation.y = -Math.PI / 2; tunnel.add(gm);
+
+  // the dock and the block's relay box
+  const grey = new THREE.MeshStandardMaterial({ color: 0x3b4044, roughness: 0.6, metalness: 0.3 });
+  const dock = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.34, 0.46), grey); dock.position.set(-0.43, ground(-0.43, LANE) + 0.17, LANE); dock.castShadow = dock.receiveShadow = true; tunnel.add(dock);
+  const pads = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.04, 0.2), new THREE.MeshStandardMaterial({ color: 0xb08d3c, metalness: 0.9, roughness: 0.35 }));
+  pads.position.set(-0.34, ground(-0.34, LANE) + 0.19, LANE); tunnel.add(pads);
+  const relay = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.24, 0.12), grey); relay.position.set(-0.6, 1.45, W - 0.1); relay.castShadow = true; tunnel.add(relay);
+  const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.4, 6), grey); ant.position.set(-0.5, 1.77, W - 0.1); tunnel.add(ant);
+  const conduit = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.3, 6), grey); conduit.position.set(-0.6, 0.72, W - 0.08); tunnel.add(conduit);
+  const led = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), new THREE.MeshStandardMaterial({ color: 0x57d17a, emissive: 0x57d17a, emissiveIntensity: 3 }));
+  led.position.set(-0.68, 1.5, W - 0.17); tunnel.add(led);
+  sign(paint([['RELAY', 40, 36], [ROUTE.relay, ROUTE.relay.length > 22 ? 18 : 24, 86]], 384, 120, { bg: '#cfc8b4' }), 0.3, 0.094, -0.6, 1.2, W - 0.05, -Math.PI / 2);
+  const dockLamp = new THREE.PointLight(0xffd6a0, 9, 7, 2); dockLamp.position.set(-0.9, 2.5, 1.3); tunnel.add(dockLamp);
+  const fix = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, 0.12), new THREE.MeshStandardMaterial({ color: 0xffe3b8, emissive: 0xffd6a0, emissiveIntensity: 2 }));
+  fix.position.set(-0.9, 2.56, 1.3); tunnel.add(fix);
+
+  // the tunnel's own lights are dead in the blackout; amber emergency lamps on battery every 8 m
+  const dead = new THREE.MeshStandardMaterial({ color: 0x8f9395, roughness: 0.5 }), amber = new THREE.MeshStandardMaterial({ color: 0xffa64d, emissive: 0xff9a3d, emissiveIntensity: 2.5 });
+  for (let x = 3; x < X1 - 2; x += 6) { const f = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.07, 0.14), dead); f.position.set(x, SPRING + W - 0.12, 0); tunnel.add(f); }
+  for (let x = 4; x < X1 - 2; x += 8) {
+    const f = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.08, 0.05), amber); f.position.set(x, 1.6, -W + 0.08); tunnel.add(f);
+    const l = new THREE.PointLight(0xff9a3d, 3.2, 6, 2); l.position.set(x, 1.55, -W + 0.3); tunnel.add(l);
+  }
+  // two cables slung along the right wall
+  const cable = new THREE.MeshStandardMaterial({ color: 0x151617, roughness: 0.5 });
+  for (const [y, z] of [[1.95, W - 0.12], [1.85, W - 0.16]]) {
+    const pts = []; for (let x = X0 + 0.5; x < X1 - 0.5; x += 0.25) { const ph = ((x - X0) % 1.5) / 1.5; pts.push(new THREE.Vector3(x, y - 0.09 * Math.sin(ph * Math.PI), z)); }
+    tunnel.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), pts.length, 0.014, 5, false), cable));
+  }
+}
+
+// lidar points: a horizontal ring from the spinning head to the two walls (vertical below the arch springing)
+const LIDAR_N = 300;
+const lidarGeo = new THREE.BufferGeometry(); lidarGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(LIDAR_N * 3), 3));
+const lidarPts = new THREE.Points(lidarGeo, new THREE.PointsMaterial({ color: 0xff3b30, size: 2.6, sizeAttenuation: false, transparent: true, opacity: 0.85, depthWrite: false, fog: false }));
+lidarPts.frustumCulled = false; tunnel.add(lidarPts);
+let lidarWidth = 0;
+function updateLidar(origin, spin) {
+  const p = lidarGeo.attributes.position; let n = 0, wl = 0, wr = 0;
+  for (let i = 0; i < LIDAR_N; i++) {
+    const a = spin + i / LIDAR_N * Math.PI * 2, dx = Math.cos(a), dz = Math.sin(a);
+    if (Math.abs(dz) < 0.02) continue;
+    const s = Math.sign(dz); let t = (s * W - origin.z) / dz;
+    for (let k = 0; k < 3; k++) { const hx = origin.x + dx * t; t = (s * (W + wallDisp(hx, origin.y, s * W)) - origin.z) / dz; }
+    if (t > 12) continue;
+    p.setXYZ(n++, origin.x + dx * t, origin.y, origin.z + dz * t);
+  }
+  for (const s of [-1, 1]) { const z = s * (W + wallDisp(origin.x, origin.y, s * W)); if (s < 0) wl = z; else wr = z; }
+  lidarWidth = wr - wl;
+  for (let i = n; i < LIDAR_N; i++) p.setXYZ(i, 0, -50, 0);
+  p.needsUpdate = true;
+}
+
+// ------------------------------------------------------------------ the studio, for the parts view
+const studio = new THREE.Scene();
+studio.background = new THREE.Color(0xc9cac6);
+studio.environment = envTex;
+studio.add(new THREE.HemisphereLight(0xffffff, 0x8d8f8a, 1.1));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(1.4, 3, 1.8); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -1, right: 1, top: 1, bottom: -1, near: 0.5, far: 8 }); sun.shadow.bias = -0.0005;
+studio.add(sun);
+const floorS = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.ShadowMaterial({ opacity: 0.22 })); floorS.rotation.x = -Math.PI / 2; floorS.receiveShadow = true; studio.add(floorS);
+const grid = new THREE.GridHelper(4, 40, 0x9da09b, 0xb3b5b0); grid.position.y = 0.0005; studio.add(grid);
+
+// ------------------------------------------------------------------ start
+let rover, waterNormal, spec;
+await document.fonts.ready;
+buildFloor(); buildWalls(); buildRails(); buildRubble(); buildDuct(); waterNormal = buildWater(); buildPlaces();
+try { rover = await loadRover('cad/'); } catch (e) { $('loading').textContent = 'The CAD model did not load: ' + e.message; throw e; }
+spec = rover.spec;
+$('loading').remove();
+rover.setEnv(0.35); rover.setEdges(false);
+const roverBox = () => { const b = new THREE.Box3(); for (const m of rover.meshes) b.expandByObject(m); return b; };
+
+// ------------------------------------------------------------------ power model
+// A brushed DC gearmotor at the wheel: V = I R + Ke w. Stall 8 A at 12 V gives R; no-load speed gives Ke.
+const ACT = spec.actuators.drive, DRV = spec.drive, MASS = spec.mass_g / 1000;
+const Rm = ACT.volts / ACT.stall_a, Ke = (ACT.volts - ACT.no_load_a * Rm) / (ACT.no_load_rpm * 2 * Math.PI / 60);
+const USABLE_WH = DRV.battery_wh * DRV.usable_share;
+function wheelPower(speedW, torque) {        // speedW: wheel rad/s; returns { amps, watts }
+  if (Math.abs(speedW) < 1e-4 && Math.abs(torque) < 1e-4) return { amps: 0, watts: 0 };
+  const amps = Math.max(ACT.no_load_a * 0.5, ACT.no_load_a + Math.abs(torque) / (ACT.stall_torque_nm / ACT.stall_a));
+  return { amps, watts: amps * (amps * Rm + Ke * Math.abs(speedW)) };
+}
+function flatDraw(v) {
+  const t = MASS * 9.81 / 6 * DRV.wheel_radius_m * DRV.rolling_resistance;
+  return 6 * wheelPower(v / DRV.wheel_radius_m, t).watts + DRV.electronics_w + DRV.lamps_w;
+}
+{
+  const s = spec.size, w = flatDraw(DRV.cruise_ms), hrs = USABLE_WH / w;
+  const joints = Object.values(spec.links).map(l => l.joint).filter(Boolean);
+  const act = joints.filter(j => j.actuator).length;
+  $('spec').innerHTML = [
+    ['Size, mast up', `${fmt(s.length / 10)} x ${fmt(s.width / 10)} x ${fmt(s.height_mast_up / 10)} cm`],
+    ['Height, mast folded', `${fmt(s.height_mast_folded / 10)} cm`],
+    ['Mass', `${fmt(spec.mass_g / 1000, 1)} kg`],
+    ['Wheels', `6, ${fmt(s.wheel_diameter / 10)} cm, each driven`],
+    ['Ground clearance', `${fmt(s.ground_clearance / 10, 1)} cm`],
+    ['Wades up to', `${DRV.wade_limit_cm} cm`],
+    ['Top speed', `${fmt(DRV.top_speed_ms, 2)} m/s`],
+    ['Joints', `${joints.length}: ${act} driven, ${joints.length - act} free`],
+    ['Battery', `${DRV.battery_wh} Wh`],
+    ['Runtime at 0.5 m/s', `about ${fmt(hrs, 1)} h, ${fmt(hrs * 3600 * DRV.cruise_ms / 1000, 1)} km`],
+    ['Parts cost', `about $${fmt(spec.cost_usd)}`],
+  ].map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join('');
+}
+
+// ------------------------------------------------------------------ API (optional): same address the twin uses
+let API = '';
+try { API = Q.get('api') === 'off' ? '' : Q.get('api') || localStorage.getItem('hollow.api') || ''; } catch (e) { API = Q.get('api') || ''; }
+API = API.replace(/\/$/, '');
+if (API) fetch(API + '/status').then(r => r.ok ? r.json() : Promise.reject(r.status)).then(() => { $('h-api').innerHTML = 'API <b>connected</b>'; }).catch(() => { $('h-api').innerHTML = 'API <b class="s1">not reachable</b>'; API = ''; });
+
+// ------------------------------------------------------------------ the mission
+const S = { x: 0, z: LANE, psi: 0, v: 0, w: 0, fold: 1, probe: 0, pan: 0, look: 0, lamps: false, beacon: false,
+  dist: 0, wh: USABLE_WH * 0.92, used: 0, watts: 0, held: [], sent: [], doing: 'Parked', t: 0, depth: null, photo: null, extra: 0, done: false };
+let seq = Math.floor(Date.now() / 1000) % 900000, mission, playing = false, speedMul = 4, missionClock = 0;
+const ACC = 0.45, ALPHA = 0.8;
+
+function setCaption(t) { $('caption').innerHTML = t; }
+function* say(text, doing) { setCaption(text); if (doing) S.doing = doing; yield 0; }
+function* wait(t) { while (t > 0) t -= yield; }
+function* tween(t, f) { let e = 0; while (e < t) { e += yield; f(smooth(e / t)); } }
+function* driveTo(x, speed) {           // speed > 0 drives forward, < 0 reverses, along the heading
+  const dir = Math.sign(Math.cos(S.psi)) * Math.sign(speed);
+  for (;;) {
+    const left = (x - S.x) * dir; if (left <= 0.004) break;
+    const dt = yield; const target = Math.min(Math.abs(speed), Math.sqrt(2 * ACC * left));
+    S.v = Math.sign(speed) * Math.min(target, Math.abs(S.v) + ACC * dt);
+  }
+  S.v = 0;
+}
+function* creep(speed, stop) { while (!stop()) { const dt = yield; S.v = Math.min(speed, S.v + ACC * dt); } S.v = 0; }
+function* turnTo(psi) {
+  for (;;) { const left = psi - S.psi; if (Math.abs(left) < 0.003) break; const dt = yield; S.w = Math.sign(left) * Math.min(0.55, Math.sqrt(2 * ALPHA * Math.abs(left)), Math.abs(S.w) + ALPHA * dt); }
+  S.w = 0; S.psi = psi;
+}
+function report(kind, values) {
+  const m = { id: `rover-01-${String(++seq).padStart(6, '0')}`, device: 'rover-01', block: ROUTE.from, time: new Date().toISOString(), kind, values, hops: 0, via: [], source: 'simulated' };
+  S.held.push(m); drawMsgs(); return m;
+}
+// A twin open in this browser hears the report directly (same site, so a BroadcastChannel reaches it), and one
+// opened later reads the last few from storage. With an API connected, the twin gets it from the API instead.
+let channel = null; try { channel = new BroadcastChannel('hollow-twin'); } catch (e) { /* old browser: storage only */ }
+function toTwin(list) {
+  for (const msg of list) { try { channel && channel.postMessage({ type: 'scout-report', msg }); } catch (e) { /* no channel */ } }
+  try { const kept = JSON.parse(localStorage.getItem('hollow.scout') || '[]').concat(list).slice(-10); localStorage.setItem('hollow.scout', JSON.stringify(kept)); } catch (e) { /* storage blocked */ }
+}
+async function handOver() {
+  const out = S.held.splice(0);
+  for (const m of out) { m.hops = 1; m.via = [ROUTE.relay]; m.state = API ? 'Sending to the API' : 'Passed to the relay'; S.sent.push(m); }
+  toTwin(out.map(({ state, ...m }) => m));
+  drawMsgs();
+  if (!API || !out.length) return null;
+  try {
+    const r = await fetch(API + '/ingest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(out.map(({ state, ...m }) => m)) });
+    const j = await r.json().catch(() => ({}));
+    for (const m of out) m.state = r.ok ? 'Accepted by the API' : `API refused it (${r.status}${j.error ? ': ' + j.error : ''})`;
+    drawMsgs(); return r.ok;
+  } catch (e) { for (const m of out) m.state = 'API not reachable: kept on the relay'; drawMsgs(); return false; }
+}
+
+const cm = m => fmt(m * 100);
+function* script() {
+  const camH = spec.size.camera_height / 10;
+  yield* say(`Nobody has walked the tunnel from ${ROUTE.fromName} to ${ROUTE.toName} since the blackout, and ${ROUTE.toName} residents have reported water. The scout goes to see if the route is still open.`, 'Waking up');
+  yield* wait(2.5);
+  S.lamps = true; S.beacon = true;
+  yield* say(`Lamps on, mast up. The camera rides ${fmt(camH)} cm off the floor.`, 'Raising the mast');
+  yield* tween(2.2, f => { S.fold = 1 - f; });
+  yield* say('Into the tunnel. The tunnel lights are dead; the amber lamps are on their own batteries.', 'Driving');
+  yield* driveTo(RUBBLE[0] - 0.6, 0.5);
+  yield* say('Rubble from a roof fall. Each side has a rocker and a bogie that pivot freely, so all six wheels stay on the rock, and the differential tilts the body only half as much as either side.', 'Climbing rubble');
+  yield* driveTo(RUBBLE[1], 0.2);
+  yield* say(`Past ${fmt(RELAY_RANGE)} m the ${ROUTE.fromName} relay can no longer be heard through the rock. From here on, everything the scout measures stays on its memory card.`, 'Driving, out of range');
+  yield* driveTo(DUCT_X - 1.5, 0.5);
+  const low = ductBottom(LANE + spec.size.track / 2000 + 0.04), tall = roverBox().max.y;
+  yield* say(`The lidar finds a vent duct down across the tunnel, ${cm(low)} cm off the floor where the scout drives. With the mast up the scout is ${cm(tall)} cm tall.`, 'Obstacle ahead');
+  yield* wait(1.4);
+  yield* tween(2.2, f => { S.fold = f; });
+  const folded = roverBox().max.y - ground(S.x, S.z);
+  yield* say(`Mast folded forward: ${cm(folded)} cm tall. It goes under with ${cm(low - folded)} cm to spare.`, 'Under the duct');
+  yield* driveTo(DUCT_X + 1.2, 0.22);
+  yield* say('Mast back up.', 'Raising the mast');
+  yield* tween(1.8, f => { S.fold = 1 - f; });
+  yield* driveTo(27, 0.5);
+  const a = air(S.x);
+  yield* say(`CO2 here is ${fmt(Math.round(a.co2 / 10) * 10)} ppm, over the 1,000 ppm Health Canada gives for stale air. With the fans off, nothing moves the air in this tunnel.`, 'Reading the air');
+  yield* tween(2.6, f => { S.pan = Math.sin(f * Math.PI * 2) * 0.9; });
+  yield* say('Water across the floor. The scout stops at the edge and lowers its probe.', 'Water ahead');
+  yield* creep(0.3, () => S.x > 30.4 && frontDepth() > 0.004);
+  yield* tween(1.6, f => { S.probe = f; });
+  yield* say('It edges in with the probe down, reading the depth at the front axle as it goes.', 'Measuring depth');
+  yield* creep(0.12, () => frontDepth() >= 0.155);
+  S.depth = frontDepth();
+  const d = Math.round(S.depth * 100);
+  S.photo = 'take';
+  yield* say(`${d} cm and getting deeper. That is over the 15 cm the API closes a tunnel at (US National Weather Service), and as deep as the scout's seals are built for. It takes a photo and marks the tunnel closed.`, 'Reporting');
+  report('tunnel', { from_block: ROUTE.from, to_block: ROUTE.to, status: 'closed', reason: `standing water, ${d} cm deep and deepening` });
+  yield* wait(3.2);
+  yield* say('Probe up. It backs out of the water and turns around.', 'Backing out');
+  yield* tween(1.4, f => { S.probe = 1 - f; });
+  yield* driveTo(29.6, -0.3);
+  yield* turnTo(Math.PI);
+  yield* say('Heading back. The report waits on the memory card: there is still no signal.', 'Driving back');
+  yield* driveTo(DUCT_X + 2.0, 0.5);
+  yield* say('Mast down for the duct, and it stays down to the dock.', 'Folding the mast');
+  yield* tween(2, f => { S.fold = f; });
+  yield* driveTo(RELAY_RANGE, 0.45);
+  yield* say(`Back in range of the ${ROUTE.fromName} relay. The report goes to the relay box, and on to the API.`, 'Handing over the report');
+  const ok = yield* (function* () { let res; handOver().then(r => { res = r; }); let t = 0; while (res === undefined && t < 4) t += yield; return res; })();
+  yield* say(ok
+    ? `The API accepted it. ${ROUTE.fromName} and ${ROUTE.toName} residents are told the tunnel is closed and to use another route, and the twin marks it closed.`
+    : `The report is handed to the twin open in this browser, which marks the tunnel closed. With the API running, it would also tell ${ROUTE.fromName} and ${ROUTE.toName} residents to use another route.`, 'Driving back');
+  yield* driveTo(RUBBLE[0] - 1, 0.25);
+  yield* driveTo(2.0, 0.5);
+  yield* turnTo(0);
+  yield* driveTo(0, -0.18);
+  S.lamps = false; S.beacon = false;
+  yield* say(`Back on the dock to charge. ${fmt(S.dist)} m driven, ${fmt(S.used, 1)} Wh used, about ${fmt(S.used / DRV.battery_wh * 100)}% of the battery.`, 'Charging');
+  S.done = true; playing = false; $('play').textContent = 'Play again'; $('play').classList.add('on');
+  for (;;) yield 0;
+}
+
+// water depth at the front axle (the probe sits beside it): positive when the front wheels are in water
+const frontDepth = () => { const fx = S.x + Math.cos(S.psi) * 0.24, fz = S.z - Math.sin(S.psi) * 0.24; return WATER_Y - ground(fx, fz); };
+
+function resetMission() {
+  Object.assign(S, { x: 0, z: LANE, psi: 0, v: 0, w: 0, fold: 1, probe: 0, pan: 0, look: 0, lamps: false, beacon: false, dist: 0,
+    wh: USABLE_WH * 0.92, used: 0, held: [], sent: [], doing: 'Parked', depth: null, photo: null, done: false });
+  missionClock = 0; mission = script(); mission.next();
+  $('msgs').innerHTML = '<p class="note" style="margin-top:0">None yet. The scout sends a <code>tunnel</code> message when it knows whether the tunnel is open.</p>';
+  photoCanvas = null;
+}
+
+function stepMission(dt) {
+  if (playing && !S.done) { missionClock += dt; mission.next(dt); }
+  // kinematics: skid steer along the heading
+  const fwd = S.v * dt, turn = S.w * dt, half = spec.size.track / 2000;
+  S.psi += turn; S.x += Math.cos(S.psi) * fwd; S.z -= Math.sin(S.psi) * fwd;
+  S.dist += Math.abs(fwd);
+  rover.roll_(fwd - turn * half, fwd + turn * half);
+}
+
+// ------------------------------------------------------------------ pose + telemetry each frame
+const inWater = () => (S.x > 30.5 && S.x < 45 ? clamp(frontDepth() / 0.16, 0, 1) : 0);
+let wheelState = [];
+function poseMission(dt) {
+  rover.poseOnGround(ground, S.x, S.z, S.psi);
+  rover.setMast(smooth(S.fold), S.look);
+  rover.setJoint('head_pan', S.pan);
+  rover.setJoint('probe_arm', S.probe * Math.PI / 2);
+  rover.setLamps(S.lamps);
+  const blink = S.beacon && (Math.abs(S.v) > 0.01 || Math.abs(S.w) > 0.01) ? (Math.sin(performance.now() / 160) > 0.3 ? 1 : 0.05) : S.beacon ? 0.25 : 0;
+  rover.setBeacon(blink);
+  rover.setRelayLight(linkBars(S.x) ? (Math.sin(performance.now() / 300) > 0 ? 1 : 0.1) : 0);
+  if (S.lamps) rover.spin('lidar_spin', dt * 2 * Math.PI * 2);
+  // motors: the rover model's torque per wheel, plus scrub when turning on the spot and drag in water
+  const extra = (Math.abs(S.w) > 0.01 ? 0.35 : 0) + 0.25 * inWater();
+  const m = rover.motors(S.v === 0 && S.w !== 0 ? 0.0001 : S.v, extra), half = spec.size.track / 2000;
+  let watts = DRV.electronics_w + (S.lamps ? DRV.lamps_w : 0);
+  wheelState = m.map((w, i) => { const side = i < 3 ? -1 : 1, lin = S.v + side * S.w * half; const p = wheelPower(lin / DRV.wheel_radius_m, (S.v || S.w) ? w.torque : 0); watts += p.watts; return p; });
+  S.watts = watts;
+  const used = watts * dt / 3600; S.wh -= used; S.used += used;
+}
+
+const W_LABEL = ['FL', 'ML', 'RL', 'FR', 'MR', 'RR'];
+$('wheels').innerHTML = W_LABEL.map((l, i) => `<span class="lbl">${l}</span><span class="bar"><i id="wb${i}"></i></span><span class="v" id="wv${i}"></span>`).join('');
+function telemetry() {
+  $('t-doing').textContent = S.doing;
+  $('t-speed').textContent = `${fmt(Math.abs(S.v), 2)} m/s`;
+  $('t-dist').textContent = `${fmt(S.dist, 1)} m`;
+  const hrs = S.wh / Math.max(S.watts, 1);
+  $('t-batt').innerHTML = `${fmt(S.wh / USABLE_WH * 100)}%, ${fmt(S.wh)} Wh`;
+  $('t-power').textContent = `${fmt(S.watts)} W, ${hrs > 99 ? '99+' : fmt(hrs, 1)} h left at this rate`;
+  const bars = linkBars(S.x);
+  $('t-link').innerHTML = `<span class="sig">${[1, 2, 3, 4].map(k => `<i class="${k <= bars ? 'on' : ''}" style="height:${k * 3}px"></i>`).join('')}</span> ${bars ? '' : '<span class="s1">out of range</span>'}`;
+  $('t-held').textContent = `${S.held.length} message${S.held.length === 1 ? '' : 's'}`;
+  wheelState.forEach((w, i) => { const b = $('wb' + i); b.style.width = clamp(w.amps / 4, 0, 1) * 100 + '%'; b.className = w.amps > 2.5 ? 'w' : ''; $('wv' + i).textContent = `${fmt(w.amps, 1)} A`; });
+  const q = rover.q;
+  $('t-rock').textContent = `${fmt(deg(q.rocker_left), 1)}° / ${fmt(deg(q.rocker_right), 1)}°`;
+  $('t-bog').textContent = `${fmt(deg(q.bogie_left), 1)}° / ${fmt(deg(q.bogie_right), 1)}°`;
+  $('t-pr').textContent = `${fmt(deg(rover.pitch), 1)}° / ${fmt(deg(rover.roll), 1)}°`;
+  const a = air(S.x);
+  $('t-co2').innerHTML = S.lamps || S.x > 0.5 ? `<span class="${a.co2 > 1000 ? 's1' : ''}">${fmt(Math.round(a.co2 / 10) * 10)} ppm</span>` : 'off';
+  $('t-temp').textContent = `${fmt(a.temp, 1)} °C`;
+  $('t-hum').textContent = `${fmt(a.hum)}%`;
+  $('t-width').textContent = S.lamps ? `${fmt(lidarWidth, 2)} m` : 'off';
+  const fd = frontDepth();
+  $('t-depth').innerHTML = S.probe > 0.95 ? `<span class="${fd > 0.15 ? 's2' : fd > 0.075 ? 's1' : ''}">${fmt(Math.max(0, fd) * 100)} cm</span> <small>(closed over 15)</small>` : 'probe stowed';
+  $('t-step').textContent = playing ? '' : S.done ? 'done' : 'paused';
+  const mm = Math.floor(missionClock / 60), ss = Math.floor(missionClock % 60);
+  $('clock').textContent = `Mission time ${mm}:${String(ss).padStart(2, '0')}, shown at ${speedMul}x`;
+  drawSus();
+}
+
+function drawSus() {
+  const g = rover.geo, st = rover.sus.L, sc = -300 / 0.95, ox = 150, base = 100; // seen from the left side: front to the left
+  const rot = (p, a) => ({ x: p.x * Math.cos(a) + p.z * Math.sin(a), z: -p.x * Math.sin(a) + p.z * Math.cos(a) });
+  const F = rot(g.F, st.tr), B = rot(g.B, st.tr), M = rot(g.M, st.tb), R = rot(g.R, st.tb);
+  const P = (x, z) => `${(ox + x * sc).toFixed(1)},${(base + z * sc).toFixed(1)}`;
+  const zp = st.zp - ground(S.x, S.z) + 0.0;
+  const pts = { piv: [0, zp], f: [F.x, zp + F.z], b: [B.x, zp + B.z], m: [B.x + M.x, zp + B.z + M.z], r: [B.x + R.x, zp + B.z + R.z] };
+  const c = Math.cos(S.psi), sn = Math.sin(S.psi), lx = S.x - sn * g.trackY, lz = S.z - c * g.trackY;
+  let gp = []; for (let f = -0.45; f <= 0.45; f += 0.02) gp.push(P(f, ground(lx + c * f, lz - sn * f) - ground(S.x, S.z)));
+  const wheel = p => `<circle cx="${ox + p[0] * sc}" cy="${base + p[1] * sc}" r="${-g.r * sc}" fill="none" stroke="#1F2326" stroke-width="1.5"/>`;
+  $('sus').innerHTML = `<polyline points="${gp.join(' ')}" fill="none" stroke="#9DA09B" stroke-width="1.5"/>
+    <polyline points="${P(...pts.f)} ${P(...pts.piv)} ${P(...pts.b)}" fill="none" stroke="#33383D" stroke-width="3"/>
+    <polyline points="${P(...pts.m)} ${P(...pts.b)} ${P(...pts.r)}" fill="none" stroke="#565B60" stroke-width="3"/>
+    ${wheel(pts.f)}${wheel(pts.m)}${wheel(pts.r)}
+    <circle cx="${ox}" cy="${base + zp * sc}" r="4" fill="#D2A01E"/><circle cx="${ox + pts.b[0] * sc}" cy="${base + pts.b[1] * sc}" r="3" fill="#D2A01E"/>
+    <text x="6" y="12" font-size="10" fill="#565B60">← front</text>`;
+}
+
+let photoCanvas = null;
+function drawMsgs() {
+  const all = [...S.held.map(m => ({ ...m, state: 'Held on the memory card' })), ...S.sent];
+  if (!all.length) return;
+  $('msgs').innerHTML = all.map(m => {
+    const { state, ...msg } = m;
+    return `<div class="msg"><div class="hd"><b>${msg.kind}: ${msg.values.status || ''}</b><span class="${/Accepted/.test(state) ? 'sok' : /refused|not reachable/.test(state) ? 's2' : 's1'}">${state}</span></div><pre>${JSON.stringify(msg, null, 1)}</pre></div>`;
+  }).join('') + (photoCanvas ? '<div class="photo" id="photo"></div>' : '');
+  if (photoCanvas) { $('photo').append(photoCanvas); const d = document.createElement('div'); d.textContent = 'Photo from the head camera when it stopped. It stays with the rover: there is no photo store yet, so the message carries no photo_url.'; $('photo').append(d); }
+}
+
+// ------------------------------------------------------------------ parts view
+const bomById = Object.fromEntries(spec.bom.map(b => [b.id, b]));
+{
+  let html = '', group = '';
+  for (const b of spec.bom) {
+    if (b.group !== group) { group = b.group; html += `<tr class="g"><td>${group}</td><td class="n">Qty</td><td class="n">Mass</td><td class="n">Cost</td></tr>`; }
+    html += `<tr class="p" data-id="${b.id}"><td>${b.name}</td><td class="n">${b.qty}</td><td class="n">${b.mass_g * b.qty >= 1000 ? fmt(b.mass_g * b.qty / 1000, 2) + ' kg' : fmt(b.mass_g * b.qty) + ' g'}</td><td class="n">$${fmt(b.cost_usd * b.qty)}</td></tr>`;
+  }
+  html += `<tr class="t"><td>Total</td><td></td><td class="n">${fmt(spec.mass_g / 1000, 1)} kg</td><td class="n">$${fmt(spec.cost_usd)}</td></tr>`;
+  $('bom').innerHTML = html;
+}
+let focus = null;
+function setFocus(id) {
+  focus = focus === id ? null : id;
+  rover.setFocus(focus, $('c-xray').checked);
+  document.querySelectorAll('#bom tr.p').forEach(r => r.classList.toggle('on', r.dataset.id === focus));
+  if (focus) { const b = bomById[focus]; setCaption(`<b>${b.name}</b>${b.qty > 1 ? ` (${b.qty})` : ''}: ${b.what}. ${b.does}`); }
+  else partsCaption();
+}
+const partsCaption = () => setCaption(`${spec.parts.length} parts from the CAD file, on ${Object.keys(spec.links).length} links. Hover a part to name it, click it or a row in the list to show it alone, and pull the rover apart with the slider.`);
+$('bom').addEventListener('click', e => { const r = e.target.closest('tr.p'); if (r) setFocus(r.dataset.id); });
+
+const JOINT_NAMES = { rocker_left: 'Left rocker', rocker_right: 'Right rocker', bogie_left: 'Left bogie', bogie_right: 'Right bogie', mast_fold: 'Mast fold', head_pan: 'Head pan', head_tilt: 'Head tilt', probe_arm: 'Water probe' };
+const jointsUI = Object.values(rover.joints).filter(j => j.type === 'revolute' && j.name !== 'rocker_right');
+$('joints').innerHTML = jointsUI.map(j => `<div class="slider"><label for="j-${j.name}">${JOINT_NAMES[j.name] || j.name}${j.actuator ? '' : ' (free)'}</label><output id="o-${j.name}">0°</output><input id="j-${j.name}" type="range" min="${deg(j.lower)}" max="${deg(j.upper)}" step="0.5" value="0"><small>${j.note}</small></div>`).join('')
+  + `<label class="chk"><input type="checkbox" id="c-spin"> Spin the six drive motors and the lidar</label>`;
+const continuous = Object.values(rover.joints).filter(j => j.type === 'continuous').length;
+$('j-count').textContent = `${Object.keys(rover.joints).length} in the CAD, ${continuous} turn without limit`;
+const JQ = {};
+function setJ(name, d) {
+  JQ[name] = d; $('o-' + name).textContent = `${fmt(d)}°`;
+  rover.setJoint(name, d * Math.PI / 180);
+  if (name === 'rocker_left') { JQ.rocker_right = -d; rover.setJoint('rocker_right', -d * Math.PI / 180); }
+}
+jointsUI.forEach(j => $('j-' + j.name).addEventListener('input', e => setJ(j.name, +e.target.value)));
+$('j-reset').onclick = () => jointsUI.forEach(j => { $('j-' + j.name).value = 0; setJ(j.name, 0); });
+
+// ------------------------------------------------------------------ modes, views, controls
+let mode = 'mission', viewMode = 'follow';
+const lastPos = new THREE.Vector3();
+function enterMission() {
+  mode = 'mission'; document.body.dataset.mode = 'mission';
+  tunnel.add(rover.object); rover.setExplode(0); rover.setFocus(null); rover.setEdges($('c-edges').checked); rover.setEnv(0.35);
+  $('inset-frame').style.display = ''; controls.autoRotate = false; setView(viewMode, true);
+  setCaption(playing ? $('caption').innerHTML : (S.done ? 'Mission done. Restart to run it again.' : 'Press Play to send the scout down the tunnel.'));
+}
+function enterParts() {
+  mode = 'parts'; document.body.dataset.mode = 'parts'; playing = false; $('play').textContent = 'Play'; $('play').classList.add('on');
+  studio.add(rover.object); rover.object.position.set(0, 0, 0); rover.object.rotation.y = 0; rover.rest();
+  rover.setLamps(false); rover.setBeacon(0); rover.setRelayLight(0.2); rover.setEnv(1); rover.setEdges($('c-edges2').checked);
+  rover.setExplode(+$('explode').value); rover.setFocus(focus, $('c-xray').checked);
+  rover.setMast(0); rover.setJoint('head_pan', 0); rover.setJoint('probe_arm', 0);
+  for (const [k, v] of Object.entries(JQ)) rover.setJoint(k, v * Math.PI / 180);
+  $('inset-frame').style.display = 'none'; lidarPts.visible = false;
+  camera.position.set(1.15, 0.85, 1.35); controls.target.set(0, 0.3, 0); controls.enabled = true; controls.autoRotate = $('c-turn').checked; controls.autoRotateSpeed = 0.6;
+  controls.minDistance = 0.4; controls.maxDistance = 4; controls.update();
+  partsCaption();
+}
+$('tab-mission').onclick = () => { $('tab-mission').classList.add('on'); $('tab-parts').classList.remove('on'); enterMission(); };
+$('tab-parts').onclick = () => { $('tab-parts').classList.add('on'); $('tab-mission').classList.remove('on'); enterParts(); };
+
+function setView(v, keep) {
+  viewMode = v; document.querySelectorAll('#views button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  controls.enabled = v === 'follow'; controls.minDistance = 0.5; controls.maxDistance = 14;
+  $('inset-frame').style.display = v === 'eye' ? 'none' : '';
+  if (v === 'follow' && !keep) { camera.position.set(S.x - 2.1 * Math.cos(S.psi), 1.25, S.z - 1.5); controls.target.set(S.x, 0.32, S.z); }
+  if (v === 'follow' && keep && camera.position.lengthSq() < 0.01) { camera.position.set(S.x - 2.1, 1.25, S.z - 1.5); controls.target.set(S.x, 0.32, S.z); }
+  lastPos.set(S.x, 0, S.z);
+}
+document.querySelectorAll('#views button').forEach(b => b.onclick = () => setView(b.dataset.v));
+document.querySelectorAll('#speeds button').forEach(b => b.onclick = () => { speedMul = +b.dataset.s; document.querySelectorAll('#speeds button').forEach(x => x.classList.toggle('on', x === b)); });
+function togglePlay() {
+  if (mode !== 'mission') return;
+  if (S.done) { resetMission(); }
+  playing = !playing; $('play').textContent = playing ? 'Pause' : 'Play'; $('play').classList.toggle('on', !playing);
+}
+$('play').onclick = togglePlay;
+$('restart').onclick = () => { resetMission(); playing = true; $('play').textContent = 'Pause'; $('play').classList.remove('on'); setView(viewMode); };
+addEventListener('keydown', e => { if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); togglePlay(); } });
+$('c-lidar').onchange = () => {};
+$('c-edges').onchange = e => rover.setEdges(e.target.checked);
+$('c-edges2').onchange = e => rover.setEdges(e.target.checked);
+$('c-xray').onchange = () => rover.setFocus(focus, $('c-xray').checked);
+$('c-turn').onchange = e => { controls.autoRotate = e.target.checked; };
+$('explode').oninput = e => { rover.setExplode(+e.target.value); $('o-explode').textContent = `${Math.round(e.target.value * 100)}%`; };
+
+// hover and click in the parts view
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2(), tip = $('tip');
+let down = null;
+renderer.domElement.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
+function pick(e) {
+  const r = renderer.domElement.getBoundingClientRect(); mouse.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  const hit = ray.intersectObjects(rover.meshes.filter(m => !m.material.transparent), false)[0];
+  return hit ? hit.object.userData.bom : null;
+}
+renderer.domElement.addEventListener('pointermove', e => {
+  if (mode !== 'parts' || e.buttons) { tip.style.display = 'none'; return; }
+  const id = pick(e);
+  if (!id) { tip.style.display = 'none'; renderer.domElement.style.cursor = ''; return; }
+  const b = bomById[id], r = view.getBoundingClientRect();
+  tip.innerHTML = `<b>${b.name}</b><i>${b.what}</i>`; tip.style.display = 'block';
+  tip.style.left = Math.min(e.clientX - r.left + 14, r.width - 270) + 'px'; tip.style.top = (e.clientY - r.top + 14) + 'px';
+  renderer.domElement.style.cursor = 'pointer';
+});
+renderer.domElement.addEventListener('pointerup', e => {
+  if (mode !== 'parts' || !down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
+  const id = pick(e); if (id || focus) setFocus(id || focus);
+});
+
+// ------------------------------------------------------------------ render loop
+function resize() {
+  const r = view.getBoundingClientRect(); renderer.setSize(r.width, r.height, false);
+  camera.aspect = r.width / r.height; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(view); resize();
+
+const sideCam = new THREE.Vector3(), tmpV = new THREE.Vector3(), lidarO = new THREE.Vector3();
+let last = performance.now(), uiT = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const real = Math.min(0.05, (now - last) / 1000); last = now;
+  if (mode === 'mission') {
+    const dt = real * (playing ? speedMul : 1), n = Math.ceil(dt / 0.02);
+    for (let i = 0; i < n; i++) stepMission(dt / n);
+    poseMission(dt);
+    waterNormal.offset.x += real * 0.01; waterNormal.offset.y += real * 0.006;
+    rover.updateEye();
+    lidarPts.visible = $('c-lidar').checked && S.lamps;
+    if (lidarPts.visible) { rover.point('lidar', 0, 0, 10, lidarO); updateLidar(lidarO, now / 1000 * 3); }
+    if (viewMode === 'follow') {
+      tmpV.set(S.x - lastPos.x, 0, S.z - lastPos.z); camera.position.add(tmpV); controls.target.add(tmpV);
+      controls.target.y += (0.32 + rover.height - 0.235 - controls.target.y) * 0.1;
+    } else if (viewMode === 'side') {
+      sideCam.set(S.x + 0.15, rover.height + 0.12, S.z - 1.75); camera.position.lerp(sideCam, 0.12); camera.lookAt(S.x, rover.height - 0.05, S.z);
+    } else { camera.position.copy(rover.eye.position); camera.quaternion.copy(rover.eye.quaternion); camera.fov = rover.eye.fov; camera.updateProjectionMatrix(); }
+    if (viewMode !== 'eye' && camera.fov !== 50) { camera.fov = 50; camera.updateProjectionMatrix(); }
+    lastPos.set(S.x, 0, S.z);
+    rover.beam.visible = S.lamps && viewMode !== 'eye';
+    uiT += real; if (uiT > 0.1) { uiT = 0; telemetry(); }
+  } else if ($('c-spin').checked) {
+    for (const w of ['front', 'mid', 'rear']) { rover.spin(`drive_${w}_left`, real * 3); rover.spin(`drive_${w}_right`, real * 3); }
+    rover.spin('lidar_spin', real * 12);
+  }
+  if (controls.enabled) controls.update();
+  const scene = mode === 'mission' ? tunnel : studio;
+  const size = renderer.getSize(new THREE.Vector2());
+  renderer.setScissorTest(false); renderer.setViewport(0, 0, size.x, size.y);
+  renderer.render(scene, camera);
+  if (mode === 'mission' && viewMode !== 'eye') {
+    const f = $('inset-frame').getBoundingClientRect(), r = renderer.domElement.getBoundingClientRect();
+    const x = f.left - r.left, y = r.bottom - f.bottom, w = f.width, h = f.height;
+    rover.eye.aspect = w / h; rover.eye.updateProjectionMatrix();
+    renderer.setScissorTest(true); renderer.setScissor(x, y, w, h); renderer.setViewport(x, y, w, h);
+    const bv = rover.beam.visible; rover.beam.visible = false;
+    renderer.render(tunnel, rover.eye);
+    rover.beam.visible = bv; renderer.setScissorTest(false);
+    if (S.photo === 'take') {         // grab the inset now, in the same frame, before the browser clears the buffer
+      const dpr = renderer.getPixelRatio(); photoCanvas = document.createElement('canvas'); photoCanvas.width = Math.round(w * dpr); photoCanvas.height = Math.round(h * dpr);
+      photoCanvas.getContext('2d').drawImage(renderer.domElement, x * dpr, (size.y - y - h) * dpr, w * dpr, h * dpr, 0, 0, photoCanvas.width, photoCanvas.height);
+      S.photo = 'taken'; $('inset-frame').classList.add('rec'); setTimeout(() => $('inset-frame').classList.remove('rec'), 900); drawMsgs();
+    }
+  }
+}
+
+resetMission();
+tunnel.add(rover.object);
+setView('follow');
+camera.position.set(1.7, 0.95, LANE - 1.55); controls.target.set(0.05, 0.3, LANE); controls.update();
+setCaption('Press Play to send the scout down the tunnel.');
+telemetry();
+if (Q.get('play') === '1') togglePlay();
+if (Q.get('mode') === 'parts') $('tab-parts').click();
+requestAnimationFrame(frame);
+window.__scout = { S, rover, ground, setView, play: togglePlay, get mission() { return mission; } };
+</script>
+</body>
+</html>

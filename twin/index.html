@@ -2609,7 +2609,7 @@ function onScoutReport(m, fresh) {
   if (e) { e.api = { status: m.values.status, reason: m.values.reason, m }; e.blocked = m.values.status === 'closed'; }
   log(m.values.status === 'closed' ? 'crit' : 'ok', `${m.device} checked the tunnel from ${a.name} to ${b.name}: ${m.values.status}${m.values.reason ? ', ' + m.values.reason : ''}.${m.hops ? ` Carried back and passed on by ${m.via.join(', ')}.` : ''}`, [a, b], 'Scout rover, simulated');
   if (fresh) { flash(a); flash(b); }
-  if (selected === a || selected === b) select(selected, false);
+  if (selected === a || selected === b) { rightMode = null; select(selected, false); } // rebuild the card so its tunnel buttons show the closure
 }
 try { const ch = new BroadcastChannel('hollow-twin'); ch.onmessage = ev => { if (ev.data && ev.data.type === 'scout-report') onScoutReport(ev.data.msg, true); }; } catch (e) { /* old browser: storage only */ }
 try { for (const m of JSON.parse(localStorage.getItem('hollow.scout') || '[]')) if (Date.now() - Date.parse(m.time) < 6 * 3600e3) onScoutReport(m, false); } catch (e) { /* storage blocked */ }

@@ -1,0 +1,2475 @@
+{
+ "name": "Scout rover",
+ "device": "rover-01",
+ "units": "mm",
+ "axes": "X forward, Y left, Z up",
+ "status": "Design only. Nothing here has been built or tested.",
+ "size": {
+  "length": 642,
+  "width": 540,
+  "height_mast_up": 754,
+  "height_mast_folded": 380,
+  "lo": [
+   -321,
+   -270,
+   -1
+  ],
+  "hi": [
+   321,
+   270,
+   753
+  ],
+  "camera_height": 696,
+  "wheel_diameter": 160.0,
+  "ground_clearance": 185.0,
+  "wheelbase": 480.0,
+  "track": 470.0
+ },
+ "mass_g": 11943,
+ "cost_usd": 1240,
+ "links": {
+  "base": {
+   "parent": null,
+   "origin": [
+    0,
+    0,
+    235.0
+   ],
+   "joint": null,
+   "mass_g": 5054
+  },
+  "rocker_L": {
+   "parent": "base",
+   "origin": [
+    0,
+    169.0,
+    0
+   ],
+   "joint": {
+    "name": "rocker_left",
+    "type": "revolute",
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "lower": -0.4886921905584123,
+    "upper": 0.4886921905584123,
+    "actuator": null,
+    "note": "Free pivot. The two rockers are tied through the differential, so the body sits at their average angle."
+   },
+   "mass_g": 831
+  },
+  "bogie_L": {
+   "parent": "rocker_L",
+   "origin": [
+    -120.0,
+    10.0,
+    -100.0
+   ],
+   "joint": {
+    "name": "bogie_left",
+    "type": "revolute",
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "lower": -0.5585053606381855,
+    "upper": 0.5585053606381855,
+    "actuator": null,
+    "note": "Free pivot. Lets the middle and rear wheels follow the ground."
+   },
+   "mass_g": 1142
+  },
+  "wheel_FL": {
+   "parent": "rocker_L",
+   "origin": [
+    240.0,
+    66.0,
+    -155.0
+   ],
+   "joint": {
+    "name": "drive_front_left",
+    "type": "continuous",
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "lower": null,
+    "upper": null,
+    "actuator": "drive",
+    "note": "Drive motor."
+   },
+   "mass_g": 410
+  },
+  "wheel_ML": {
+   "parent": "bogie_L",
+   "origin": [
+    120.0,
+    56.0,
+    -55.0
+   ],
+   "joint": {
+    "name": "drive_mid_left",
+    "type": "continuous",
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "lower": null,
+    "upper": null,
+    "actuator": "drive",
+    "note": "Drive motor."
+   },
+   "mass_g": 410
+  },
+  "wheel_RL": {
+   "parent": "bogie_L",
+   "origin": [
+    -120.0,
+    56.0,
+    -55.0
+   ],
+   "joint": {
+    "name": "drive_rear_left",
+    "type": "continuous",
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "lower": null,
+    "upper": null,
+    "actuator": "drive",
+    "note": "Drive motor."
+   },
+   "mass_g": 410
+  },
+  "rocker_R": {
+   "parent": "base",
+   "origin": [
+    0,
+    -169.0,
+    0
+   ],
+   "joint": {
+    "name": "rocker_right",
+    "type": "revolute",
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "lower": -0.4886921905584123,
+    "upper": 0.4886921905584123,
+    "actuator": null,
+    "note": "Free pivot. The two rockers are tied through the differential, so the body sits at their average angle."
+   },
+   "mass_g": 831
+  },
+  "bogie_R": {
+   "parent": "rocker_R",
+   "origin": [
+    -120.0,
+    -10.0,
+    -100.0
+   ],
+   "joint": {
+    "name": "bogie_right",
+    "type": "revolute",
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "lower": -0.5585053606381855,
+    "upper": 0.5585053606381855,
+    "actuator": null,
+    "note": "Free pivot. Lets the middle and rear wheels follow the ground."
+   },
+   "mass_g": 1142
+  },
+  "wheel_FR": {
+   "parent": "rocker_R",
+   "origin": [
+    240.0,
+    -66.0,
+    -155.0
+   ],
+   "joint": {
+    "name": "drive_front_right",
+    "type": "continuous",
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "lower": null,
+    "upper": null,
+    "actuator": "drive",
+    "note": "Drive motor."
+   },
+   "mass_g": 410
+  },
+  "wheel_MR": {
+   "parent": "bogie_R",
+   "origin": [
+    120.0,
+    -56.0,
+    -55.0
+   ],
+   "joint": {
+    "name": "drive_mid_right",
+    "type": "continuous",
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "lower": null,
+    "upper": null,
+    "actuator": "drive",
+    "note": "Drive motor."
+   },
+   "mass_g": 410
+  },
+  "wheel_RR": {
+   "parent": "bogie_R",
+   "origin": [
+    -120.0,
+    -56.0,
+    -55.0
+   ],
+   "joint": {
+    "name": "drive_rear_right",
+    "type": "continuous",
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "lower": null,
+    "upper": null,
+    "actuator": "drive",
+    "note": "Drive motor."
+   },
+   "mass_g": 410
+  },
+  "mast": {
+   "parent": "base",
+   "origin": [
+    -150.0,
+    0,
+    83.0
+   ],
+   "joint": {
+    "name": "mast_fold",
+    "type": "revolute",
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "lower": 0.0,
+    "upper": 1.5707963267948966,
+    "actuator": "mast",
+    "note": "0 is upright. 90 degrees lays the mast forward along the deck."
+   },
+   "mass_g": 142
+  },
+  "pan": {
+   "parent": "mast",
+   "origin": [
+    0,
+    0,
+    334.0
+   ],
+   "joint": {
+    "name": "head_pan",
+    "type": "revolute",
+    "axis": [
+     0,
+     0,
+     1
+    ],
+    "lower": -2.6179938779914944,
+    "upper": 2.6179938779914944,
+    "actuator": "micro",
+    "note": "Turns the camera head left and right."
+   },
+   "mass_g": 40
+  },
+  "head": {
+   "parent": "pan",
+   "origin": [
+    0,
+    0,
+    40.0
+   ],
+   "joint": {
+    "name": "head_tilt",
+    "type": "revolute",
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "lower": -1.7453292519943295,
+    "upper": 0.8726646259971648,
+    "actuator": "micro",
+    "note": "Positive looks down. Reaches -90 so the head stays level when the mast is folded."
+   },
+   "mass_g": 179
+  },
+  "lidar": {
+   "parent": "head",
+   "origin": [
+    6,
+    0,
+    38
+   ],
+   "joint": {
+    "name": "lidar_spin",
+    "type": "continuous",
+    "axis": [
+     0,
+     0,
+     1
+    ],
+    "lower": null,
+    "upper": null,
+    "actuator": "lidar",
+    "note": "The lidar's own motor, about 10 turns a second."
+   },
+   "mass_g": 50
+  },
+  "probe": {
+   "parent": "base",
+   "origin": [
+    232.0,
+    90.0,
+    -35.0
+   ],
+   "joint": {
+    "name": "probe_arm",
+    "type": "revolute",
+    "axis": [
+     1,
+     0,
+     0
+    ],
+    "lower": 0.0,
+    "upper": 1.5707963267948966,
+    "actuator": "standard",
+    "note": "0 is stowed across the bumper. 90 degrees points the probe straight down."
+   },
+   "mass_g": 70
+  }
+ },
+ "parts": [
+  {
+   "mesh": "meshes/chassis_tub.stl",
+   "link": "base",
+   "color": "#D2A01E",
+   "finish": "paint",
+   "bom": "chassis",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    0
+   ],
+   "bbox": [
+    [
+     -220.0,
+     -130.0,
+     -50.0
+    ],
+    [
+     220.0,
+     130.0,
+     50.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/deck_lid.stl",
+   "link": "base",
+   "color": "#D2A01E",
+   "finish": "paint",
+   "bom": "lid",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    150
+   ],
+   "bbox": [
+    [
+     -220.0,
+     -130.0,
+     50.0
+    ],
+    [
+     220.0,
+     130.0,
+     54.6
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/bumper.stl",
+   "link": "base",
+   "color": "#34383C",
+   "finish": "metal",
+   "bom": "bumper",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    -70
+   ],
+   "bbox": [
+    [
+     -256.0,
+     -116.0,
+     -7.0
+    ],
+    [
+     247.0,
+     116.0,
+     28.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/bearing_block.stl",
+   "link": "base",
+   "color": "#B9BDC1",
+   "finish": "metal",
+   "bom": "bearing",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    60,
+    0
+   ],
+   "bbox": [
+    [
+     -35.0,
+     130.0,
+     -35.0
+    ],
+    [
+     35.0,
+     163.0,
+     35.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/bearing_block.stl",
+   "link": "base",
+   "color": "#B9BDC1",
+   "finish": "metal",
+   "bom": "bearing",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 180,
+   "explode": [
+    0,
+    -60,
+    0
+   ],
+   "bbox": [
+    [
+     -35.0,
+     130.0,
+     -35.0
+    ],
+    [
+     35.0,
+     163.0,
+     35.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/differential.stl",
+   "link": "base",
+   "color": "#34383C",
+   "finish": "plastic",
+   "bom": "diff",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    75
+   ],
+   "bbox": [
+    [
+     -30.0,
+     -165.0,
+     -30.0
+    ],
+    [
+     30.0,
+     165.0,
+     42.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/battery_pack.stl",
+   "link": "base",
+   "color": "#2C5F86",
+   "finish": "plastic",
+   "bom": "battery",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    80
+   ],
+   "bbox": [
+    [
+     -174.0,
+     -25.0,
+     -48.0
+    ],
+    [
+     -36.0,
+     25.0,
+     26.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/main_board.stl",
+   "link": "base",
+   "color": "#2F6B45",
+   "finish": "plastic",
+   "bom": "controller",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    60
+   ],
+   "bbox": [
+    [
+     30.0,
+     -50.0,
+     -40.8
+    ],
+    [
+     160.0,
+     50.0,
+     -39.2
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/board_parts.stl",
+   "link": "base",
+   "color": "#B9BDC1",
+   "finish": "metal",
+   "bom": "controller",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    60
+   ],
+   "bbox": [
+    [
+     32.0,
+     -45.0,
+     -39.2
+    ],
+    [
+     143.0,
+     45.0,
+     -29.2
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/motor_drivers.stl",
+   "link": "base",
+   "color": "#17181A",
+   "finish": "plastic",
+   "bom": "drivers",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    60
+   ],
+   "bbox": [
+    [
+     48.0,
+     -42.0,
+     -39.2
+    ],
+    [
+     92.0,
+     42.0,
+     -27.2
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/power_board.stl",
+   "link": "base",
+   "color": "#2F6B45",
+   "finish": "plastic",
+   "bom": "power",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    60
+   ],
+   "bbox": [
+    [
+     -140.0,
+     61.0,
+     -40.8
+    ],
+    [
+     -70.0,
+     107.0,
+     -27.2
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/relay_box.stl",
+   "link": "base",
+   "color": "#34383C",
+   "finish": "plastic",
+   "bom": "relay",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    -60,
+    250
+   ],
+   "bbox": [
+    [
+     -87.0,
+     -117.0,
+     53.0
+    ],
+    [
+     79.0,
+     -33.0,
+     100.5
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/relay_light.stl",
+   "link": "base",
+   "color": "#57D17A",
+   "finish": "glow",
+   "bom": "relay",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    -60,
+    250
+   ],
+   "bbox": [
+    [
+     -64.5,
+     -79.5,
+     99.0
+    ],
+    [
+     -55.5,
+     -70.5,
+     101.2
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/gas_pod.stl",
+   "link": "base",
+   "color": "#D9DBD6",
+   "finish": "plastic",
+   "bom": "air",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    60,
+    250
+   ],
+   "bbox": [
+    [
+     10.0,
+     57.0,
+     53.0
+    ],
+    [
+     70.0,
+     103.0,
+     85.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/estop_base.stl",
+   "link": "base",
+   "color": "#D2A01E",
+   "finish": "paint",
+   "bom": "estop",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    40,
+    230
+   ],
+   "bbox": [
+    [
+     -206.0,
+     64.0,
+     53.0
+    ],
+    [
+     -164.0,
+     106.0,
+     79.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/estop_button.stl",
+   "link": "base",
+   "color": "#B3131F",
+   "finish": "plastic",
+   "bom": "estop",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    40,
+    245
+   ],
+   "bbox": [
+    [
+     -203.0,
+     67.0,
+     79.0
+    ],
+    [
+     -167.0,
+     103.0,
+     88.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/beacon_base.stl",
+   "link": "base",
+   "color": "#34383C",
+   "finish": "plastic",
+   "bom": "beacon",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    -40,
+    0,
+    230
+   ],
+   "bbox": [
+    [
+     -204.0,
+     -59.0,
+     53.0
+    ],
+    [
+     -176.0,
+     -31.0,
+     65.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/beacon_dome.stl",
+   "link": "base",
+   "color": "#E08A00",
+   "finish": "glow",
+   "bom": "beacon",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    -40,
+    0,
+    245
+   ],
+   "bbox": [
+    [
+     -202.0,
+     -57.0,
+     65.0
+    ],
+    [
+     -178.0,
+     -33.0,
+     87.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/charge_contacts.stl",
+   "link": "base",
+   "color": "#B08D3C",
+   "finish": "metal",
+   "bom": "contacts",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    -70,
+    0,
+    0
+   ],
+   "bbox": [
+    [
+     -223.0,
+     -47.0,
+     -30.0
+    ],
+    [
+     -220.0,
+     47.0,
+     -14.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/mast_base.stl",
+   "link": "base",
+   "color": "#34383C",
+   "finish": "plastic",
+   "bom": "mastbase",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    210
+   ],
+   "bbox": [
+    [
+     -182.0,
+     -32.0,
+     53.0
+    ],
+    [
+     -118.0,
+     32.0,
+     99.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/mast_servo.stl",
+   "link": "base",
+   "color": "#17181A",
+   "finish": "plastic",
+   "bom": "mastservo",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    50,
+    210
+   ],
+   "bbox": [
+    [
+     -160.0,
+     22.0,
+     73.0
+    ],
+    [
+     -120.0,
+     66.0,
+     93.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/probe_flange.stl",
+   "link": "base",
+   "color": "#34383C",
+   "finish": "plastic",
+   "bom": "probeservo",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    60,
+    0,
+    0
+   ],
+   "bbox": [
+    [
+     220.0,
+     68.0,
+     -51.0
+    ],
+    [
+     227.0,
+     112.0,
+     -19.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/rocker_L.stl",
+   "link": "rocker_L",
+   "color": "#34383C",
+   "finish": "metal",
+   "bom": "rocker",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    90,
+    0
+   ],
+   "bbox": [
+    [
+     -141.0,
+     -6.0,
+     -186.0
+    ],
+    [
+     271.0,
+     14.0,
+     30.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/bogie_L.stl",
+   "link": "bogie_L",
+   "color": "#34383C",
+   "finish": "metal",
+   "bom": "bogie",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    150,
+    0
+   ],
+   "bbox": [
+    [
+     -151.0,
+     -16.0,
+     -86.0
+    ],
+    [
+     151.0,
+     9.0,
+     22.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/drive_unit.stl",
+   "link": "rocker_L",
+   "color": "#B9BDC1",
+   "finish": "metal",
+   "bom": "drive",
+   "xyz": [
+    240.0,
+    66.0,
+    -155.0
+   ],
+   "yaw": 0,
+   "explode": [
+    0,
+    215,
+    0
+   ],
+   "bbox": [
+    [
+     -24.5,
+     -98.0,
+     -24.5
+    ],
+    [
+     24.5,
+     15.0,
+     24.5
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/drive_unit.stl",
+   "link": "bogie_L",
+   "color": "#B9BDC1",
+   "finish": "metal",
+   "bom": "drive",
+   "xyz": [
+    120.0,
+    56.0,
+    -55.0
+   ],
+   "yaw": 0,
+   "explode": [
+    0,
+    215,
+    0
+   ],
+   "bbox": [
+    [
+     -24.5,
+     -98.0,
+     -24.5
+    ],
+    [
+     24.5,
+     15.0,
+     24.5
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/drive_unit.stl",
+   "link": "bogie_L",
+   "color": "#B9BDC1",
+   "finish": "metal",
+   "bom": "drive",
+   "xyz": [
+    -120.0,
+    56.0,
+    -55.0
+   ],
+   "yaw": 0,
+   "explode": [
+    0,
+    215,
+    0
+   ],
+   "bbox": [
+    [
+     -24.5,
+     -98.0,
+     -24.5
+    ],
+    [
+     24.5,
+     15.0,
+     24.5
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/rim.stl",
+   "link": "wheel_FL",
+   "color": "#D2A01E",
+   "finish": "plastic",
+   "bom": "rim",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0,
+   "explode": [
+    0,
+    300,
+    0
+   ],
+   "bbox": [
+    [
+     -64.0,
+     -35.0,
+     -64.0
+    ],
+    [
+     64.0,
+     35.0,
+     64.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/tyre.stl",
+   "link": "wheel_FL",
+   "color": "#1D1E20",
+   "finish": "rubber",
+   "bom": "tyre",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0,
+   "explode": [
+    0,
+    390,
+    0
+   ],
+   "bbox": [
+    [
+     -80.8,
+     -35.0,
+     -80.8
+    ],
+    [
+     80.8,
+     35.0,
+     80.8
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/rim.stl",
+   "link": "wheel_ML",
+   "color": "#D2A01E",
+   "finish": "plastic",
+   "bom": "rim",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0,
+   "explode": [
+    0,
+    300,
+    0
+   ],
+   "bbox": [
+    [
+     -64.0,
+     -35.0,
+     -64.0
+    ],
+    [
+     64.0,
+     35.0,
+     64.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/tyre.stl",
+   "link": "wheel_ML",
+   "color": "#1D1E20",
+   "finish": "rubber",
+   "bom": "tyre",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0,
+   "explode": [
+    0,
+    390,
+    0
+   ],
+   "bbox": [
+    [
+     -80.8,
+     -35.0,
+     -80.8
+    ],
+    [
+     80.8,
+     35.0,
+     80.8
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/rim.stl",
+   "link": "wheel_RL",
+   "color": "#D2A01E",
+   "finish": "plastic",
+   "bom": "rim",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0,
+   "explode": [
+    0,
+    300,
+    0
+   ],
+   "bbox": [
+    [
+     -64.0,
+     -35.0,
+     -64.0
+    ],
+    [
+     64.0,
+     35.0,
+     64.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/tyre.stl",
+   "link": "wheel_RL",
+   "color": "#1D1E20",
+   "finish": "rubber",
+   "bom": "tyre",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0,
+   "explode": [
+    0,
+    390,
+    0
+   ],
+   "bbox": [
+    [
+     -80.8,
+     -35.0,
+     -80.8
+    ],
+    [
+     80.8,
+     35.0,
+     80.8
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/rocker_R.stl",
+   "link": "rocker_R",
+   "color": "#34383C",
+   "finish": "metal",
+   "bom": "rocker",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    -90,
+    0
+   ],
+   "bbox": [
+    [
+     -141.0,
+     -14.0,
+     -186.0
+    ],
+    [
+     271.0,
+     6.0,
+     30.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/bogie_R.stl",
+   "link": "bogie_R",
+   "color": "#34383C",
+   "finish": "metal",
+   "bom": "bogie",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    -150,
+    0
+   ],
+   "bbox": [
+    [
+     -151.0,
+     -9.0,
+     -86.0
+    ],
+    [
+     151.0,
+     16.0,
+     22.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/drive_unit.stl",
+   "link": "rocker_R",
+   "color": "#B9BDC1",
+   "finish": "metal",
+   "bom": "drive",
+   "xyz": [
+    240.0,
+    -66.0,
+    -155.0
+   ],
+   "yaw": 180,
+   "explode": [
+    0,
+    -215,
+    0
+   ],
+   "bbox": [
+    [
+     -24.5,
+     -98.0,
+     -24.5
+    ],
+    [
+     24.5,
+     15.0,
+     24.5
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/drive_unit.stl",
+   "link": "bogie_R",
+   "color": "#B9BDC1",
+   "finish": "metal",
+   "bom": "drive",
+   "xyz": [
+    120.0,
+    -56.0,
+    -55.0
+   ],
+   "yaw": 180,
+   "explode": [
+    0,
+    -215,
+    0
+   ],
+   "bbox": [
+    [
+     -24.5,
+     -98.0,
+     -24.5
+    ],
+    [
+     24.5,
+     15.0,
+     24.5
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/drive_unit.stl",
+   "link": "bogie_R",
+   "color": "#B9BDC1",
+   "finish": "metal",
+   "bom": "drive",
+   "xyz": [
+    -120.0,
+    -56.0,
+    -55.0
+   ],
+   "yaw": 180,
+   "explode": [
+    0,
+    -215,
+    0
+   ],
+   "bbox": [
+    [
+     -24.5,
+     -98.0,
+     -24.5
+    ],
+    [
+     24.5,
+     15.0,
+     24.5
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/rim.stl",
+   "link": "wheel_FR",
+   "color": "#D2A01E",
+   "finish": "plastic",
+   "bom": "rim",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 180,
+   "explode": [
+    0,
+    -300,
+    0
+   ],
+   "bbox": [
+    [
+     -64.0,
+     -35.0,
+     -64.0
+    ],
+    [
+     64.0,
+     35.0,
+     64.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/tyre.stl",
+   "link": "wheel_FR",
+   "color": "#1D1E20",
+   "finish": "rubber",
+   "bom": "tyre",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 180,
+   "explode": [
+    0,
+    -390,
+    0
+   ],
+   "bbox": [
+    [
+     -80.8,
+     -35.0,
+     -80.8
+    ],
+    [
+     80.8,
+     35.0,
+     80.8
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/rim.stl",
+   "link": "wheel_MR",
+   "color": "#D2A01E",
+   "finish": "plastic",
+   "bom": "rim",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 180,
+   "explode": [
+    0,
+    -300,
+    0
+   ],
+   "bbox": [
+    [
+     -64.0,
+     -35.0,
+     -64.0
+    ],
+    [
+     64.0,
+     35.0,
+     64.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/tyre.stl",
+   "link": "wheel_MR",
+   "color": "#1D1E20",
+   "finish": "rubber",
+   "bom": "tyre",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 180,
+   "explode": [
+    0,
+    -390,
+    0
+   ],
+   "bbox": [
+    [
+     -80.8,
+     -35.0,
+     -80.8
+    ],
+    [
+     80.8,
+     35.0,
+     80.8
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/rim.stl",
+   "link": "wheel_RR",
+   "color": "#D2A01E",
+   "finish": "plastic",
+   "bom": "rim",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 180,
+   "explode": [
+    0,
+    -300,
+    0
+   ],
+   "bbox": [
+    [
+     -64.0,
+     -35.0,
+     -64.0
+    ],
+    [
+     64.0,
+     35.0,
+     64.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/tyre.stl",
+   "link": "wheel_RR",
+   "color": "#1D1E20",
+   "finish": "rubber",
+   "bom": "tyre",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 180,
+   "explode": [
+    0,
+    -390,
+    0
+   ],
+   "bbox": [
+    [
+     -80.8,
+     -35.0,
+     -80.8
+    ],
+    [
+     80.8,
+     35.0,
+     80.8
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/mast_tube.stl",
+   "link": "mast",
+   "color": "#17181A",
+   "finish": "carbon",
+   "bom": "mast",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    170
+   ],
+   "bbox": [
+    [
+     -16.0,
+     -19.0,
+     -15.0
+    ],
+    [
+     16.0,
+     19.0,
+     326.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/antenna.stl",
+   "link": "mast",
+   "color": "#17181A",
+   "finish": "plastic",
+   "bom": "antenna",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    -70,
+    0,
+    170
+   ],
+   "bbox": [
+    [
+     -21.0,
+     -10.0,
+     143.0
+    ],
+    [
+     -7.0,
+     10.0,
+     314.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/pan_servo.stl",
+   "link": "mast",
+   "color": "#17181A",
+   "finish": "plastic",
+   "bom": "microservo",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    200
+   ],
+   "bbox": [
+    [
+     -12.0,
+     -6.5,
+     312.0
+    ],
+    [
+     12.0,
+     6.5,
+     334.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/yoke.stl",
+   "link": "pan",
+   "color": "#34383C",
+   "finish": "plastic",
+   "bom": "mastbase",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    230
+   ],
+   "bbox": [
+    [
+     -20.0,
+     -62.0,
+     0.0
+    ],
+    [
+     20.0,
+     62.0,
+     54.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/tilt_servo.stl",
+   "link": "pan",
+   "color": "#17181A",
+   "finish": "plastic",
+   "bom": "microservo",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    60,
+    230
+   ],
+   "bbox": [
+    [
+     -12.0,
+     61.0,
+     25.0
+    ],
+    [
+     12.0,
+     74.0,
+     47.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/head_housing.stl",
+   "link": "head",
+   "color": "#D2A01E",
+   "finish": "paint",
+   "bom": "head",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    280
+   ],
+   "bbox": [
+    [
+     -26.0,
+     -52.0,
+     -28.0
+    ],
+    [
+     38.0,
+     52.0,
+     38.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/head_lens.stl",
+   "link": "head",
+   "color": "#17181A",
+   "finish": "plastic",
+   "bom": "camera",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    60,
+    0,
+    280
+   ],
+   "bbox": [
+    [
+     32.0,
+     -15.0,
+     -11.0
+    ],
+    [
+     44.0,
+     15.0,
+     19.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/head_glass.stl",
+   "link": "head",
+   "color": "#0E1A24",
+   "finish": "glass",
+   "bom": "camera",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    75,
+    0,
+    280
+   ],
+   "bbox": [
+    [
+     37.8,
+     -17.0,
+     -23.0
+    ],
+    [
+     41.2,
+     17.0,
+     15.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/lamp_bezel.stl",
+   "link": "head",
+   "color": "#B9BDC1",
+   "finish": "metal",
+   "bom": "lamps",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    60,
+    0,
+    280
+   ],
+   "bbox": [
+    [
+     36.0,
+     -46.0,
+     -8.0
+    ],
+    [
+     44.0,
+     46.0,
+     16.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/lamp_lens.stl",
+   "link": "head",
+   "color": "#FFF3D6",
+   "finish": "glow",
+   "bom": "lamps",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    75,
+    0,
+    280
+   ],
+   "bbox": [
+    [
+     40.5,
+     -43.0,
+     -5.0
+    ],
+    [
+     42.0,
+     43.0,
+     13.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/lidar_rotor.stl",
+   "link": "lidar",
+   "color": "#17181A",
+   "finish": "plastic",
+   "bom": "lidar",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    340
+   ],
+   "bbox": [
+    [
+     -21.0,
+     -21.0,
+     0.0
+    ],
+    [
+     21.0,
+     21.0,
+     23.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/probe_arm.stl",
+   "link": "probe",
+   "color": "#D9DBD6",
+   "finish": "plastic",
+   "bom": "probe",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    110,
+    0,
+    0
+   ],
+   "bbox": [
+    [
+     -6.0,
+     -199.0,
+     -12.0
+    ],
+    [
+     6.0,
+     12.0,
+     12.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/probe_strip.stl",
+   "link": "probe",
+   "color": "#B08D3C",
+   "finish": "metal",
+   "bom": "probe",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    125,
+    0,
+    0
+   ],
+   "bbox": [
+    [
+     2.8,
+     -157.0,
+     -4.0
+    ],
+    [
+     4.0,
+     -22.0,
+     4.0
+    ]
+   ]
+  }
+ ],
+ "bom": [
+  {
+   "id": "chassis",
+   "group": "Body",
+   "name": "Chassis tub",
+   "what": "2 mm 5052 aluminium sheet, cut and bent, painted",
+   "does": "Holds the battery, the controller and the differential. The underside sits 18.5 cm off the floor.",
+   "qty": 1,
+   "mass_g": 1303,
+   "mass_from": "CAD volume x density",
+   "cost_usd": 85
+  },
+  {
+   "id": "lid",
+   "group": "Body",
+   "name": "Deck lid",
+   "what": "3 mm 5052 aluminium plate",
+   "does": "Seals the tub with a gasket and carries everything mounted on top.",
+   "qty": 1,
+   "mass_g": 925,
+   "mass_from": "CAD volume x density",
+   "cost_usd": 38
+  },
+  {
+   "id": "bumper",
+   "group": "Body",
+   "name": "Front bumper and rear handle",
+   "what": "14 mm aluminium tube",
+   "does": "The bumper protects the folded probe. The handle is for carrying: the rover weighs about as much as a full backpack.",
+   "qty": 1,
+   "mass_g": 40,
+   "mass_from": "CAD volume x density",
+   "cost_usd": 18
+  },
+  {
+   "id": "bearing",
+   "group": "Suspension",
+   "name": "Rocker bearing block",
+   "what": "Machined aluminium, two ball bearings each",
+   "does": "Carries a rocker's half shaft through the side of the tub.",
+   "qty": 2,
+   "mass_g": 142,
+   "mass_from": "CAD volume x density",
+   "cost_usd": 16
+  },
+  {
+   "id": "diff",
+   "group": "Suspension",
+   "name": "Differential",
+   "what": "Three bevel gears in a printed housing, two 14 mm half shafts",
+   "does": "Ties the two rockers together: when one side climbs, the other pushes down, and the body tilts only half as much.",
+   "qty": 1,
+   "mass_g": 390,
+   "mass_from": "typical for the part",
+   "cost_usd": 45
+  },
+  {
+   "id": "rocker",
+   "group": "Suspension",
+   "name": "Rocker arm",
+   "what": "8 mm 6061 aluminium plate, waterjet cut",
+   "does": "Joins the front wheel to the bogie. Pivots freely on the body.",
+   "qty": 2,
+   "mass_g": 411,
+   "mass_from": "CAD volume x density",
+   "cost_usd": 38
+  },
+  {
+   "id": "bogie",
+   "group": "Suspension",
+   "name": "Bogie arm",
+   "what": "8 mm 6061 aluminium plate, waterjet cut",
+   "does": "Carries the middle and rear wheels and rocks about its own pivot, so all six wheels stay on the ground.",
+   "qty": 2,
+   "mass_g": 302,
+   "mass_from": "CAD volume x density",
+   "cost_usd": 30
+  },
+  {
+   "id": "drive",
+   "group": "Drive",
+   "name": "Drive unit",
+   "what": "12 V planetary gearmotor with encoder in a sealed pod",
+   "does": "One per wheel, inside the wheel hub. The pod's shaft seal is what lets the rover wade.",
+   "qty": 6,
+   "mass_g": 420,
+   "mass_from": "typical for the part",
+   "cost_usd": 46
+  },
+  {
+   "id": "rim",
+   "group": "Drive",
+   "name": "Wheel rim",
+   "what": "Printed PETG",
+   "does": "Cup-shaped so the drive unit sits inside it.",
+   "qty": 6,
+   "mass_g": 109,
+   "mass_from": "CAD volume x density",
+   "cost_usd": 4
+  },
+  {
+   "id": "tyre",
+   "group": "Drive",
+   "name": "Tyre",
+   "what": "Printed TPU, 20 cleats",
+   "does": "160 mm across. Soft enough to grip wet rock, cleated for loose rubble.",
+   "qty": 6,
+   "mass_g": 301,
+   "mass_from": "CAD volume x density",
+   "cost_usd": 6
+  },
+  {
+   "id": "drivers",
+   "group": "Drive",
+   "name": "Motor drivers",
+   "what": "Three dual-channel drivers, 10 A a channel",
+   "does": "One channel per wheel, so each wheel's speed and current are controlled and measured separately.",
+   "qty": 1,
+   "mass_g": 22,
+   "mass_from": "typical for the part",
+   "cost_usd": 14
+  },
+  {
+   "id": "battery",
+   "group": "Power",
+   "name": "Battery",
+   "what": "12 x 21700 Li-ion cells, 4S3P, 14.4 V 15 Ah, with a protection board",
+   "does": "216 Wh. Mounted low and to the rear to balance the mast.",
+   "qty": 1,
+   "mass_g": 960,
+   "mass_from": "typical for the part",
+   "cost_usd": 110
+  },
+  {
+   "id": "power",
+   "group": "Power",
+   "name": "Power board",
+   "what": "Fuse, cut-off relay, 12 V and 5 V regulators, current sensor",
+   "does": "Measures what the rover draws, so it reports its own hours left the same way a block relay does.",
+   "qty": 1,
+   "mass_g": 90,
+   "mass_from": "typical for the part",
+   "cost_usd": 28
+  },
+  {
+   "id": "estop",
+   "group": "Power",
+   "name": "Emergency stop",
+   "what": "Latching mushroom button",
+   "does": "Cuts motor power. Anyone in the tunnel can stop it by hand.",
+   "qty": 1,
+   "mass_g": 60,
+   "mass_from": "typical for the part",
+   "cost_usd": 9
+  },
+  {
+   "id": "contacts",
+   "group": "Power",
+   "name": "Charging contacts",
+   "what": "Two sprung brass pads",
+   "does": "The rover backs onto a dock beside a block's relay box to charge.",
+   "qty": 1,
+   "mass_g": 30,
+   "mass_from": "typical for the part",
+   "cost_usd": 6
+  },
+  {
+   "id": "controller",
+   "group": "Compute and radio",
+   "name": "Controller",
+   "what": "ESP32-S3 module on a carrier board, IMU, microSD card",
+   "does": "Drives the motors, reads the sensors, and keeps every message on the card until it has been passed on.",
+   "qty": 1,
+   "mass_g": 85,
+   "mass_from": "typical for the part",
+   "cost_usd": 32
+  },
+  {
+   "id": "relay",
+   "group": "Compute and radio",
+   "name": "Relay box",
+   "what": "ESP32 with a LoRa radio: the same box every block has",
+   "does": "Stores messages and forwards them. On the rover it becomes a relay that can drive to where the signal is.",
+   "qty": 1,
+   "mass_g": 210,
+   "mass_from": "typical for the part",
+   "cost_usd": 30
+  },
+  {
+   "id": "antenna",
+   "group": "Compute and radio",
+   "name": "Antenna",
+   "what": "Short whip clamped to the mast",
+   "does": "Rides on the mast, so it goes up with the camera and lies flat when the mast folds.",
+   "qty": 1,
+   "mass_g": 25,
+   "mass_from": "typical for the part",
+   "cost_usd": 8
+  },
+  {
+   "id": "beacon",
+   "group": "Compute and radio",
+   "name": "Beacon",
+   "what": "Amber LED",
+   "does": "So people in a dark tunnel see it coming.",
+   "qty": 1,
+   "mass_g": 40,
+   "mass_from": "typical for the part",
+   "cost_usd": 7
+  },
+  {
+   "id": "mast",
+   "group": "Mast and head",
+   "name": "Mast",
+   "what": "22 mm carbon tube, printed hinge",
+   "does": "Lifts the camera to see over rubble, and folds forward along the deck to get under a low roof.",
+   "qty": 1,
+   "mass_g": 103,
+   "mass_from": "CAD volume x density",
+   "cost_usd": 14
+  },
+  {
+   "id": "mastbase",
+   "group": "Mast and head",
+   "name": "Mast hinge and yoke",
+   "what": "Printed PETG brackets",
+   "does": "The hinge at the deck and the fork that holds the head.",
+   "qty": 1,
+   "mass_g": 51,
+   "mass_from": "CAD volume x density",
+   "cost_usd": 6
+  },
+  {
+   "id": "mastservo",
+   "group": "Mast and head",
+   "name": "Mast servo",
+   "what": "High-torque servo, 25 kg cm class",
+   "does": "Raises and folds the mast.",
+   "qty": 1,
+   "mass_g": 65,
+   "mass_from": "typical for the part",
+   "cost_usd": 18
+  },
+  {
+   "id": "microservo",
+   "group": "Mast and head",
+   "name": "Pan and tilt servos",
+   "what": "Metal-gear micro servos",
+   "does": "Aim the head. Tilt reaches straight up so the head stays level when the mast is down.",
+   "qty": 2,
+   "mass_g": 14,
+   "mass_from": "typical for the part",
+   "cost_usd": 6
+  },
+  {
+   "id": "head",
+   "group": "Mast and head",
+   "name": "Head housing",
+   "what": "Printed PETG, gasketed",
+   "does": "Holds the camera, the lamps and the range sensor.",
+   "qty": 1,
+   "mass_g": 143,
+   "mass_from": "CAD volume x density",
+   "cost_usd": 7
+  },
+  {
+   "id": "camera",
+   "group": "Sensors",
+   "name": "Camera",
+   "what": "5 MP wide-angle module",
+   "does": "Takes the photo that goes out with every tunnel report.",
+   "qty": 1,
+   "mass_g": 12,
+   "mass_from": "typical for the part",
+   "cost_usd": 14
+  },
+  {
+   "id": "lamps",
+   "group": "Sensors",
+   "name": "Lamps",
+   "what": "Two 3 W LEDs",
+   "does": "The tunnel lights are off in a blackout. These are the rover's own.",
+   "qty": 1,
+   "mass_g": 24,
+   "mass_from": "typical for the part",
+   "cost_usd": 8
+  },
+  {
+   "id": "lidar",
+   "group": "Sensors",
+   "name": "Lidar",
+   "what": "360 degree scanner, 12 m range class",
+   "does": "Measures the tunnel's cross-section, so the rover can tell a roof fall from a clear bore.",
+   "qty": 1,
+   "mass_g": 50,
+   "mass_from": "typical for the part",
+   "cost_usd": 85
+  },
+  {
+   "id": "air",
+   "group": "Sensors",
+   "name": "Air sensor",
+   "what": "CO2, temperature and humidity (photoacoustic CO2 sensor)",
+   "does": "Reads the air along the tunnel, in the same units a block's sensor node reports.",
+   "qty": 1,
+   "mass_g": 20,
+   "mass_from": "typical for the part",
+   "cost_usd": 48
+  },
+  {
+   "id": "probe",
+   "group": "Sensors",
+   "name": "Water probe",
+   "what": "Folding arm with a depth strip and two electrodes",
+   "does": "Swings down to measure how deep standing water is and how much is dissolved in it.",
+   "qty": 1,
+   "mass_g": 70,
+   "mass_from": "typical for the part",
+   "cost_usd": 22
+  },
+  {
+   "id": "probeservo",
+   "group": "Sensors",
+   "name": "Probe servo",
+   "what": "Standard servo behind a sealed flange",
+   "does": "Lowers and stows the probe.",
+   "qty": 1,
+   "mass_g": 55,
+   "mass_from": "typical for the part",
+   "cost_usd": 12
+  },
+  {
+   "id": "hardware",
+   "group": "Body",
+   "name": "Fasteners, bearings, wiring, gaskets",
+   "what": "Not drawn",
+   "does": "Everything too small to model. Weight and cost are allowances.",
+   "qty": 1,
+   "mass_g": 450,
+   "mass_from": "typical for the part",
+   "cost_usd": 60
+  }
+ ],
+ "actuators": {
+  "drive": {
+   "name": "12 V planetary gearmotor with encoder, 36 mm, about 1:100",
+   "count": 6,
+   "no_load_rpm": 75,
+   "rated_torque_nm": 1.8,
+   "stall_torque_nm": 6.0,
+   "no_load_a": 0.3,
+   "stall_a": 8.0,
+   "volts": 12
+  },
+  "mast": {
+   "name": "High-torque servo, 25 kg cm class",
+   "count": 1,
+   "stall_torque_nm": 2.4,
+   "volts": 6
+  },
+  "standard": {
+   "name": "Standard servo, 10 kg cm class",
+   "count": 1,
+   "stall_torque_nm": 1.0,
+   "volts": 6
+  },
+  "micro": {
+   "name": "Metal-gear micro servo, 2 kg cm class",
+   "count": 2,
+   "stall_torque_nm": 0.2,
+   "volts": 5
+  },
+  "lidar": {
+   "name": "Motor inside the lidar",
+   "count": 1,
+   "volts": 5
+  }
+ },
+ "drive": {
+  "wheel_radius_m": 0.08,
+  "track_m": 0.47,
+  "top_speed_ms": 0.63,
+  "cruise_ms": 0.5,
+  "rolling_resistance": 0.1,
+  "battery_wh": 216,
+  "usable_share": 0.85,
+  "electronics_w": 4.5,
+  "lamps_w": 6.0,
+  "wade_limit_cm": 16,
+  "wade_note": "Set by the drive pods' shaft seals. The underside of the body is at 18.5 cm."
+ }
+}
