@@ -85,6 +85,8 @@ On camera, say "watch and family app, prototyped on a phone, with simulated rela
 - **Fall**: the watch asks "Are you OK?" and calls for help by itself after 15 seconds with no answer.
 - **Inside, right now** lights each part while it works (radio sending, motor buzzing, buzzer beeping), and the motor shakes the watch when an alert arrives.
 
+**On your own wrist:** https://hollow-twin.vercel.app/ar/ puts this watch on your wrist through the phone's camera, with the same live screen. See [`twin/README.md`](../../twin/README.md#ar-at-ar).
+
 **Parts** (the second tab): pull it apart, see inside the case, hide the strap, and click any part for what it is and what it's for.
 
 With no API address the page runs in local mode, and the family answers on its own. With one (the address the twin uses, or `?api=`), every press reaches the API and the twin; sending needs the API key, typed once in **Connect**.
