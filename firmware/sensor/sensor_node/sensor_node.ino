@@ -47,6 +47,7 @@ static double clearVolts = 0;                      // turbidity probe volts in c
 static double mountHeightCm = DEFAULT_MOUNT_HEIGHT_CM;
 static double waterTempC = DEFAULT_WATER_TEMP_C;
 
+static hollow::RollingMedian turbidityFilter(5, 3);  // last 5 readings (10 s), none until 3: see hollow_core.h
 static double lastTds = NAN, lastTurbidity = NAN, lastCo2 = NAN, lastAirTemp = NAN, lastHumidity = NAN, lastFlood = NAN;
 static hollow::Alarm alarmLevel = hollow::CLEAR;
 static bool muted = false;
@@ -70,12 +71,12 @@ static bool due(unsigned long at) { return (long)(millis() - at) >= 0; }
 
 // One analog measurement in volts at the pin: the median of three averages of ADC_SAMPLES readings, through the
 // ESP32's factory-calibrated millivolt reading (default 11 dB range, about 0.15 to 3.1 V).
-static double readPinVolts(int pin) {
+static double readPinVolts(int pin, int samples = ADC_SAMPLES) {
   std::vector<double> means;
   for (int m = 0; m < 3; m++) {
     uint32_t sum = 0;
-    for (int i = 0; i < ADC_SAMPLES; i++) { sum += analogReadMilliVolts(pin); delayMicroseconds(200); }
-    means.push_back(sum / (double)ADC_SAMPLES / 1000.0);
+    for (int i = 0; i < samples; i++) { sum += analogReadMilliVolts(pin); delayMicroseconds(50); }
+    means.push_back(sum / (double)samples / 1000.0);
   }
   return hollow::median(means);
 }
@@ -151,6 +152,9 @@ static void enqueue(const char* kind, const std::vector<Field>& fields) {
 }
 
 static void sample() {
+  // Reading the sensors blocks for about 0.4 s (the ultrasonic pings). Silence the buzzer first so a beep can never
+  // stick on through it.
+  digitalWrite(PIN_BUZZER, LOW);
 #if HAS_TDS || HAS_TURBIDITY
   {
     std::vector<Field> w;
@@ -160,15 +164,17 @@ static void sample() {
     w.push_back(Field{"tds_ppm", lastTds, 0});
 #endif
 #if HAS_TURBIDITY
-    double probeV = readPinVolts(PIN_TURBIDITY) * TURBIDITY_DIVIDER;
-    lastTurbidity = hollow::turbidityNtu(probeV, clearVolts);
-    w.push_back(Field{"turbidity_ntu", lastTurbidity, 1});
+    double probeV = readPinVolts(PIN_TURBIDITY, TURBIDITY_ADC_SAMPLES) * TURBIDITY_DIVIDER;
+    lastTurbidity = hollow::turbidityReported(turbidityFilter.add(hollow::turbidityNtu(probeV, clearVolts)),
+                                              TURBIDITY_DETECTION_LIMIT_NTU);
+    w.push_back(Field{"turbidity_ntu", lastTurbidity, 0});
 #endif
     bool any = false;
     for (size_t i = 0; i < w.size(); i++) any = any || std::isfinite(w[i].value);
-    if (any && hollow::shouldSend(waterRule, waterSent, w, uptimeS())) {
+    hollow::SendReason why = any ? hollow::sendReason(waterRule, waterSent, w, uptimeS()) : hollow::NO_SEND;
+    if (why != hollow::NO_SEND) {
       enqueue("water", w);
-      hollow::markSent(waterSent, w, uptimeS());
+      hollow::markSent(waterSent, w, uptimeS(), why);
     }
   }
 #endif
@@ -186,9 +192,10 @@ static void sample() {
       a.push_back(Field{"co2_ppm", lastCo2, 0});
       a.push_back(Field{"temp_c", lastAirTemp, 1});
       a.push_back(Field{"humidity_pct", lastHumidity, 1});
-      if (hollow::shouldSend(airRule, airSent, a, uptimeS())) {
+      hollow::SendReason why = hollow::sendReason(airRule, airSent, a, uptimeS());
+      if (why != hollow::NO_SEND) {
         enqueue("air", a);
-        hollow::markSent(airSent, a, uptimeS());
+        hollow::markSent(airSent, a, uptimeS(), why);
       }
     }
   }
@@ -201,9 +208,10 @@ static void sample() {
     if (std::isfinite(lastFlood)) {
       std::vector<Field> f;
       f.push_back(Field{"depth_cm", lastFlood, 1});
-      if (hollow::shouldSend(floodRule, floodSent, f, uptimeS())) {
+      hollow::SendReason why = hollow::sendReason(floodRule, floodSent, f, uptimeS());
+      if (why != hollow::NO_SEND) {
         enqueue("flood", f);
-        hollow::markSent(floodSent, f, uptimeS());
+        hollow::markSent(floodSent, f, uptimeS(), why);
       }
     }
   }
@@ -295,13 +303,15 @@ static void refreshLimits() {
 
 static void indicate() {
   unsigned long t = millis();
-  // status: solid = API reachable and nothing waiting; blinking = holding messages or offline
-  bool holding = backlog.size() > 0 || !apiReachable;
+  // status: solid = API reachable and nothing waiting; blinking = holding messages or offline. Wi-Fi down counts as
+  // offline at once, not only after the next upload fails, so unplugging the router shows on the board immediately.
+  bool holding = backlog.size() > 0 || !apiReachable || WiFi.status() != WL_CONNECTED;
   digitalWrite(PIN_STATUS_LED, holding ? ((t / 250) % 2) : HIGH);
-  // alarm: danger = solid red and a beep every 2 s; warning = slow red blink, no sound
+  // alarm: danger = solid red and a 250 ms beep every 1.25 s; warning = slow red blink, no sound. The beep's
+  // rhythm is deliberately not a divisor of the 2 s sampling, so the 0.4 s sensor read can never swallow every beep.
   if (alarmLevel == hollow::DANGER) {
     digitalWrite(PIN_ALARM_LED, HIGH);
-    digitalWrite(PIN_BUZZER, (!muted && (t % 2000) < 200) ? HIGH : LOW);
+    digitalWrite(PIN_BUZZER, (!muted && (t % 1250) < 250) ? HIGH : LOW);
   } else if (alarmLevel == hollow::WARN) {
     digitalWrite(PIN_ALARM_LED, (t / 1000) % 2);
     digitalWrite(PIN_BUZZER, LOW);
@@ -352,11 +362,12 @@ static void command(String line) {
 #if HAS_TURBIDITY
   } else if (cmd == "cal" && arg == "clear") {
     // turbidity probe in clean, clear water
-    double v = readPinVolts(PIN_TURBIDITY) * TURBIDITY_DIVIDER;
+    double v = readPinVolts(PIN_TURBIDITY, TURBIDITY_ADC_SAMPLES) * TURBIDITY_DIVIDER;
     if (v < 2.5) {
       Serial.printf("not calibrated: %.2f V is too low for clear water (check the divider and that the probe is in clear water)\n", v);
     } else {
       clearVolts = v;
+      turbidityFilter.clear();  // readings from before calibration mean nothing now
       prefs.putDouble("clear_v", clearVolts);
       Serial.printf("turbidity calibrated: clear water = %.2f V at the probe\n", clearVolts);
     }
@@ -376,6 +387,7 @@ static void command(String line) {
   } else if (cmd == "cal" && arg == "reset") {
     tdsK = 1.0;
     clearVolts = 0;
+    turbidityFilter.clear();
     mountHeightCm = DEFAULT_MOUNT_HEIGHT_CM;
     prefs.remove("tds_k");
     prefs.remove("clear_v");

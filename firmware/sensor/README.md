@@ -1,6 +1,6 @@
 # Lane 3: Sensor node
 
-> **Not part of the submission's claim** ([`docs/PLAN.md`](../../docs/PLAN.md), Nov 17: we claim problems 1, 2, 7, 8 and the rover). Built Nov 18 as an add-on so the water, air and flood layers can run on a real device if someone has the parts. **Tested on a laptop against the real API; not yet run on a board.** See [What is tested](#what-is-tested).
+> **Not part of the submission's claim** ([`docs/PLAN.md`](../../docs/PLAN.md), Nov 17: we claim problems 1, 2, 7, 8 and the rover). Built Nov 18 as an add-on so the water, air and flood layers can run on a real device if someone has the parts. **The real sketch passes a full virtual bench session against the real API; it has not yet run on a physical board.** See [What is tested](#what-is-tested).
 
 One ESP32 per block watches the tap water, the air and the tunnel floor, and tells the API in the contract's own messages. It answers three of the brief's problems from the device side: bad water (4), flooded tunnels (5) and hot, stale air in the deep levels (3).
 
@@ -11,8 +11,10 @@ Every 2 seconds it reads its sensors. Then:
 - **It sends a message** for each kind (`water`, `air`, `flood`, [`CONTRACT.md`](../../CONTRACT.md) section 2) once a minute, or **at once** (at most every 3 s) when a value moves. A salty cup reaches the API seconds after it goes in, while a quiet tap line costs one message a minute.
 - **Every message is signed** with the node's key (HMAC-SHA256, the rule in [`api/sign.js`](../../api/sign.js)). The API stores it as **verified, live**. A reading forged in the node's name is refused and shown on `/live` as `event: forgery`.
 - **When the network is cut it keeps going.** Messages wait in memory (up to 300, over an hour of all sensors), then go up as one array with their original times when the API answers again (`CONTRACT.md` section 5). An upload whose reply was lost is safe to repeat: the API drops the copies.
-- **It warns the block itself, network or not.** A red LED and a buzzer use the **API's own published limits** (`GET /limits`: WHO, US EPA, Health Canada, OSHA/NIOSH, US NWS), refreshed every 30 minutes and kept in flash. Danger (water unsafe to drink, dangerous air): red on, beep every 2 s. Warning (stale air, flooded tunnel): red blinking.
+- **It reacts within about 2 seconds** to salty water, a flood or dangerous air, and within about 6 seconds to muddy water (turbidity is filtered over 10 s, see Honest limits).
+- **It warns the block itself, network or not.** A red LED and a buzzer use the **API's own published limits** (`GET /limits`: WHO, US EPA, Health Canada, OSHA/NIOSH, US NWS), refreshed every 30 minutes and kept in flash. Danger (water unsafe to drink, dangerous air): red on, a beep every 1.25 s. Warning (stale air, flooded tunnel): red blinking.
 - **Its message ids never repeat**, even across reboots, so the API never drops a real reading as a duplicate.
+- **After a sudden change it sends one confirming reading 3 s later.** The API holds back a very large step as a possible probe fault until the next reading agrees (muddy water going from 0 to 700 NTU is one); the confirmation means the alert follows in seconds, not at the next one-minute message.
 
 It needs **no Arduino libraries**: the CO2 sensor is driven from its datasheet commands, so no library version can break the build.
 
@@ -86,19 +88,25 @@ node e2e.mjs
 ```
 ./check_sketch.sh
 ```
+```
+node bench/bench.mjs
+```
 
 | Check | What it proves | Result (Nov 18) |
 | --- | --- | --- |
-| `core_test.cpp`: 116 unit checks | SHA-256 and HMAC (FIPS 180-4 and RFC 4231 vectors), **the API's published signature test vector**, number formatting, dates, sensor maths, SCD40 CRC (the datasheet's example), **an uncalibrated turbidity probe or flood sensor reports nothing rather than a false alarm**, when to send, ids across reboots, the backlog, limits | all pass, g++ and clang++ |
-| `e2e.mjs`: 10 checks against the **real** `api/server.js` | 2,000 random readings written exactly as `JSON.stringify` writes them (or signatures would fail); the node reads the API's five limits; clean water stored **verified, live**; salty cup raises "Do not drink" on the first reading; stale air and a flooded tunnel raise their alerts; a 5-reading backlog uploaded in one request lands in time order with original times; the same backlog re-sent stores nothing twice; a reading changed after signing is refused, never stored and shown as `event: forgery`; an unsigned node is accepted as unverified | all pass |
-| `check_sketch.sh` | The sketch compiles, warning-free, in 7 sensor combinations and two C++ standards, **against stand-in headers** for the ESP32 core | passes |
+| `core_test.cpp`: 135 unit checks | SHA-256 and HMAC (FIPS 180-4 and RFC 4231 vectors), **the API's published signature test vector**, number formatting, dates, sensor maths, SCD40 CRC (the datasheet's example), an uncalibrated probe reports nothing, the turbidity filter and detection limit, when to send (including the confirming send), ids across reboots, the backlog, limits | all pass, g++ and clang++ |
+| `e2e.mjs`: 10 checks against the **real** `api/server.js` | 2,000 random readings written exactly as `JSON.stringify` writes them (or signatures would fail); the node reads the API's five limits; clean water stored **verified, live**; salty cup raises "Do not drink" on the first reading; stale air and a flooded tunnel raise their alerts; a backlog lands in time order with original times; a re-sent backlog stores nothing twice; a reading changed after signing is refused and shown as `event: forgery`; an unsigned node is accepted as unverified | all pass |
+| `check_sketch.sh` | The sketch compiles warning-free in 7 sensor combinations and two C++ standards, against stand-in headers | passes |
+| **`bench/bench.mjs`: the virtual bench** | **The real `sensor_node.ino`, compiled unchanged, on a simulated ESP32** (`bench/board/`): sensors with their physics (a TDS probe 8% off until calibrated, a turbidity probe that gives 4.0 V in clear water, ADC noise of +/- 5 mV and slow drift, the speed of sound, the SCD40 answering its I2C commands), a router that can be unplugged, flash that survives a power cut, and **real HTTP to the real API**. It plays a full bench session: first power-on, calibration, tap water, the salty cup, muddy water, the router unplugged and back, a flood, crowded air, the API down, a power cut, and a forger with the wrong key. 42 checks on the board (red LED, buzzer and blue LED states and timing, serial output) and 7 on what the API stored | **passes, 3 runs in a row**: alarm within 2.0 to 2.1 s (muddy water 6 s); clean water never above 0 NTU over 26 readings with noise and drift; calibrated TDS 240 and 1448-1450 ppm for true 240 and 1450; 9 "Do not drink" alerts, none on clean water; a 14-message backlog in one request with original times; ids continue after the power cut; the forger's messages all refused |
 
-**Not tested:** the sketch has not been built with the real ESP32 core (no Arduino toolchain in the build environment) and has not run on a board or with real sensors. The first person with the parts should build it in the Arduino IDE, run the calibration, and do the demo shot once. Everything that decides anything lives in [`sensor_node/hollow_core.h`](sensor_node/hollow_core.h), which the tests above compile unchanged; the sketch only reads pins and talks over Wi-Fi.
+The virtual bench found and fixed four bugs a desk test would have hit: the blue LED stayed steady after the router was unplugged; turbidity noise put clean water over the 5 NTU line; the danger beep could fall silent when its rhythm lined up with the 2 s sensor read; and a muddy cup's alert waited up to a minute for the API's confirmation.
+
+**Not tested:** the sketch has not been built with the real ESP32 core (no Arduino toolchain in the build environment) and has not run on a physical board with real parts. The bench simulates parts from their datasheets; real parts are noisier and drift more. The first person with the parts should build it in the Arduino IDE, calibrate, and do the demo shot once.
 
 ## Honest limits
 
 - **TDS** is rated to 1000 ppm, and the WHO limit is 1000 ppm, so "unsafe" sits at the top of the probe's range: the alarm is right, the exact number above it is not.
-- **Turbidity** probes in this price range are indicators, not lab instruments. The clear-cup calibration makes clear water read 0; the EPA's 5 NTU line is near the probe's resolution.
+- **Turbidity: this probe catches visibly cloudy water; it cannot certify water against the EPA's 5 NTU line.** Near clear water it moves about 3.7 NTU per millivolt, so an ESP32's few millivolts of noise and drift are 10 NTU or more. The node averages 768 samples per reading, takes the median of the last five, and reports anything under its 20 NTU detection limit as 0 (`TURBIDITY_DETECTION_LIMIT_NTU`) rather than noise that would say "Do not drink" about clean water. Run `cal clear` at the start of each session; drift builds over hours.
 - **Water temperature** is a setting, not a measurement (no water thermometer on the node).
 - **While the board waits on the network** (at most about 8 s when the API is down but Wi-Fi is up), it does not sample; the buzzer is silenced first so it can never stick on. With Wi-Fi down it never waits.
 - **The backlog is in RAM**: if the node loses power during a network cut, what it was holding is lost. Its ids are not reused.
@@ -113,3 +121,4 @@ node e2e.mjs
 | [`sensor_node/config.h`](sensor_node/config.h) | Block, fitted sensors, pins, reporting choices |
 | [`sensor_node/secrets.example.h`](sensor_node/secrets.example.h) | Copy to `secrets.h`: Wi-Fi, API address, device key |
 | [`test/`](test/) | Unit tests, the end-to-end test against the API, the sketch syntax check and its stand-in headers |
+| [`test/bench/`](test/bench/) | The virtual bench: the simulated board (`board/`), the bench driver and the bench session |

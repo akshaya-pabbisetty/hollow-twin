@@ -38,6 +38,11 @@
 // (10 + 20) / 20 = 1.5, so 4.5 V at the probe is 3.0 V at the pin.
 #define TURBIDITY_DIVIDER 1.5
 #define ADC_SAMPLES 32            // readings averaged per analog measurement (median of 3 averages)
+#define TURBIDITY_ADC_SAMPLES 256 // the turbidity probe needs far more: 3.7 NTU per millivolt near clear water
+// Below this the turbidity probe cannot tell clear water from slightly cloudy on an ESP32 (its few millivolts of
+// ADC noise and drift are 10 NTU or more there), so the node reports 0 below it. Visibly cloudy water is far above.
+// A design choice for this probe, not a safety limit: the limit (US EPA, 5 NTU) comes from the API.
+#define TURBIDITY_DETECTION_LIMIT_NTU 20.0
 
 // ---- Water temperature for TDS compensation. The node has no water thermometer; room-temperature tap water is
 // close enough (2% per degree). Change it from the serial monitor with: watertemp 21
@@ -55,7 +60,7 @@
 #define PERIOD_S 60
 #define MIN_GAP_S 3
 #define DELTA_TDS_PPM 50
-#define DELTA_TURBIDITY_NTU 1.0
+#define DELTA_TURBIDITY_NTU 10.0  // above the detection limit, in whole NTU
 #define DELTA_CO2_PPM 100
 #define DELTA_AIR_TEMP_C 1.0
 #define DELTA_HUMIDITY_PCT 5.0

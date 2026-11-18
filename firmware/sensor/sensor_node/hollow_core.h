@@ -300,6 +300,35 @@ inline double turbidityNtu(double probeVolts, double clearVolts) {
   return ntu < 0 ? 0 : ntu;
 }
 
+// What the node reports for turbidity. Near clear water the probe moves about 3.7 NTU per millivolt, so the ESP32
+// ADC's few millivolts of noise and drift are 10 NTU or more of uncertainty: below the detection limit the probe
+// cannot tell clear water from slightly cloudy, and the node reports 0 ("below what this probe can see") instead of
+// noise that would trip the EPA's 5 NTU line on clean water. Above it, the value is reported in whole NTU.
+// So this probe catches visibly cloudy water; it cannot certify water below 5 NTU (README, "Honest limits").
+inline double turbidityReported(double ntu, double detectionLimitNtu) {
+  if (!std::isfinite(ntu)) return NAN;
+  return ntu < detectionLimitNtu ? 0 : std::round(ntu);
+}
+
+// A rolling median of the last n readings. The turbidity curve is steep near clear water (about 3.7 NTU per
+// millivolt at the probe), so ADC noise alone can push clean water past the EPA's 5 NTU line; the median of the
+// last 5 readings (10 s) throws out the spikes. Missing readings (NAN) are not counted.
+// Until it holds `minCount` readings it reports nothing, so the first reading after a calibration is not trusted alone.
+class RollingMedian {
+ public:
+  explicit RollingMedian(size_t n, size_t minCount = 1) : n_(n ? n : 1), min_(minCount ? minCount : 1) {}
+  double add(double v) {
+    if (std::isfinite(v)) { q_.push_back(v); if (q_.size() > n_) q_.pop_front(); }
+    return value();
+  }
+  double value() const { return q_.size() < min_ ? NAN : median(std::vector<double>(q_.begin(), q_.end())); }
+  void clear() { q_.clear(); }
+
+ private:
+  size_t n_, min_;
+  std::deque<double> q_;
+};
+
 // SCD40 CO2 sensor, spoken to directly over I2C from its datasheet (Sensirion SCD4x), so no library version can
 // break the build. Every 16-bit word the sensor sends is followed by this CRC-8 (polynomial 0x31, start 0xFF).
 inline uint8_t scdCrc(const uint8_t* data, size_t n) {
@@ -350,6 +379,9 @@ inline double floodDepthCm(double mountHeightCm, double distanceCm) {
 // A kind is sent when its period has passed, or at once (but no more often than minGapS) when any value has moved
 // by at least its delta since the last message. So a salty cup reaches the API seconds after it goes in, while a
 // quiet tap line costs one message a minute.
+// After a send caused by a change, one more message follows minGapS later even if nothing moved again: the API treats
+// a very large step as a possible probe fault until the next reading confirms it (api/sensors.js, "jump"), and a
+// muddy cup that stays muddy would otherwise wait a whole period for that confirmation.
 struct SendRule {
   double periodS;
   double minGapS;
@@ -358,26 +390,34 @@ struct SendRule {
 
 struct SendState {
   bool sentOnce;
+  bool confirmDue;
   double lastSentS;
   std::vector<double> lastValues;
-  SendState() : sentOnce(false), lastSentS(0) {}
+  SendState() : sentOnce(false), confirmDue(false), lastSentS(0) {}
 };
 
-inline bool shouldSend(const SendRule& rule, const SendState& st, const std::vector<Field>& now, double nowS) {
-  if (!st.sentOnce) return true;
+enum SendReason { NO_SEND = 0, FIRST, PERIOD, CHANGE, CONFIRM };
+
+inline SendReason sendReason(const SendRule& rule, const SendState& st, const std::vector<Field>& now, double nowS) {
+  if (!st.sentOnce) return FIRST;
   double since = nowS - st.lastSentS;
-  if (since >= rule.periodS) return true;
-  if (since < rule.minGapS) return false;
+  if (since >= rule.periodS) return PERIOD;
+  if (since < rule.minGapS) return NO_SEND;
   for (size_t i = 0; i < now.size() && i < st.lastValues.size() && i < rule.deltas.size(); i++) {
     double a = st.lastValues[i], b = now[i].value;
-    if (std::isfinite(a) != std::isfinite(b)) return true;  // a sensor came back or went away
-    if (std::isfinite(a) && std::fabs(b - a) >= rule.deltas[i]) return true;
+    if (std::isfinite(a) != std::isfinite(b)) return CHANGE;  // a sensor came back or went away
+    if (std::isfinite(a) && std::fabs(b - a) >= rule.deltas[i]) return CHANGE;
   }
-  return false;
+  return st.confirmDue ? CONFIRM : NO_SEND;
 }
 
-inline void markSent(SendState& st, const std::vector<Field>& now, double nowS) {
+inline bool shouldSend(const SendRule& rule, const SendState& st, const std::vector<Field>& now, double nowS) {
+  return sendReason(rule, st, now, nowS) != NO_SEND;
+}
+
+inline void markSent(SendState& st, const std::vector<Field>& now, double nowS, SendReason why) {
   st.sentOnce = true;
+  st.confirmDue = why == CHANGE;
   st.lastSentS = nowS;
   st.lastValues.clear();
   for (size_t i = 0; i < now.size(); i++) st.lastValues.push_back(now[i].value);

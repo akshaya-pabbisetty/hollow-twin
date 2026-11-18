@@ -168,6 +168,27 @@ static void testSensors() {
   CHECK(std::isnan(floodDepthCm(60, 0)));     // no echo
   CHECK(std::isnan(floodDepthCm(0, 40)));     // not calibrated: no reading, never a flood on a dry floor
   CHECK_NEAR(median(std::vector<double>{5, 1, 9, 3}), 4, 0);
+  // the turbidity filter: one noise spike in five readings changes nothing; a real change wins after 3 readings
+  RollingMedian rm(5);
+  CHECK(std::isnan(rm.value()));
+  for (int i = 0; i < 4; i++) rm.add(0.5);
+  CHECK_NEAR(rm.add(9.0), 0.5, 0);            // a spike over the 5 NTU line: filtered out
+  rm.add(NAN);                                 // a missing reading is not a reading
+  CHECK_NEAR(rm.value(), 0.5, 0);
+  rm.add(40); rm.add(40);
+  CHECK_NEAR(rm.value(), 9.0, 0);              // two of five: not yet
+  CHECK_NEAR(rm.add(40), 40, 0);               // three of five: cloudy water is real
+  RollingMedian fresh(5, 3);                   // after a calibration: nothing until 3 readings agree
+  CHECK(std::isnan(fresh.add(30)));
+  CHECK(std::isnan(fresh.add(0.4)));
+  CHECK_NEAR(fresh.add(0.5), 0.5, 0);
+  // below the probe's detection limit: 0, never noise that trips the 5 NTU line; above it: whole NTU
+  CHECK_NEAR(turbidityReported(7.2, 20), 0, 0);
+  CHECK_NEAR(turbidityReported(19.9, 20), 0, 0);
+  CHECK_NEAR(turbidityReported(731.4, 20), 731, 0);
+  CHECK(std::isnan(turbidityReported(NAN, 20)));
+  CHECK(localAlarm(Limits(), 240, turbidityReported(7.2, 20), 650, 0) == CLEAR);
+  CHECK(localAlarm(Limits(), 240, turbidityReported(731.4, 20), 650, 0) == DANGER);
   CHECK(std::isnan(median(std::vector<double>())));
 }
 
@@ -185,14 +206,24 @@ static void testSendRule() {
   rule.deltas.push_back(50);   // tds
   rule.deltas.push_back(1.0);  // turbidity
   SendState st;
-  CHECK(shouldSend(rule, st, water(250, 1), 0));  // the first reading always goes
-  markSent(st, water(250, 1), 0);
-  CHECK(!shouldSend(rule, st, water(260, 1.2), 10));   // small moves wait for the period
-  CHECK(shouldSend(rule, st, water(260, 1.2), 60));    // the period
-  CHECK(!shouldSend(rule, st, water(1400, 1), 2));     // a big move inside the minimum gap waits
-  CHECK(shouldSend(rule, st, water(1400, 1), 3));      // ... then goes at once: the salty cup
-  CHECK(shouldSend(rule, st, water(250, 2.5), 3));     // either value can trigger it
-  CHECK(shouldSend(rule, st, water(250, NAN), 3));     // a probe that disappears is news too
+  CHECK(sendReason(rule, st, water(250, 1), 0) == FIRST);  // the first reading always goes
+  markSent(st, water(250, 1), 0, FIRST);
+  CHECK(sendReason(rule, st, water(260, 1.2), 10) == NO_SEND);  // small moves wait for the period
+  CHECK(sendReason(rule, st, water(260, 1.2), 60) == PERIOD);   // the period
+  CHECK(sendReason(rule, st, water(1400, 1), 2) == NO_SEND);    // a big move inside the minimum gap waits
+  CHECK(sendReason(rule, st, water(1400, 1), 3) == CHANGE);     // ... then goes at once: the salty cup
+  CHECK(shouldSend(rule, st, water(250, 2.5), 3));              // either value can trigger it
+  CHECK(shouldSend(rule, st, water(250, NAN), 3));              // a probe that disappears is news too
+  // after a change: one confirming message once the gap has passed, then quiet again
+  markSent(st, water(1400, 1), 3, CHANGE);
+  CHECK(sendReason(rule, st, water(1400, 1), 5) == NO_SEND);
+  CHECK(sendReason(rule, st, water(1400, 1), 6) == CONFIRM);
+  markSent(st, water(1400, 1), 6, CONFIRM);
+  CHECK(sendReason(rule, st, water(1400, 1), 20) == NO_SEND);
+  CHECK(sendReason(rule, st, water(1400, 1), 66) == PERIOD);
+  // a period send does not ask for a confirmation
+  markSent(st, water(1400, 1), 66, PERIOD);
+  CHECK(sendReason(rule, st, water(1400, 1), 70) == NO_SEND);
 }
 
 static void testIds() {
