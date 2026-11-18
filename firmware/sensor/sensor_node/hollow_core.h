@@ -288,9 +288,12 @@ inline double calibrateTdsK(double volts, double waterTempC, double knownPpm) {
 // NTU = -1120.4 V^2 + 5742.3 V - 4352.9, holds from 2.5 V (about 3000 NTU) to 4.2 V (clear, about 0 NTU) at the
 // probe's own 5 V output. Real probes read clear water at different voltages, so the clear-cup calibration scales
 // the measured voltage until clear water sits at 4.2 V. `probeVolts` is the probe's output before the divider.
+// Until the probe is calibrated (`clearVolts` 0) there is NO reading: most probes read clear water at 3.9 to
+// 4.1 V, where the maker's curve says 360 to 1000 NTU, so an uncalibrated node would tell a whole block not to
+// drink clean water. No number is better than that one.
 inline double turbidityNtu(double probeVolts, double clearVolts) {
-  if (!(probeVolts > 0)) return NAN;
-  double v = clearVolts > 0.5 ? probeVolts * 4.2 / clearVolts : probeVolts;
+  if (!(probeVolts > 0) || !(clearVolts > 0.5)) return NAN;
+  double v = probeVolts * 4.2 / clearVolts;
   if (v >= 4.2) return 0;
   if (v <= 2.5) return 3000;
   double ntu = -1120.4 * v * v + 5742.3 * v - 4352.9;
@@ -335,6 +338,7 @@ inline double echoToCm(double echoMicros, double airTempC) {
 }
 
 // Depth from the median distance. A distance a little longer than the mount height is noise on a dry floor: 0.
+// No mount height (0: not calibrated) = no reading, never a guess: a wrong height reports a dry floor as flooded.
 inline double floodDepthCm(double mountHeightCm, double distanceCm) {
   if (!(distanceCm > 0) || !(mountHeightCm > 0)) return NAN;
   double d = mountHeightCm - distanceCm;

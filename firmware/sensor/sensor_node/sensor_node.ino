@@ -63,6 +63,8 @@ static unsigned long sentTotal = 0;
 static bool clockSet() { return time(nullptr) > 1600000000; }
 static int64_t nowUnix() { return clockSet() ? (int64_t)time(nullptr) : (int64_t)(millis() / 1000); }
 static double uptimeS() { return millis() / 1000.0; }
+// true once millis() has reached `at`, correct across millis() wrapping to 0 after 49 days
+static bool due(unsigned long at) { return (long)(millis() - at) >= 0; }
 
 // ---------------------------------------------------------------- sensors
 
@@ -194,7 +196,8 @@ static void sample() {
 
 #if HAS_FLOOD
   {
-    lastFlood = hollow::floodDepthCm(mountHeightCm, pingCm());
+    // not calibrated: no ping, no reading (a wrong mount height would report a dry floor as flooded)
+    lastFlood = mountHeightCm > 0 ? hollow::floodDepthCm(mountHeightCm, pingCm()) : NAN;
     if (std::isfinite(lastFlood)) {
       std::vector<Field> f;
       f.push_back(Field{"depth_cm", lastFlood, 1});
@@ -214,6 +217,9 @@ static void sample() {
 // https (a hosted API) or http (a laptop on the bench). The hosted certificate is not pinned: the node has no
 // clock or certificate store worth trusting at boot, and the signature, not TLS, is what proves the reading.
 static int httpRequest(const char* method, const String& path, const String& body, String* reply) {
+  // The board waits here. Silence the buzzer first so a beep can never stick on through a slow network, and keep
+  // the waits short: an API that is down costs a few seconds, not the alarm.
+  digitalWrite(PIN_BUZZER, LOW);
   String url = String(API_URL) + path;
   WiFiClient plain;
   WiFiClientSecure secure;
@@ -221,7 +227,8 @@ static int httpRequest(const char* method, const String& path, const String& bod
   bool https = url.startsWith("https://");
   if (https) secure.setInsecure();
   if (!(https ? http.begin(secure, url) : http.begin(plain, url))) return 0;
-  http.setTimeout(10000);
+  http.setConnectTimeout(3000);
+  http.setTimeout(5000);
   if (String(INGEST_KEY).length()) http.addHeader("x-api-key", INGEST_KEY);
   int code;
   if (String(method) == "POST") {
@@ -236,7 +243,7 @@ static int httpRequest(const char* method, const String& path, const String& bod
 }
 
 static void upload() {
-  if (!backlog.size() || WiFi.status() != WL_CONNECTED || millis() < nextUploadAt) return;
+  if (!backlog.size() || WiFi.status() != WL_CONNECTED || !due(nextUploadAt)) return;
   size_t n = backlog.size() < (size_t)BATCH_MAX ? backlog.size() : (size_t)BATCH_MAX;
   String reply;
   int code = httpRequest("POST", "/ingest", String(backlog.batch(n).c_str()), &reply);
@@ -270,7 +277,7 @@ static void saveLimits() {
 }
 
 static void refreshLimits() {
-  if (WiFi.status() != WL_CONNECTED || millis() < nextLimitsAt) return;
+  if (WiFi.status() != WL_CONNECTED || !due(nextLimitsAt)) return;
   String reply;
   int code = httpRequest("GET", "/limits", "", &reply);
   if (code == 200 && hollow::readLimits(std::string(reply.c_str()), limits) == 5) {
@@ -311,10 +318,11 @@ static void printStatus() {
                 clockSet() ? hollow::isoTime(nowUnix()).c_str() : "not set yet",
                 WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString().c_str() : "down",
                 apiReachable ? "reachable" : "not reached", (unsigned)backlog.size(), sentTotal, backlog.dropped());
-  Serial.printf("  water: TDS %.0f ppm (k %.3f, water %.1f C), turbidity %.1f NTU (clear %.2f V)\n", lastTds, tdsK,
-                waterTempC, lastTurbidity, clearVolts);
-  Serial.printf("  air: CO2 %.0f ppm, %.1f C, %.1f %% | flood: %.1f cm (sensor %.1f cm above the floor)\n", lastCo2,
-                lastAirTemp, lastHumidity, lastFlood, mountHeightCm);
+  Serial.printf("  water: TDS %.0f ppm (k %.3f%s, water %.1f C), turbidity %.1f NTU (%s)\n", lastTds, tdsK,
+                tdsK == 1.0 ? ", maker's default: run cal tds" : "", waterTempC, lastTurbidity,
+                clearVolts > 0.5 ? "calibrated" : "NOT SENT until you run cal clear");
+  Serial.printf("  air: CO2 %.0f ppm, %.1f C, %.1f %% | flood: %.1f cm (%s)\n", lastCo2, lastAirTemp, lastHumidity,
+                lastFlood, mountHeightCm > 0 ? "calibrated" : "NOT SENT until you run cal floor");
   Serial.printf("  alarm: %s%s | signed: %s\n", alarmLevel == hollow::DANGER ? "DANGER" : alarmLevel == hollow::WARN ? "warning" : "clear",
                 muted ? " (muted)" : "", String(DEVICE_KEY).length() ? "yes" : "NO (set DEVICE_KEY in secrets.h)");
 }
@@ -440,19 +448,20 @@ void setup() {
   WiFi.setAutoReconnect(true);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   configTime(0, 0, "pool.ntp.org", "time.nist.gov");  // UTC; sets the clock once Wi-Fi is up
+  printStatus();  // says which sensors still need calibrating before they send anything
   Serial.println("type `status` or `help` in the serial monitor (115200 baud, newline)");
 }
 
 void loop() {
   if (Serial.available()) command(Serial.readStringUntil('\n'));
   unsigned long t = millis();
-  if (t >= nextSampleAt) {
+  if (due(nextSampleAt)) {
     nextSampleAt = t + SAMPLE_MS;
     sample();
   }
   refreshLimits();
   upload();
   indicate();
-  if (t - lastStatusPrint > 60000UL) { lastStatusPrint = t; printStatus(); }
+  if (t - lastStatusPrint >= 60000UL) { lastStatusPrint = t; printStatus(); }
   delay(10);
 }

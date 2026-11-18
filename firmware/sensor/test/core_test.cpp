@@ -135,9 +135,13 @@ static void testSensors() {
   CHECK_NEAR(turbidityNtu(2.5 * 3.9 / 4.2, 3.9), 3000, 1e-9);
   CHECK_NEAR(turbidityNtu(1.0, 3.9), 3000, 0);
   CHECK(std::isnan(turbidityNtu(0, 3.9)));
-  // uncalibrated: the maker's curve as is; 4.2 V is its clear point
-  CHECK_NEAR(turbidityNtu(4.2, 0), 0, 0);
-  CHECK_NEAR(turbidityNtu(3.0, 0), -1120.4 * 9 + 5742.3 * 3 - 4352.9, 1e-9);
+  // uncalibrated: no reading at all. A probe reading clean water at 4.0 V would be 690 NTU on the maker's curve
+  // (limit 5): an uncalibrated node must not tell a block its clean water is unsafe.
+  CHECK(std::isnan(turbidityNtu(4.0, 0)));
+  CHECK(std::isnan(turbidityNtu(3.0, 0)));
+  CHECK(localAlarm(Limits(), 250, turbidityNtu(4.0, 0), 800, NAN) == CLEAR);
+  // the calibrated maker's curve at a mid point
+  CHECK_NEAR(turbidityNtu(3.0, 4.2), -1120.4 * 9 + 5742.3 * 3 - 4352.9, 1e-9);
 
   // SCD40: the datasheet's CRC example (0xBEEF -> 0x92), and a decoded measurement
   const uint8_t beef[2] = {0xBE, 0xEF};
@@ -162,6 +166,7 @@ static void testSensors() {
   CHECK_NEAR(floodDepthCm(60, 44), 16, 1e-9);
   CHECK_NEAR(floodDepthCm(60, 60.8), 0, 0);   // noise on a dry floor
   CHECK(std::isnan(floodDepthCm(60, 0)));     // no echo
+  CHECK(std::isnan(floodDepthCm(0, 40)));     // not calibrated: no reading, never a flood on a dry floor
   CHECK_NEAR(median(std::vector<double>{5, 1, 9, 3}), 4, 0);
   CHECK(std::isnan(median(std::vector<double>())));
 }

@@ -43,9 +43,11 @@
 // close enough (2% per degree). Change it from the serial monitor with: watertemp 21
 #define DEFAULT_WATER_TEMP_C 22.0
 
-// ---- Flood sensor: its height above the dry tunnel floor, in cm. Measure it, or put the sensor in place over a
-// dry floor and type `cal floor` in the serial monitor. HC-SR04 reads from 2 cm; the JSN-SR04T only from about 25 cm.
-#define DEFAULT_MOUNT_HEIGHT_CM 60.0
+// ---- Flood sensor: its height above the dry tunnel floor, in cm. 0 = not set: the node sends NO flood reading
+// until it knows, because a wrong height reports a dry floor as flooded. Put the sensor in place over a dry floor and
+// type `cal floor` in the serial monitor (saved in flash), or write the measured height here.
+// HC-SR04 reads from 2 cm; the JSN-SR04T only from about 25 cm.
+#define DEFAULT_MOUNT_HEIGHT_CM 0.0
 
 // ---- When to send (see hollow_core.h, SendRule): each kind once a minute, or at once (at most every 3 s) when a
 // value moves this much. These are reporting choices, not safety limits; the limits come from the API.

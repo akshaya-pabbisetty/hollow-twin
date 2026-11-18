@@ -3,6 +3,7 @@
 class HTTPClient {
  public:
   bool begin(WiFiClient&, String) { return true; }
+  void setConnectTimeout(int32_t) {}
   void setTimeout(uint16_t) {}
   void addHeader(const String&, const String&, bool = false, bool = true) {}
   int POST(String) { return 0; }

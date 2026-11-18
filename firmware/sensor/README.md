@@ -55,6 +55,8 @@ The analog sensors are on ADC1 pins (32 to 39) on purpose: the ESP32's ADC2 stop
 
 ## Calibrate (5 minutes, saved in flash)
 
+**The turbidity probe and the flood sensor send nothing until they are calibrated.** That is on purpose: most turbidity probes read clean water at 3.9 to 4.1 V, where the maker's curve says 360 to 1,000 NTU (the limit is 5), and a flood sensor with the wrong height reports a dry floor as flooded. An uncalibrated node would tell a block not to drink clean water. `status` says which sensors are still waiting. The TDS probe starts on the maker's own factor and is better after `cal tds`.
+
 | Command | Do this first | What it sets |
 | --- | --- | --- |
 | `cal tds 707` | TDS probe in a **1413 uS/cm** conductivity standard (about 707 ppm). Any solution of known ppm works: give its value | The probe's factor, as the maker's own library does it |
@@ -66,6 +68,7 @@ The analog sensors are on ADC1 pins (32 to 39) on purpose: the ESP32's ADC2 stop
 
 ## The demo shot (problem 4, "catch bad water before people drink it")
 
+0. Calibrate first (above). Without `cal clear` the node sends TDS only, which is still enough for the salty cup.
 1. Probe in a cup of tap water: `status` shows a few hundred ppm; the twin's block shows a **verified device** reading.
 2. Move it to a **cup of salted water** (a pinch of salt in a glass is plenty; above about 1,000 ppm the probe still rises but is past its rated range). Within seconds the red LED and buzzer go, and the API raises **"Do not drink: tap water failing"**, citing the WHO limit.
 3. **Unplug the router.** The red light keeps working: the limits are on the node. Put the probe back and forth; the blue LED blinks while messages wait.
@@ -86,7 +89,7 @@ node e2e.mjs
 
 | Check | What it proves | Result (Nov 18) |
 | --- | --- | --- |
-| `core_test.cpp`: 113 unit checks | SHA-256 and HMAC (FIPS 180-4 and RFC 4231 vectors), **the API's published signature test vector**, number formatting, dates, sensor maths, SCD40 CRC (the datasheet's example), when to send, ids across reboots, the backlog, limits | all pass, g++ and clang++ |
+| `core_test.cpp`: 116 unit checks | SHA-256 and HMAC (FIPS 180-4 and RFC 4231 vectors), **the API's published signature test vector**, number formatting, dates, sensor maths, SCD40 CRC (the datasheet's example), **an uncalibrated turbidity probe or flood sensor reports nothing rather than a false alarm**, when to send, ids across reboots, the backlog, limits | all pass, g++ and clang++ |
 | `e2e.mjs`: 10 checks against the **real** `api/server.js` | 2,000 random readings written exactly as `JSON.stringify` writes them (or signatures would fail); the node reads the API's five limits; clean water stored **verified, live**; salty cup raises "Do not drink" on the first reading; stale air and a flooded tunnel raise their alerts; a 5-reading backlog uploaded in one request lands in time order with original times; the same backlog re-sent stores nothing twice; a reading changed after signing is refused, never stored and shown as `event: forgery`; an unsigned node is accepted as unverified | all pass |
 | `check_sketch.sh` | The sketch compiles, warning-free, in 7 sensor combinations and two C++ standards, **against stand-in headers** for the ESP32 core | passes |
 
@@ -97,6 +100,7 @@ node e2e.mjs
 - **TDS** is rated to 1000 ppm, and the WHO limit is 1000 ppm, so "unsafe" sits at the top of the probe's range: the alarm is right, the exact number above it is not.
 - **Turbidity** probes in this price range are indicators, not lab instruments. The clear-cup calibration makes clear water read 0; the EPA's 5 NTU line is near the probe's resolution.
 - **Water temperature** is a setting, not a measurement (no water thermometer on the node).
+- **While the board waits on the network** (at most about 8 s when the API is down but Wi-Fi is up), it does not sample; the buzzer is silenced first so it can never stick on. With Wi-Fi down it never waits.
 - **The backlog is in RAM**: if the node loses power during a network cut, what it was holding is lost. Its ids are not reused.
 - **HTTPS is not certificate-checked** on the node. The signature, not TLS, is what proves a reading is the node's; a man in the middle can delay or drop messages but not forge them.
 
