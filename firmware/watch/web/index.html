@@ -20,6 +20,12 @@
   .col { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 
   /* ---------- the watch ---------- */
+  /* embed mode (?embed=1): the face alone, filling its frame. The 3D watch (device/) shows it on its screen. */
+  html.embed, html.embed body { background: transparent; min-height: 0; overflow: hidden; }
+  html.embed body { display: block; padding: 0; }
+  html.embed .col { display: block; }
+  html.embed .col > :not(.face), html.embed .app { display: none !important; }
+  html.embed .face { width: 100vw; border: 0; box-shadow: none; }
   .face { position: relative; width: min(88vw, 360px); aspect-ratio: 1; border-radius: 50%;
     background: radial-gradient(circle at 50% 35%, #161b22, var(--face) 70%);
     border: 10px solid var(--ring); box-shadow: 0 0 0 2px #000, 0 20px 60px rgba(0,0,0,.6);
@@ -271,6 +277,12 @@ const TWIN_API = '';
 const PRESETS = ['On my way', 'Stay where you are', 'Meet at the lift', 'Need water'];
 
 const $ = id => document.getElementById(id);
+// Embed mode: the 3D watch (twin/watch/device/) runs this page on its screen. The page tells it what the
+// hardware would be doing (radio, motor, buzzer) and takes its physical buttons, fall alarm and settings.
+const EMBED = new URLSearchParams(location.search).has('embed') && window.parent !== window;
+if (EMBED) document.documentElement.classList.add('embed');
+function hw(m) { if (EMBED) try { window.parent.postMessage({ hollowWatch: 1, ...m }, location.origin); } catch (e) {} }
+function vibe(p) { hw({ type: 'vibrate', pattern: p }); if (navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} }
 const store = {
   get(k, d) { try { const v = localStorage.getItem('hollow.watch.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem('hollow.watch.' + k, JSON.stringify(v)); } catch (e) { /* storage blocked: memory only */ } },
@@ -410,6 +422,7 @@ let audio = null;
 function unlockAudio() { try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } catch (e) {} }
 document.addEventListener('pointerdown', unlockAudio, { once: false });
 function beep(ms) {
+  hw({ type: 'beep', ms });
   if (!audio) return;
   const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime;
   o.frequency.value = 640; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 0.01);
@@ -423,25 +436,26 @@ async function playMorse(text) {   // the code as sound and vibration, the way a
     else if (sym === '-') { beep(U * 3); buzz.push(U * 3, U); await wait(U * 4); }
     else { buzz.push(0, U * 2); await wait(U * 2); }
   }
-  if (navigator.vibrate) navigator.vibrate(buzz.slice(0, 60));
+  vibe(buzz.slice(0, 60));
 }
 
 // the key: tap for a dot, hold for a dash; a pause ends the letter
 let mText = '', mCode = '', keyDown = 0, letterTimer = null;
 function paintMorse() { $('m-text').innerHTML = mText ? esc(mText) : '&nbsp;'; $('m-code').innerHTML = mCode ? showCode(mCode) : '&nbsp;'; }
 function endLetter() { if (mCode) { mText += FROM_MORSE[mCode] || '?'; mCode = ''; paintMorse(); } }
-$('key').addEventListener('pointerdown', e => { e.preventDefault(); unlockAudio(); clearTimeout(letterTimer); keyDown = performance.now(); $('key').classList.add('down'); beepOn(); });
+function morseDown() { unlockAudio(); clearTimeout(letterTimer); keyDown = performance.now(); $('key').classList.add('down'); beepOn(); }
+$('key').addEventListener('pointerdown', e => { e.preventDefault(); morseDown(); });
 const keyUp = e => {
   if (!keyDown) return;
   const held = performance.now() - keyDown; keyDown = 0; $('key').classList.remove('down'); beepOff();
   mCode += held < 220 ? '.' : '-'; paintMorse();
-  if (navigator.vibrate) navigator.vibrate(held < 220 ? 30 : 90);
+  vibe(held < 220 ? 30 : 90);
   clearTimeout(letterTimer); letterTimer = setTimeout(endLetter, 650);
 };
 $('key').addEventListener('pointerup', keyUp); $('key').addEventListener('pointerleave', keyUp); $('key').addEventListener('pointercancel', keyUp);
 let tone = null;
-function beepOn() { if (!audio) return; tone = audio.createOscillator(); const g = audio.createGain(); g.gain.value = 0.2; tone.frequency.value = 640; tone.connect(g).connect(audio.destination); tone.start(); }
-function beepOff() { if (tone) { try { tone.stop(); } catch (e) {} tone = null; } }
+function beepOn() { hw({ type: 'tone', on: true }); if (!audio) return; tone = audio.createOscillator(); const g = audio.createGain(); g.gain.value = 0.2; tone.frequency.value = 640; tone.connect(g).connect(audio.destination); tone.start(); }
+function beepOff() { hw({ type: 'tone', on: false }); if (tone) { try { tone.stop(); } catch (e) {} tone = null; } }
 $('m-del').addEventListener('click', () => { clearTimeout(letterTimer); if (mCode) mCode = ''; else mText = mText.slice(0, -1); paintMorse(); });
 $('m-space').addEventListener('click', () => { endLetter(); if (mText && !mText.endsWith(' ')) mText += ' '; paintMorse(); });
 $('m-back').addEventListener('click', () => show('talk'));
@@ -466,7 +480,7 @@ function send(status) {
   if (p.type !== 'msg' && p.type !== 'morse') news[cfg.device] = { status, time: out[0].time, block: cfg.block, hops: 0 };
   store.set(S('news'), news);
   routeDone = false;
-  if (navigator.vibrate) navigator.vibrate(40);
+  vibe(40);
   paint(); flush();
 }
 
@@ -475,7 +489,7 @@ function send(status) {
 function reportSymptom() {
   const m = { id: nextId(), device: cfg.device, block: cfg.block, time: new Date().toISOString(), kind: 'button', values: { button: 'symptom' }, hops: 0, via: [], source: 'live' };
   queue.push(m); store.set(S('queue'), queue);
-  if (navigator.vibrate) navigator.vibrate(40);
+  vibe(40);
   say('Symptom reported.<br>It counts toward the residents\' own sickness numbers.');
   flush();
 }
@@ -515,6 +529,7 @@ async function flush() {
       queue = queue.filter(m => !batch.includes(m)); store.set(S('queue'), queue);
       const first = parse(batch[0].values.status || 'help');
       const what = first.type === 'safe' ? "you're safe" : first.type === 'help' ? 'you need help' : `“${esc(first.text)}”`;
+      hw({ type: 'tx', radio: byRadio ? 'lora' : 'wifi', count: batch.length, msg: batch[0] });
       if (rejected.size) say('<b>Not accepted:</b> ' + esc([...rejected.values()][0].join('; ')));
       else if (byRadio) { routeDone = true; drawRoute(3); say(`<b>Sent by radio ✓</b><br>Family knows ${what}.`); }
       else say(`<b>Sent ✓</b> ${hhmm(batch[0].time)}<br>Family knows ${what}.`);
@@ -599,12 +614,29 @@ function arrive(e) {   // something from family covers the face
   else showAlert('info', `Radio · ${who}`, p.text, '', via);
 }
 function showAlert(cls, lvl, txt, code, sub) {
+  hw({ type: 'alert', cls, lvl, txt });
   $('alert').className = 'alert show ' + cls;
   $('a-lvl').textContent = lvl; $('a-txt').textContent = txt; $('a-code').textContent = code || ''; $('a-sub').textContent = sub || '';
-  if (navigator.vibrate) navigator.vibrate(cls === 'danger' ? [300, 120, 300, 120, 300] : [200, 100, 200]);
+  vibe(cls === 'danger' ? [300, 120, 300, 120, 300] : [200, 100, 200]);
   if (cls !== 'info') { beep(120); setTimeout(() => beep(120), 220); }
 }
-$('alert').addEventListener('click', () => $('alert').classList.remove('show'));
+$('alert').addEventListener('click', () => { $('alert').classList.remove('show'); if (fallTimer) cancelFall(); });
+
+// After a fall (the motion sensor on the real watch; the 3D page's Fall button here): ask, then call for help.
+let fallTimer = null;
+function fallCheck() {
+  if (fallTimer) return;
+  let left = 15;
+  const sub = () => `Tap here or I'M OK. Calling for help in ${left} s.`;
+  show('home'); showAlert('warn', 'Fall detected', 'Are you OK?', '', sub());
+  fallTimer = setInterval(() => {
+    left--;
+    if (left > 0) { $('a-sub').textContent = sub(); return; }
+    clearInterval(fallTimer); fallTimer = null; $('alert').classList.remove('show');
+    send('help'); say('<b>No answer after a fall.</b><br>Help called for you.');
+  }, 1000);
+}
+function cancelFall() { clearInterval(fallTimer); fallTimer = null; $('alert').classList.remove('show'); send('ok'); }
 
 // ---------- screens ----------
 function show(name) {
@@ -711,7 +743,7 @@ function paintBlock() {
 }
 
 // ---------- controls ----------
-$('ok').addEventListener('click', () => send('ok'));
+$('ok').addEventListener('click', () => { if (fallTimer) { cancelFall(); return; } send('ok'); });
 let helpArmed = null;
 $('help').addEventListener('click', () => {   // two taps, so a bump doesn't call for help
   if (helpArmed) { clearTimeout(helpArmed); helpArmed = null; $('help').classList.remove('arm'); $('help').textContent = 'NEED HELP'; send('help'); return; }
@@ -741,6 +773,27 @@ $('dlg').addEventListener('close', () => {
   if (location.search) { u.searchParams.set('device', vals.device); u.hash = ''; location.href = u.toString(); }
   else { history.replaceState(null, '', location.pathname); location.reload(); }   // reload as that watch, with its own history
 });
+
+window.addEventListener('message', e => {
+  if (e.origin !== location.origin || !e.data || !e.data.hollowHw) return;
+  const m = e.data;
+  if (m.type === 'button' && m.which === 'ok') { $('alert').classList.remove('show'); show('home'); $('ok').click(); }
+  else if (m.type === 'button' && m.which === 'help') { if (fallTimer) { clearInterval(fallTimer); fallTimer = null; } $('alert').classList.remove('show'); show('home'); send('help'); }
+  else if (m.type === 'morse-down') { $('alert').classList.remove('show'); show('morse'); morseDown(); }
+  else if (m.type === 'morse-up') keyUp();
+  else if (m.type === 'morse-send') $('m-send').click();
+  else if (m.type === 'cut') { if (cut !== !!m.on) $('cut').click(); }
+  else if (m.type === 'fall') fallCheck();
+  else if (m.type === 'config') {
+    if ('api' in m) cfg.api = m.api || '';
+    if ('key' in m) cfg.key = m.key || '';
+    store.set('cfg.' + cfg.device, cfg); reachable = null; statusHtml = null;
+    paint(); flush(); poll(); pollFamily(); pollBlock();
+  }
+  else if (m.type === 'hello') report();
+});
+function report() { hw({ type: 'state', cut, queue: queue.length, api: api(), device: cfg.device, name: cfg.name, block: cfg.block, reachable }); }
+if (EMBED) setInterval(report, 1000);
 
 window.addEventListener('online', () => { flush(); poll(); });
 setInterval(() => { flush(); poll(); pollFamily(); }, 2500);

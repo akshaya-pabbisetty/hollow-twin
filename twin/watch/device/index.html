@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>
+  // The page loads cad/ by relative path, so it must be addressed as a folder: /watch/device/, not /watch/device.
+  if (!location.pathname.endsWith('/') && !location.pathname.endsWith('.html')) location.replace(location.pathname + '/' + location.search + location.hash);
+  addEventListener('error', e => { const l = document.getElementById('loading'); if (l) l.textContent = 'Something did not load (' + (e.message || (e.target && (e.target.src || e.target.href)) || 'unknown') + '). Reload to try again.'; }, true);
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Family watch</title>
+<meta name="description" content="The Hollow Twin family watch in 3D: the CAD model with everything inside it, running the real watch software on its screen. Press its buttons, cut the network, simulate a fall.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%231A1C1E'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23B9BDC1' stroke-width='2.5'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%233F9A57'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  /* Same control-room palette as the twin and the scout rover. */
+  :root {
+    --app: #D3D4D0; --panel: #E2E3DF; --well: #ECEDE9; --line: #BABCB7; --line-2: #9DA09B;
+    --ink: #1F2326; --dim: #565B60; --faint: #85898D; --alarm: #C8102E; --warn: #E5A100; --warn-ink: #8A5F00;
+    --ok: #3F7D4F; --sel: #33383D; --scene: #0E0F10; --radio: #2D6FB7;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--app); color: var(--ink); }
+  body { font: 13px/1.45 'IBM Plex Sans', system-ui, sans-serif; font-variant-numeric: tabular-nums; overflow: hidden; }
+  a { color: inherit; }
+  button { font: inherit; font-size: 12px; color: var(--ink); background: var(--well); border: 1px solid var(--line-2); padding: 5px 8px; cursor: pointer; border-radius: 2px; user-select: none; -webkit-user-select: none; }
+  button:hover { border-color: var(--sel); }
+  button.on { background: var(--sel); color: #fff; border-color: var(--sel); }
+  button.big { font-size: 13px; padding: 8px 10px; font-weight: 600; }
+  button.okb { border-color: #3F9A57; color: #2c6e3e; } button.okb:active, button.okb.down { background: #3F9A57; color: #fff; }
+  button.helpb { border-color: var(--alarm); color: var(--alarm); } button.helpb.down { background: var(--alarm); color: #fff; }
+  button.morseb { border-color: var(--radio); color: var(--radio); } button.morseb.down { background: var(--radio); color: #fff; }
+  button.cutb.on { background: var(--alarm); border-color: var(--alarm); }
+  input[type=text], input[type=password] { width: 100%; font: inherit; font-size: 12px; padding: 5px 7px; border: 1px solid var(--line-2); background: var(--well); border-radius: 2px; }
+
+  #app { display: grid; grid-template-columns: 290px 1fr 340px; grid-template-rows: 44px 1fr 66px; height: 100vh; }
+  header { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px; padding: 0 16px; background: var(--panel); border-bottom: 1px solid var(--line); white-space: nowrap; overflow: hidden; }
+  .brand { font-weight: 600; font-size: 15px; }
+  .brand a { text-decoration: none; color: var(--dim); font-weight: 400; }
+  .brand a:hover { color: var(--ink); text-decoration: underline; }
+  .pill { padding: 1px 8px; border-radius: 2px; font-weight: 600; font-size: 12px; border: 1px solid var(--line-2); background: var(--well); }
+  .pill.warn { background: #F6E7BF; border-color: var(--warn); color: var(--warn-ink); }
+  .tabs { display: flex; gap: 4px; }
+  .spacer { flex: 1; }
+  .hstat { color: var(--dim); font-size: 12px; }
+  .hstat b { color: var(--ink); font-weight: 600; }
+  .hstat a { color: var(--dim); }
+
+  aside { background: var(--panel); overflow-y: auto; padding: 12px 14px; }
+  aside#left { border-right: 1px solid var(--line); }
+  aside#right { border-left: 1px solid var(--line); }
+  h3 { margin: 18px 0 6px; font-size: 12px; font-weight: 600; color: var(--dim); display: flex; justify-content: space-between; align-items: baseline; }
+  h3:first-child { margin-top: 0; }
+  h3 small { font-weight: 400; color: var(--faint); }
+  .row { display: flex; gap: 4px; flex-wrap: wrap; }
+  .row button { flex: 1; }
+  .note { color: var(--dim); font-size: 12px; margin-top: 6px; }
+  .kv { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; font-size: 12px; }
+  .kv span:nth-child(odd) { color: var(--dim); }
+  .kv span:nth-child(even) { text-align: right; font-weight: 500; }
+  .s1 { color: var(--warn-ink); font-weight: 600; } .s2 { color: var(--alarm); font-weight: 600; } .sok { color: var(--ok); font-weight: 600; }
+  .mode-only { display: none; }
+  body[data-mode="live"] .m-live, body[data-mode="parts"] .m-parts { display: block; }
+
+  main { position: relative; background: var(--scene); overflow: hidden; }
+  main canvas { display: block; width: 100%; height: 100%; }
+  #css { position: absolute; inset: 0; pointer-events: none; }
+  #css iframe { border: 0; border-radius: 50%; background: transparent; pointer-events: auto; display: block; }
+  #tip { position: absolute; pointer-events: none; background: rgba(31,35,38,.92); color: #fff; padding: 5px 8px; font-size: 12px; border-radius: 2px; display: none; max-width: 260px; z-index: 3; }
+  #tip b { font-weight: 600; } #tip i { font-style: normal; color: #C9CBC6; display: block; }
+  #loading { position: absolute; inset: 0; display: grid; place-items: center; color: #C9CBC6; font-size: 13px; z-index: 2; }
+  #scale { position: absolute; left: 12px; bottom: 12px; color: #C9CBC6; font-size: 11px; text-shadow: 0 1px 2px #000; pointer-events: none; }
+  #views { position: absolute; right: 12px; top: 12px; display: flex; gap: 4px; z-index: 2; }
+  #views button { background: rgba(236,237,233,.9); }
+  #views button.on { background: var(--sel); color: #fff; }
+  #hint { position: absolute; left: 12px; top: 12px; color: #C9CBC6; font-size: 12px; text-shadow: 0 1px 2px #000; pointer-events: none; max-width: 330px; z-index: 2; }
+  #hint b { color: #fff; }
+
+  footer { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; padding: 0 16px; background: var(--panel); border-top: 1px solid var(--line); }
+  #caption { flex: 1; font-size: 14px; line-height: 1.4; max-width: 1100px; }
+  #clock { color: var(--dim); font-size: 12px; white-space: nowrap; }
+
+  /* live */
+  .slider { display: grid; grid-template-columns: 1fr 64px; gap: 0 6px; font-size: 12px; margin-top: 6px; }
+  .slider label { color: var(--dim); }
+  .slider output { text-align: right; font-weight: 500; }
+  .slider input { grid-column: 1 / -1; width: 100%; margin: 2px 0 0; accent-color: var(--sel); }
+  .chk { display: flex; gap: 6px; align-items: center; font-size: 12px; margin-top: 6px; color: var(--dim); }
+  .inside { display: grid; grid-template-columns: 12px 1fr auto; gap: 4px 8px; align-items: center; font-size: 12px; }
+  .inside i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: block; transition: background .15s, box-shadow .15s; }
+  .inside i.on { background: var(--ok); }
+  .inside i.tx { background: var(--radio); box-shadow: 0 0 6px var(--radio); }
+  .inside i.hot { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
+  .inside i.bad { background: var(--alarm); box-shadow: 0 0 6px var(--alarm); }
+  .inside span:nth-child(3n+2) { color: var(--ink); cursor: pointer; }
+  .inside span:nth-child(3n+2):hover { text-decoration: underline; }
+  .inside span:nth-child(3n) { color: var(--dim); text-align: right; }
+  .msg { border: 1px solid var(--line); background: var(--well); margin-top: 6px; }
+  .msg .hd { display: flex; justify-content: space-between; padding: 4px 8px; font-size: 12px; border-bottom: 1px solid var(--line); }
+  .msg pre { margin: 0; padding: 6px 8px; font: 11px/1.4 'IBM Plex Mono', ui-monospace, monospace; white-space: pre-wrap; word-break: break-all; color: var(--dim); max-height: 200px; overflow: auto; }
+  .tag { display: inline-block; font-size: 10px; font-weight: 600; padding: 0 5px; border-radius: 2px; border: 1px solid var(--line-2); margin-left: 3px; color: var(--dim); }
+  .tag.lora { border-color: var(--radio); color: var(--radio); }
+
+  /* parts */
+  table.bom { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.bom td { padding: 3px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.bom td.n { text-align: right; white-space: nowrap; }
+  table.bom tr.g td { font-weight: 600; color: var(--dim); padding-top: 10px; border-bottom: 1px solid var(--line-2); }
+  table.bom tr.p { cursor: pointer; }
+  table.bom tr.p:hover td { background: var(--well); }
+  table.bom tr.p.on td { background: var(--sel); color: #fff; }
+  table.bom tr.p.on .pr { border-color: #fff; color: #fff; }
+  table.bom tr.t td { font-weight: 600; border-bottom: 0; padding-top: 8px; }
+  .pr { display: inline-block; font-size: 10px; padding: 0 4px; border: 1px solid var(--line-2); border-radius: 2px; color: var(--dim); margin-left: 3px; }
+  .dl a { display: block; font-size: 12px; margin-top: 3px; }
+
+  @media (max-width: 900px) {
+    body { overflow: auto; }
+    #app { grid-template-columns: 1fr; grid-template-rows: auto 64vh auto auto auto; height: auto; }
+    header { gap: 8px 10px; padding: 8px 10px; flex-wrap: wrap; white-space: normal; }
+    .hstat { display: none; }
+    main { grid-row: 2; }
+    footer { grid-row: 3; padding: 10px 16px; flex-wrap: wrap; }
+    aside#left { grid-row: 4; border-right: 0; border-top: 1px solid var(--line); }
+    aside#right { grid-row: 5; border-left: 0; border-top: 1px solid var(--line); }
+    #hint { display: none; }
+  }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body data-mode="live">
+<div id="app">
+  <header>
+    <div class="brand"><a href="../../">Hollow Twin</a> / Family watch</div>
+    <span class="pill warn" title="The software on the screen is the real watch, talking to the API. The case is a CAD design: the working hardware prototypes are the phone watch and the Arduino watch.">Real software, CAD case</span>
+    <div class="tabs">
+      <button id="tab-live" class="on">Wear it</button>
+      <button id="tab-parts">Parts</button>
+    </div>
+    <div class="spacer"></div>
+    <span class="hstat"><a href="../">Phone watch</a> · <a href="../../scout/">Scout rover</a></span>
+    <span class="hstat">Device <b id="h-dev">watch-0071</b></span>
+    <span class="hstat" id="h-api">API <b>local</b></span>
+  </header>
+
+  <aside id="left">
+    <div class="mode-only m-live">
+      <h3>The buttons</h3>
+      <div class="row">
+        <button class="big okb" id="b-ok" title="Shortcut: O">I'M OK</button>
+        <button class="big helpb" id="b-help" title="Hold for 1.5 seconds. Shortcut: hold H">HELP <small>(hold)</small></button>
+      </div>
+      <div class="row" style="margin-top:4px">
+        <button class="big morseb" id="b-morse" title="Tap for a dot, hold for a dash. Shortcut: Space">Morse key</button>
+        <button id="b-msend" title="Shortcut: Enter">Send Morse</button>
+      </div>
+      <p class="note">Or press the real ones on the watch: <b style="color:#3F9A57">green</b> at 2 o'clock, <b style="color:var(--alarm)">red</b> at 4 o'clock (hold), <b style="color:var(--radio)">blue</b> at 9 o'clock. The screen takes taps too.</p>
+
+      <h3>The network</h3>
+      <div class="row"><button id="b-net" class="on">Network up</button><button id="b-cut" class="cutb">Cut it</button></div>
+      <p class="note" id="net-note">Up: the watch talks to the relay box over Bluetooth and to the API over Wi-Fi.</p>
+
+      <h3>The wearer <small>simulated body</small></h3>
+      <div class="row" id="presets">
+        <button data-p="rest" class="on">Resting</button><button data-p="work">Working</button><button data-p="sick">Lung sickness</button>
+      </div>
+      <div class="row" style="margin-top:4px"><button id="b-fall">Fall</button></div>
+      <div class="slider"><label for="hr">Heart rate</label><output id="o-hr"></output><input id="hr" type="range" min="40" max="180" value="72"></div>
+      <div class="slider"><label for="spo2">Blood oxygen</label><output id="o-spo2"></output><input id="spo2" type="range" min="80" max="100" value="98"></div>
+      <div class="slider"><label for="temp">Skin temperature</label><output id="o-temp"></output><input id="temp" type="range" min="34" max="41" step="0.1" value="36.6"></div>
+      <label class="chk"><input type="checkbox" id="c-vitals" checked> Send vitals to the API every 30 s</label>
+      <p class="note" id="vitals-note"></p>
+
+      <h3>Connect</h3>
+      <input type="text" id="api" placeholder="API address, e.g. https://… (empty = local mode)" autocomplete="off" spellcheck="false">
+      <input type="password" id="key" placeholder="API key (for sending)" autocomplete="off" style="margin-top:4px">
+      <div class="row" style="margin-top:4px"><button id="b-connect">Connect</button><button id="b-local">Local mode</button></div>
+      <p class="note">Local mode needs nothing: the family answers on its own. Connected, everything goes to the team's API and shows in the <a href="../../" target="hollow-twin">twin</a>.</p>
+    </div>
+
+    <div class="mode-only m-parts">
+      <h3>View</h3>
+      <div class="slider"><label for="explode">Pull apart</label><output id="o-explode">0%</output><input id="explode" type="range" min="0" max="1" step="0.01" value="0"></div>
+      <label class="chk"><input type="checkbox" id="c-xray"> See inside the case</label>
+      <label class="chk"><input type="checkbox" id="c-strap" checked> Strap</label>
+      <label class="chk"><input type="checkbox" id="c-edges" checked> CAD edges</label>
+      <label class="chk"><input type="checkbox" id="c-turn" checked> Turn slowly</label>
+      <h3>The watch</h3>
+      <div class="kv" id="spec"></div>
+      <p class="note">Battery life comes from typical datasheet currents. It is an estimate for a design, not a measurement.</p>
+      <h3>Files</h3>
+      <div class="dl">
+        <a href="cad/watch.step" download>watch.step <small>(whole watch, any CAD program)</small></a>
+        <a href="cad/watch.json" download>watch.json <small>(what this page reads)</small></a>
+      </div>
+      <p class="note">Both come from one script, <code>firmware/watch/cad/watch.py</code> (CadQuery), the same way as the scout rover.</p>
+    </div>
+  </aside>
+
+  <main id="view">
+    <div id="loading">Loading the CAD model…</div>
+    <div id="hint"></div>
+    <div id="views"><button data-v="front" class="on">Front</button><button data-v="side">Side</button><button data-v="back">Back</button><button data-v="wrist">On the wrist</button></div>
+    <div id="css"></div>
+    <div id="scale"></div>
+    <div id="tip"></div>
+  </main>
+
+  <aside id="right">
+    <div class="mode-only m-live">
+      <h3>Inside, right now <small>click a part to see it</small></h3>
+      <div class="inside" id="inside"></div>
+      <h3>Battery</h3>
+      <div class="kv" id="batt"></div>
+      <h3>Last message out <small id="msg-n"></small></h3>
+      <div id="msgs"><p class="note" style="margin-top:0">Nothing yet. Press a button.</p></div>
+    </div>
+    <div class="mode-only m-parts">
+      <h3>Parts list <small>click a row to show it</small></h3>
+      <table class="bom" id="bom"></table>
+      <p class="note"><span class="pr">P7</span> and so on: the HackFest problem the part helps answer. Masses: from the CAD volume and the material for made parts, typical catalogue figures for bought ones. Costs: typical prices for one watch, not quotes.</p>
+    </div>
+  </aside>
+
+  <footer>
+    <div id="caption">Loading…</div>
+    <div id="clock"></div>
+  </footer>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
+import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
+
+const $ = id => document.getElementById(id);
+const Q = new URLSearchParams(location.search);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (v, d = 0) => (+v || 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+};
+const setCaption = html => { $('caption').innerHTML = html; };
+
+// ------------------------------------------------------------------ renderer, all in millimetres
+const view = $('view');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+view.prepend(renderer.domElement);
+const css = new CSS3DRenderer({ element: $('css') });
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0e0f10);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+const camera = new THREE.PerspectiveCamera(28, 1, 1, 3000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.minDistance = 45; controls.maxDistance = 600;
+const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(80, 120, 160); scene.add(key);
+const rim = new THREE.DirectionalLight(0x9fb8d6, 0.7); rim.position.set(-120, -40, -80); scene.add(rim);
+
+const watch = new THREE.Group(); scene.add(watch);     // CAD frame: X 3 o'clock, Y 12 o'clock, Z out of the screen
+const ppgLight = new THREE.PointLight(0xff2a2a, 0, 40, 2); ppgLight.position.set(0, 0, -3); watch.add(ppgLight);
+
+// ------------------------------------------------------------------ the CAD model
+const FINISH = {
+  paint: { metalness: 0.2, roughness: 0.45 }, metal: { metalness: 0.9, roughness: 0.32 }, plastic: { metalness: 0, roughness: 0.6 },
+  rubber: { metalness: 0, roughness: 0.92 }, glass: { metalness: 0.6, roughness: 0.06 }, glow: { metalness: 0.5, roughness: 0.4 },
+};
+const spec = await (await fetch('cad/watch.json')).json();
+const bomById = Object.fromEntries(spec.bom.map(b => [b.id, b]));
+const loader = new STLLoader(), geos = {};
+await Promise.all([...new Set(spec.parts.map(p => p.mesh))].map(async f => { geos[f] = toCreasedNormals(await loader.loadAsync('cad/' + f), 0.5); }));
+const meshes = [], byBom = {}, edgeMat = new THREE.LineBasicMaterial({ color: 0x0b0c0d, transparent: true, opacity: 0.35 });
+for (const p of spec.parts) {
+  const f = FINISH[p.finish] || FINISH.plastic;
+  const mat = new THREE.MeshStandardMaterial({ color: p.color, metalness: f.metalness, roughness: f.roughness, emissive: 0x000000 });
+  if (p.bom === 'glass') { mat.transparent = true; mat.opacity = 0.18; mat.depthWrite = false; }
+  const m = new THREE.Mesh(geos[p.mesh], mat);
+  m.userData = { bom: p.bom, mesh: p.mesh, ex: new THREE.Vector3(...p.explode), glass: p.bom === 'glass', baseEmissive: 0 };
+  const e = new THREE.LineSegments(new THREE.EdgesGeometry(geos[p.mesh], 30), edgeMat); e.raycast = () => {};
+  m.add(e);
+  watch.add(m); meshes.push(m); (byBom[p.bom] ||= []).push(m);
+}
+const S = spec.size;
+$('loading').remove();
+
+// the real watch software on the screen: the phone watch page in embed mode
+const FACE_PX = 360;
+const frame = document.createElement('iframe');
+frame.width = FACE_PX; frame.height = FACE_PX; frame.title = 'Watch screen'; frame.allow = 'autoplay; vibrate';
+const screenObj = new CSS3DObject(frame);
+screenObj.scale.setScalar(2 * S.active_r / FACE_PX);
+const SCREEN_Z = S.screen_z + 0.25;
+screenObj.position.set(0, 0, SCREEN_Z);
+watch.add(screenObj);
+const glowScreen = new THREE.Mesh(new THREE.CircleGeometry(S.active_r, 64), new THREE.MeshBasicMaterial({ color: 0x0d1117 }));
+glowScreen.position.z = S.screen_z + 0.05; glowScreen.raycast = () => {}; watch.add(glowScreen);
+const mask = new THREE.Mesh(new THREE.RingGeometry(S.active_r, 18.45, 96), new THREE.MeshStandardMaterial({ color: 0x050607, roughness: 0.35, metalness: 0.2 }));
+mask.position.z = S.glass_z - 0.75; mask.raycast = () => {}; watch.add(mask);
+
+// ------------------------------------------------------------------ talking to the watch software
+const W = { cut: false, queue: 0, api: '', device: 'watch-0071', name: 'Maya', block: 'l7-chalk-cut', reachable: null };
+const toWatch = m => { try { frame.contentWindow.postMessage({ hollowHw: 1, ...m }, location.origin); } catch (e) {} };
+let apiAddr = (Q.get('api') || store.get('hollow.api', '') || '').replace(/\/+$/, '');
+let apiKey = Q.get('key') || store.get('hollow.watch.device.key', '');
+$('api').value = apiAddr; $('key').value = apiKey;
+const src = new URL('../', location.href);
+src.searchParams.set('embed', '1');
+src.searchParams.set('device', Q.get('device') || 'watch-0071');
+if (apiAddr) src.searchParams.set('api', apiAddr);
+frame.src = src.toString();
+frame.addEventListener('load', () => { toWatch({ type: 'config', api: apiAddr, key: apiKey }); toWatch({ type: 'hello' }); });
+
+const fx = { tx: 0, txRadio: 'wifi', rings: [], shake: 0, shakeUntil: 0, motorUntil: 0, beepUntil: 0, tone: false, sends: 0 };
+window.addEventListener('message', e => {
+  if (e.origin !== location.origin || !e.data || !e.data.hollowWatch) return;
+  const m = e.data, now = performance.now();
+  if (m.type === 'state') {
+    Object.assign(W, m);
+    $('h-dev').textContent = W.device;
+    $('h-api').innerHTML = `API <b>${W.api ? (W.reachable === false ? 'not reachable' : 'connected') : 'local'}</b>`;
+    setNet(W.cut, false);
+  } else if (m.type === 'tx') {
+    fx.tx = now; fx.txRadio = m.radio; fx.sends++;
+    addRing(m.radio);
+    showMsg(m.msg, m.radio, m.count);
+    const st = (m.msg && m.msg.values && m.msg.values.status) || '';
+    const what = st === 'ok' ? "I'M OK" : st === 'help' ? 'a help call' : st.startsWith('morse:') ? `Morse “${esc(st.slice(6))}”` : st.startsWith('msg:') ? `“${esc(st.slice(4))}”` : esc(m.msg.kind);
+    setCaption(m.radio === 'lora'
+      ? `<b>LoRa radio:</b> ${what} went out by radio to the relay box in ${esc(blockName(W.block))}, which passes it on. The Directorate's network is down; this radio isn't on it.`
+      : `<b>Sent:</b> ${what}, over Wi-Fi to the API. The family's watches and the twin have it.`);
+  } else if (m.type === 'vibrate') {
+    const total = (Array.isArray(m.pattern) ? m.pattern : [m.pattern]).reduce((a, b) => a + (+b || 0), 0);
+    fx.motorUntil = Math.max(fx.motorUntil, now + Math.min(total, 4000));
+  } else if (m.type === 'beep') {
+    fx.beepUntil = Math.max(fx.beepUntil, now + m.ms);
+  } else if (m.type === 'tone') {
+    fx.tone = m.on;
+  } else if (m.type === 'alert') {
+    setCaption(`<b>On the wrist:</b> ${esc(m.lvl)}: ${esc(m.txt)}. The vibration motor buzzes it into the wrist${m.cls !== 'info' ? ' and the buzzer beeps' : ''}.`);
+  }
+});
+const blockName = b => (b || '').split('-').slice(1).map(w => w[0].toUpperCase() + w.slice(1)).join(' ') || 'this block';
+
+function showMsg(msg, radio, count) {
+  if (!msg) return;
+  $('msg-n').textContent = `${fx.sends} sent`;
+  const out = { ...msg };
+  $('msgs').innerHTML = `<div class="msg"><div class="hd"><span>${esc(msg.kind)}${count > 1 ? ` + ${count - 1} more` : ''}<span class="tag ${radio}">${radio === 'lora' ? 'LoRa radio' : 'Wi-Fi'}</span></span><span>${new Date(msg.time).toLocaleTimeString()}</span></div><pre>${esc(JSON.stringify(out, null, 1))}</pre></div>`;
+}
+
+// ------------------------------------------------------------------ physical buttons
+const BTN = { ok: 'btn_ok', help: 'btn_help', morse: 'btn_morse' };
+const pressed = {};
+function pressVisual(which, on) {
+  pressed[which] = on;
+  const b = { ok: $('b-ok'), help: $('b-help'), morse: $('b-morse') }[which];
+  if (b) b.classList.toggle('down', on);
+}
+let helpTimer = null, helpStart = 0;
+function down(which) {
+  if (pressed[which]) return;
+  pressVisual(which, true);
+  if (which === 'ok') { toWatch({ type: 'button', which: 'ok' }); setTimeout(() => pressVisual('ok', false), 180); }
+  if (which === 'help') {
+    helpStart = performance.now();
+    setCaption('<b>HELP:</b> keep holding… (1.5 seconds, so a knock against a wall can\'t call for help)');
+    helpTimer = setTimeout(() => { helpTimer = null; toWatch({ type: 'button', which: 'help' }); setCaption('<b>HELP sent.</b> The family is told, and the call joins the rescue queue with this watch\'s latest vitals.'); }, 1500);
+  }
+  if (which === 'morse') toWatch({ type: 'morse-down' });
+}
+function up(which) {
+  if (!pressed[which]) return;
+  pressVisual(which, false);
+  if (which === 'help' && helpTimer) {
+    clearTimeout(helpTimer); helpTimer = null;
+    if (performance.now() - helpStart >= 1500) { toWatch({ type: 'button', which: 'help' }); setCaption('<b>HELP sent.</b> The family is told, and the call joins the rescue queue with this watch\'s latest vitals.'); }
+    else setCaption('Let go too soon: HELP needs a 1.5 second hold.');
+  }
+  if (which === 'morse') toWatch({ type: 'morse-up' });
+}
+for (const [which, id] of [['ok', 'b-ok'], ['help', 'b-help'], ['morse', 'b-morse']]) {
+  $(id).addEventListener('pointerdown', e => { e.preventDefault(); down(which); });
+  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) $(id).addEventListener(ev, () => up(which));
+}
+$('b-msend').onclick = () => toWatch({ type: 'morse-send' });
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.repeat) return;
+  if (e.key === 'o' || e.key === 'O') down('ok');
+  else if (e.key === 'h' || e.key === 'H') down('help');
+  else if (e.key === ' ') { e.preventDefault(); down('morse'); }
+  else if (e.key === 'Enter') toWatch({ type: 'morse-send' });
+});
+addEventListener('keyup', e => {
+  if (e.key === 'h' || e.key === 'H') up('help');
+  else if (e.key === ' ') up('morse');
+});
+
+// ------------------------------------------------------------------ network
+function setNet(isCut, tell = true) {
+  W.cut = isCut;
+  $('b-cut').classList.toggle('on', isCut); $('b-net').classList.toggle('on', !isCut);
+  $('net-note').innerHTML = isCut
+    ? '<b>Cut.</b> Wi-Fi and the phone network are down. The watch sends by <b>LoRa radio</b> to its block\'s relay box, which passes it relay to relay to one that still has a line out.'
+    : 'Up: the watch talks to the relay box over Bluetooth and to the API over Wi-Fi.';
+  if (tell) toWatch({ type: 'cut', on: isCut });
+}
+$('b-cut').onclick = () => { setNet(true); setCaption('<b>The Directorate cut the network.</b> Press a button: it still gets out, by radio.'); };
+$('b-net').onclick = () => { setNet(false); setCaption('Network back. Anything held goes out with its original time.'); };
+
+// ------------------------------------------------------------------ the wearer's body (simulated) and vitals
+const PRESET = { rest: [72, 98, 36.6], work: [128, 96, 37.3], sick: [112, 89, 38.6] };
+function vitals() { return { hr_bpm: +$('hr').value, spo2_pct: +$('spo2').value, temp_c: +(+$('temp').value).toFixed(1) }; }
+function paintVitals() {
+  const v = vitals();
+  $('o-hr').innerHTML = `<span class="${v.hr_bpm > 120 || v.hr_bpm < 50 ? 's1' : ''}">${v.hr_bpm} bpm</span>`;
+  $('o-spo2').innerHTML = `<span class="${v.spo2_pct < 90 ? 's2' : v.spo2_pct < 94 ? 's1' : ''}">${v.spo2_pct} %</span>`;
+  $('o-temp').innerHTML = `<span class="${v.temp_c >= 38 ? 's1' : ''}">${v.temp_c.toFixed(1)} °C</span>`;
+}
+for (const id of ['hr', 'spo2', 'temp']) $(id).oninput = () => { document.querySelectorAll('#presets button').forEach(b => b.classList.remove('on')); paintVitals(); };
+document.querySelectorAll('#presets button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#presets button').forEach(x => x.classList.toggle('on', x === b));
+  const [h, s, t] = PRESET[b.dataset.p]; $('hr').value = h; $('spo2').value = s; $('temp').value = t; paintVitals();
+  if (b.dataset.p === 'sick') setCaption('<b>Lung sickness:</b> low blood oxygen and a fever. The vitals go to the API, which puts this wearer\'s help call higher in the queue and adds them to the outbreak map.');
+  sendVitals();
+});
+let fallAt = -1e9;
+$('b-fall').onclick = () => { fallAt = performance.now(); toWatch({ type: 'fall' }); setCaption('<b>Fall:</b> the motion sensor felt a hard jolt and then no movement. The watch asks if you are OK. No answer in 15 seconds and it calls for help by itself.'); };
+
+let vcount = 0, lastVitals = 0;
+async function sendVitals() {
+  lastVitals = performance.now();
+  if (!W.api) { $('vitals-note').textContent = 'Local mode: vitals stay on the watch. Connect the API to send them.'; return; }
+  if (!$('c-vitals').checked) { $('vitals-note').textContent = 'Not sending vitals.'; return; }
+  const msg = { id: `${W.device}-9${String((Date.now() % 1e8) + vcount++).padStart(8, '0')}`, device: W.device, block: W.block, time: new Date().toISOString(),
+    kind: 'vitals', values: vitals(), hops: W.cut ? 1 : 0, via: W.cut ? [`relay-${W.block}`] : [], source: 'simulated' };
+  try {
+    const h = { 'Content-Type': 'application/json' }; if (apiKey) h['x-api-key'] = apiKey;
+    const r = await fetch(W.api + '/ingest', { method: 'POST', headers: h, body: JSON.stringify(msg) });
+    $('vitals-note').innerHTML = r.ok ? `Sent ${new Date().toLocaleTimeString()} <span class="tag">source: simulated</span>` : `The API said ${r.status}${r.status === 401 ? ': it needs the API key' : ''}.`;
+    if (r.ok) { fx.tx = performance.now(); fx.txRadio = W.cut ? 'lora' : 'wifi'; addRing(fx.txRadio, 0.5); showMsg(msg, fx.txRadio, 1); }
+  } catch (e) { $('vitals-note').textContent = 'Could not reach the API.'; }
+}
+setInterval(() => { if (performance.now() - lastVitals > 30000) sendVitals(); }, 2000);
+$('c-vitals').onchange = sendVitals;
+
+// ------------------------------------------------------------------ connect
+$('b-connect').onclick = () => {
+  apiAddr = $('api').value.trim().replace(/\/+$/, ''); apiKey = $('key').value.trim();
+  store.set('hollow.api', apiAddr); store.set('hollow.watch.device.key', apiKey);
+  toWatch({ type: 'config', api: apiAddr, key: apiKey });
+  setCaption(apiAddr ? `Connecting to ${esc(apiAddr)}…` : 'Local mode.');
+  setTimeout(sendVitals, 1500);
+};
+$('b-local').onclick = () => { $('api').value = ''; $('b-connect').click(); };
+
+// ------------------------------------------------------------------ what is working inside
+const INSIDE = [
+  ['display', 'Screen', () => 'on'],
+  ['esp32', 'ESP32-S3', () => W.cut ? 'Bluetooth to relay' : 'Wi-Fi + Bluetooth'],
+  ['lora', 'LoRa radio', () => performance.now() - fx.tx < 900 && fx.txRadio === 'lora' ? 'sending' : W.cut ? 'listening' : 'standby'],
+  ['ppg', 'Heart and oxygen', () => `${vitals().hr_bpm} bpm · ${vitals().spo2_pct} %`],
+  ['temp', 'Skin temperature', () => `${vitals().temp_c.toFixed(1)} °C`],
+  ['imu', 'Motion sensor', () => performance.now() - fallAt < 15000 ? 'fall!' : 'steady'],
+  ['motor', 'Vibration motor', () => performance.now() < fx.motorUntil ? 'buzzing' : 'off'],
+  ['buzzer', 'Buzzer', () => performance.now() < fx.beepUntil || fx.tone ? 'beeping' : 'off'],
+  ['battery', 'Battery', () => `${battery().pct} %`],
+];
+$('inside').innerHTML = INSIDE.map(([id, name]) => `<i id="in-${id}"></i><span data-id="${id}">${name}</span><span id="iv-${id}"></span>`).join('');
+$('inside').onclick = e => { const id = e.target.dataset && e.target.dataset.id; if (id) { $('tab-parts').click(); setFocus(id); } };
+function paintInside() {
+  const now = performance.now(), v = vitals();
+  for (const [id, , f] of INSIDE) {
+    $('iv-' + id).textContent = f();
+    let c = 'on';
+    if (id === 'lora') c = now - fx.tx < 900 && fx.txRadio === 'lora' ? 'tx' : W.cut ? 'on' : '';
+    if (id === 'esp32') c = now - fx.tx < 900 && fx.txRadio === 'wifi' ? 'tx' : 'on';
+    if (id === 'ppg') c = v.spo2_pct < 90 ? 'bad' : v.spo2_pct < 94 || v.hr_bpm > 120 ? 'hot' : 'on';
+    if (id === 'temp') c = v.temp_c >= 38 ? 'hot' : 'on';
+    if (id === 'imu') c = now - fallAt < 15000 ? 'bad' : 'on';
+    if (id === 'motor') c = now < fx.motorUntil ? 'hot' : '';
+    if (id === 'buzzer') c = now < fx.beepUntil || fx.tone ? 'hot' : '';
+    $('in-' + id).className = c;
+  }
+}
+function battery() {
+  const P = spec.power;
+  // average draw: asleep most of the time, screen on 4 %, Bluetooth 2 %, the heart sensor 10 %, LoRa listening 1 % (more when cut)
+  const ma = P.sleep_ma + 0.04 * P.screen_on_ma + 0.02 * P.ble_ma + 0.10 * P.ppg_ma + (W.cut ? 0.05 : 0.01) * P.lora_rx_ma + (W.cut ? 0.002 : 0.0005) * P.lora_tx_ma;
+  const pct = 86;
+  return { ma, pct, days: P.battery_mah * pct / 100 / ma / 24 };
+}
+function paintBattery() {
+  const b = battery();
+  $('batt').innerHTML = `<span>Charge</span><span>${b.pct} %</span><span>Average draw</span><span>${fmt(b.ma, 2)} mA</span><span>Left at this rate</span><span>about ${fmt(b.days, 1)} days</span>` +
+    `<span>Radio</span><span>${W.cut ? 'LoRa, listening more' : 'Wi-Fi and Bluetooth'}</span>`;
+}
+
+// ------------------------------------------------------------------ 3D effects: radio rings, motor, buzzer, heart light
+const ringGeo = new THREE.RingGeometry(0.96, 1, 96);
+function addRing(radio, strength = 1) {
+  for (let k = 0; k < (radio === 'lora' ? 3 : 1); k++) {
+    const m = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: radio === 'lora' ? 0x4b8fe0 : 0xc9cbc6, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
+    m.position.z = 6; m.raycast = () => {}; watch.add(m);
+    fx.rings.push({ m, t0: performance.now() + k * 260, life: radio === 'lora' ? 1600 : 900, max: radio === 'lora' ? 140 : 70, strength });
+  }
+}
+function glow(bom, color, v) {
+  for (const m of byBom[bom] || []) { m.material.emissive.set(color); m.material.emissiveIntensity = v; }
+}
+
+// ------------------------------------------------------------------ camera views
+const VIEWS = {
+  front: { pos: [0, -38, 150], at: [0, 0, 6] },
+  side: { pos: [205, 30, 70], at: [0, 0, 4] },
+  back: { pos: [10, -30, -140], at: [0, 0, 2] },
+  wrist: { pos: [-95, 120, 105], at: [0, -6, -18] },
+};
+let flyTo = null, viewName = 'front';
+function setView(name) {
+  viewName = name; if (typeof applyLook === 'function' && meshes.length) applyLook();
+  document.querySelectorAll('#views button').forEach(b => b.classList.toggle('on', b.dataset.v === name));
+  const v = VIEWS[name]; flyTo = { pos: new THREE.Vector3(...v.pos), at: new THREE.Vector3(...v.at), t: 0 };
+  if (name === 'back') setCaption('<b>The back:</b> the sapphire window over the heart-rate and oxygen sensor (it glows red at the heart rate), the skin temperature sensor, and two gold pads to charge from a relay box\'s dock.');
+}
+document.querySelectorAll('#views button').forEach(b => b.onclick = () => setView(b.dataset.v));
+camera.position.set(...VIEWS.front.pos); controls.target.set(...VIEWS.front.at);
+
+// ------------------------------------------------------------------ parts view
+let mode = 'live', focus = null, explode = 0;
+const STRAP = new Set(['strap']);
+function buildBom() {
+  let html = '', group = '';
+  for (const b of spec.bom) {
+    if (b.group !== group) { group = b.group; html += `<tr class="g"><td colspan="3">${esc(group)}</td></tr>`; }
+    html += `<tr class="p" data-id="${b.id}"><td>${esc(b.name)}${(b.solves || []).map(n => `<span class="pr">P${n}</span>`).join('')}</td><td class="n">${fmt(b.mass_g, b.mass_g < 10 ? 1 : 0)} g</td><td class="n">$${fmt(b.cost_usd, b.cost_usd % 1 ? 2 : 0)}</td></tr>`;
+  }
+  html += `<tr class="t"><td>${spec.bom.length} lines, ${spec.parts.length} parts</td><td class="n">${fmt(spec.mass_g, 1)} g</td><td class="n">$${fmt(spec.cost_usd)}</td></tr>`;
+  $('bom').innerHTML = html;
+  const b = battery();
+  $('spec').innerHTML = [
+    ['Case', `${S.across} mm across, ${S.thick} mm thick`], ['Lug to lug', `${S.lug_to_lug} mm`], ['Screen', `1.28 in round, ${S.display_px} x ${S.display_px}`],
+    ['Weight', `${fmt(spec.mass_body_g, 0)} g, ${fmt(spec.mass_g, 0)} g with the strap`], ['Radios', 'LoRa 915 MHz, Bluetooth LE, Wi-Fi'],
+    ['Sensors', 'heart rate, blood oxygen, skin temperature, motion'], ['Battery', `${spec.power.battery_mah} mAh, about ${fmt(b.days, 0)} days`], ['Parts', `about $${fmt(spec.cost_usd)} for one`],
+  ].map(([k, v]) => `<span>${k}</span><span>${v}</span>`).join('');
+}
+buildBom();
+function setFocus(id) {
+  focus = focus === id ? null : id;
+  applyLook();
+  document.querySelectorAll('#bom tr.p').forEach(r => r.classList.toggle('on', r.dataset.id === focus));
+  if (focus) { const b = bomById[focus]; setCaption(`<b>${esc(b.name)}</b>: ${esc(b.what)}. ${esc(b.does)}${(b.solves || []).length ? ` <span class="pr">Problem ${b.solves.join(', ')}</span>` : ''}`); }
+  else partsCaption();
+}
+function applyLook() {
+  const xray = mode === 'parts' && $('c-xray').checked, shell = new Set(['case', 'bezel', 'glass', 'back', 'strap', 'window', 'display']);
+  const strapOn = viewName !== 'back' && (mode === 'live' || $('c-strap').checked), edges = mode === 'parts' && $('c-edges').checked;
+  for (const m of meshes) {
+    const b = m.userData.bom;
+    m.visible = STRAP.has(b) ? strapOn : true;
+    const ghost = focus ? b !== focus : xray && shell.has(b);
+    m.material.transparent = ghost || m.userData.glass; m.material.needsUpdate = true;
+    m.material.opacity = ghost ? (focus ? 0.07 : 0.13) : m.userData.glass ? 0.18 : 1;
+    m.material.depthWrite = !m.material.transparent;
+    m.children[0].visible = edges && !ghost;
+    m.renderOrder = ghost ? 2 : 0;
+  }
+  mask.visible = !focus || focus === 'glass';
+  const screenVisible = !focus || focus === 'display';
+  frame.style.visibility = screenVisible ? '' : 'hidden';
+  glowScreen.visible = screenVisible;
+}
+const partsCaption = () => setCaption(`${spec.parts.length} parts from the CAD file. Hover a part to name it, click it or a row in the list to see it alone. The screen still runs the watch.`);
+$('bom').addEventListener('click', e => { const r = e.target.closest('tr.p'); if (r) setFocus(r.dataset.id); });
+$('explode').oninput = e => { explode = +e.target.value; $('o-explode').textContent = `${Math.round(explode * 100)}%`; };
+for (const id of ['c-xray', 'c-strap', 'c-edges']) $(id).onchange = applyLook;
+
+function enter(m) {
+  mode = m; document.body.dataset.mode = m;
+  $('tab-live').classList.toggle('on', m === 'live'); $('tab-parts').classList.toggle('on', m === 'parts');
+  if (m === 'live') { focus = null; explode = 0; $('explode').value = 0; $('o-explode').textContent = '0%'; setView('front'); setCaption(liveCaption()); }
+  else { setView('side'); explode = +$('explode').value || 0.55; $('explode').value = explode; $('o-explode').textContent = `${Math.round(explode * 100)}%`; partsCaption(); }
+  document.querySelectorAll('#bom tr.p').forEach(r => r.classList.toggle('on', r.dataset.id === focus));
+  applyLook(); hint();
+}
+const liveCaption = () => 'This is the family watch with the real watch software on its screen. Press I\'M OK, hold HELP, or tap the Morse key, then cut the network and do it again.';
+$('tab-live').onclick = () => enter('live');
+$('tab-parts').onclick = () => enter('parts');
+function hint() {
+  $('hint').innerHTML = mode === 'live'
+    ? 'Drag to turn it, scroll to zoom. <b>Click the green, red or blue button</b> on the watch, or tap its screen.'
+    : 'Drag to turn it. Hover a part to name it; click to see it alone.';
+}
+
+// hover and click on parts
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), tip = $('tip');
+function pick(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects(meshes.filter(m => m.visible && !(m.material.transparent && m.material.opacity < 0.5)), false)[0];
+  return hit ? hit.object.userData.bom : null;
+}
+let downAt = null, heldBtn = null;
+renderer.domElement.addEventListener('pointermove', e => {
+  if (e.buttons) { tip.style.display = 'none'; return; }
+  const id = pick(e);
+  const isBtn = id && id.startsWith('btn_');
+  renderer.domElement.style.cursor = isBtn && mode === 'live' ? 'pointer' : '';
+  if (!id) { tip.style.display = 'none'; return; }
+  const b = bomById[id], r = view.getBoundingClientRect();
+  tip.innerHTML = `<b>${esc(b.name)}</b><i>${esc(b.what)}</i>`;
+  tip.style.display = 'block'; tip.style.left = `${e.clientX - r.left + 14}px`; tip.style.top = `${e.clientY - r.top + 14}px`;
+});
+renderer.domElement.addEventListener('pointerleave', () => { tip.style.display = 'none'; });
+renderer.domElement.addEventListener('pointerdown', e => {
+  downAt = [e.clientX, e.clientY];
+  const id = pick(e);
+  if (mode === 'live' && id && id.startsWith('btn_')) {
+    const which = id.slice(4); heldBtn = which; controls.enabled = false; down(which);
+  }
+});
+addEventListener('pointerup', e => {
+  if (heldBtn) { up(heldBtn); heldBtn = null; controls.enabled = true; return; }
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 4) { downAt = null; return; }
+  downAt = null;
+  if (mode !== 'parts' || e.target !== renderer.domElement) return;
+  const id = pick(e); if (id || focus) setFocus(id || focus);
+});
+
+// ------------------------------------------------------------------ resize and frame loop
+function resize() {
+  const w = view.clientWidth, h = view.clientHeight;
+  renderer.setSize(w, h, false); css.setSize(w, h);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+  // scale bar: how many millimetres 100 px is at the watch
+  const mmPer100 = 100 * 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.position.distanceTo(controls.target) / h;
+  $('scale').textContent = `100 px ≈ ${fmt(mmPer100, 0)} mm`;
+}
+addEventListener('resize', resize); resize();
+
+const clock = new THREE.Clock(), tmpN = new THREE.Vector3(), tmpC = new THREE.Vector3();
+let shown = explode;
+function frameLoop() {
+  const dt = Math.min(clock.getDelta(), 0.05), now = performance.now();
+  if (flyTo) {
+    flyTo.t = Math.min(1, flyTo.t + dt * 1.6); const k = flyTo.t * flyTo.t * (3 - 2 * flyTo.t);
+    camera.position.lerp(flyTo.pos, k * 0.25); controls.target.lerp(flyTo.at, k * 0.25);
+    if (flyTo.t >= 1 && camera.position.distanceTo(flyTo.pos) < 0.5) flyTo = null;
+  }
+  if (mode === 'parts' && $('c-turn').checked && !flyTo && !focus) watch.rotation.y += dt * 0.18;
+  else watch.rotation.y += (0 - watch.rotation.y) * Math.min(1, dt * 4);
+
+  // pull apart, smoothly
+  shown += (explode - shown) * Math.min(1, dt * 8);
+  for (const m of meshes) m.position.copy(m.userData.ex).multiplyScalar(shown);
+  const dz = (spec.parts.find(p => p.bom === 'display').explode[2]) * shown;
+  screenObj.position.z = SCREEN_Z + dz; glowScreen.position.z = S.screen_z + 0.05 + dz;
+  mask.position.z = S.glass_z - 0.75 + spec.parts.find(p => p.bom === 'glass').explode[2] * shown;
+
+  // buttons move in while pressed
+  for (const [which, bom] of Object.entries(BTN)) {
+    const a = THREE.MathUtils.degToRad(spec.buttons[which].angle), d = pressed[which] ? -0.8 : 0;
+    for (const m of byBom[bom] || []) m.position.add(new THREE.Vector3(Math.cos(a) * d, Math.sin(a) * d, 0));
+  }
+
+  // motor: the whole watch trembles a little while it buzzes; the motor glows in x-ray
+  const buzzing = now < fx.motorUntil;
+  watch.position.set(buzzing ? Math.sin(now * 0.9) * 0.35 : 0, buzzing ? Math.cos(now * 1.3) * 0.2 : 0, 0);
+  glow('motor', 0xffa526, buzzing ? 1.2 : 0);
+  glow('buzzer', 0xffa526, now < fx.beepUntil || fx.tone ? 1.4 : 0);
+  // radio: the antenna lights when the LoRa radio sends; the ESP32 can for Wi-Fi
+  const txK = Math.max(0, 1 - (now - fx.tx) / 900);
+  glow('antenna', 0x4b8fe0, fx.txRadio === 'lora' ? 3 * txK + (W.cut ? 0.25 : 0) : 0);
+  glow('lora', 0x4b8fe0, fx.txRadio === 'lora' ? 1.2 * txK : 0);
+  glow('esp32', 0xc9cbc6, fx.txRadio === 'wifi' ? 0.6 * txK : 0);
+  // the heart sensor's red light, at the heart rate
+  const beat = (now / 1000) * vitals().hr_bpm / 60, pulse = Math.pow(Math.max(0, Math.sin(beat * Math.PI * 2)), 6);
+  ppgLight.intensity = 400 * (0.25 + pulse);
+  glow('window', 0xff2a2a, 0.25 + 0.9 * pulse); glow('ppg', 0xff2a2a, 0.6 + pulse);
+  // fall: a jolt
+  if (now - fallAt < 500) watch.rotation.z = Math.sin((now - fallAt) / 40) * 0.08 * (1 - (now - fallAt) / 500); else watch.rotation.z = 0;
+
+  for (const r of fx.rings.slice()) {
+    const u = (now - r.t0) / r.life;
+    if (u < 0) continue;
+    if (u >= 1) { watch.remove(r.m); r.m.material.dispose(); fx.rings.splice(fx.rings.indexOf(r), 1); continue; }
+    const rad = 26 + (r.max - 26) * u; r.m.scale.setScalar(rad); r.m.material.opacity = (1 - u) * 0.7 * r.strength;
+  }
+
+  // the DOM screen only when it faces the camera
+  tmpN.set(0, 0, 1).transformDirection(watch.matrixWorld);
+  screenObj.getWorldPosition(tmpC);
+  const facing = tmpN.dot(camera.position.clone().sub(tmpC).normalize());
+  screenObj.visible = facing > 0.12 && frame.style.visibility !== 'hidden';
+  frame.style.opacity = clamp((facing - 0.12) * 6, 0, 1);
+
+  controls.update();
+  renderer.render(scene, camera); css.render(scene, camera);
+  $('clock').textContent = new Date().toLocaleTimeString();
+  requestAnimationFrame(frameLoop);
+}
+paintVitals(); paintInside(); paintBattery(); hint(); setCaption(liveCaption());
+setInterval(() => { paintInside(); paintBattery(); }, 250);
+if (Q.get('mode') === 'parts') enter('parts');
+requestAnimationFrame(frameLoop);
+</script>
+</body>
+</html>

@@ -39,5 +39,7 @@ python3 -m http.server 8080        # then open http://localhost:8080
 cp firmware/watch/web/index.html twin/watch/index.html
 ```
 
+The 3D watch is at `/watch/device/` ([`watch/device/`](watch/device/)): the CAD model, with the watch above running on its screen. Its `cad/` folder is written by `firmware/watch/cad/watch.py`.
+
 A new watch uses the API this browser's twin is connected to (`hollow.api`), or `TWIN_API` in the watch file. Once the API is hosted, set `TWIN_API` there as well as `DEFAULT_API` here.
 
