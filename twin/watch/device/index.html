@@ -303,7 +303,7 @@ $('loading').remove();
 // the real watch software on the screen: the phone watch page in embed mode
 const FACE_PX = 360;
 const frame = document.createElement('iframe');
-frame.width = FACE_PX; frame.height = FACE_PX; frame.title = 'Watch screen'; frame.allow = 'autoplay; vibrate';
+frame.width = FACE_PX; frame.height = FACE_PX; frame.title = 'Watch screen'; frame.allow = 'autoplay';
 const screenObj = new CSS3DObject(frame);
 screenObj.scale.setScalar(2 * S.active_r / FACE_PX);
 const SCREEN_Z = S.screen_z + 0.25;
@@ -315,7 +315,7 @@ const mask = new THREE.Mesh(new THREE.RingGeometry(S.active_r, 18.45, 96), new T
 mask.position.z = S.glass_z - 0.75; mask.raycast = () => {}; watch.add(mask);
 
 // ------------------------------------------------------------------ talking to the watch software
-const W = { cut: false, queue: 0, api: '', device: 'watch-0071', name: 'Maya', block: 'l7-chalk-cut', reachable: null };
+const W = { cut: false, queue: 0, api: '', key: '', device: 'watch-0071', name: 'Maya', block: 'l7-chalk-cut', reachable: null };
 const toWatch = m => { try { frame.contentWindow.postMessage({ hollowHw: 1, ...m }, location.origin); } catch (e) {} };
 let apiAddr = (Q.get('api') || store.get('hollow.api', '') || '').replace(/\/+$/, '');
 let apiKey = Q.get('key') || store.get('hollow.watch.device.key', '');
@@ -325,7 +325,12 @@ src.searchParams.set('embed', '1');
 src.searchParams.set('device', Q.get('device') || 'watch-0071');
 if (apiAddr) src.searchParams.set('api', apiAddr);
 frame.src = src.toString();
-frame.addEventListener('load', () => { toWatch({ type: 'config', api: apiAddr, key: apiKey }); toWatch({ type: 'hello' }); });
+// On load, only pass on what this page knows: empty fields would wipe the address and key saved in the watch's own settings.
+frame.addEventListener('load', () => {
+  const c = {}; if (apiAddr) c.api = apiAddr; if (apiKey) c.key = apiKey;
+  if (Object.keys(c).length) toWatch({ type: 'config', ...c });
+  toWatch({ type: 'hello' });
+});
 
 const fx = { tx: 0, txRadio: 'wifi', rings: [], shake: 0, shakeUntil: 0, motorUntil: 0, beepUntil: 0, tone: false, sends: 0 };
 window.addEventListener('message', e => {
@@ -451,7 +456,7 @@ async function sendVitals() {
   const msg = { id: `${W.device}-9${String((Date.now() % 1e8) + vcount++).padStart(8, '0')}`, device: W.device, block: W.block, time: new Date().toISOString(),
     kind: 'vitals', values: vitals(), hops: W.cut ? 1 : 0, via: W.cut ? [`relay-${W.block}`] : [], source: 'simulated' };
   try {
-    const h = { 'Content-Type': 'application/json' }; if (apiKey) h['x-api-key'] = apiKey;
+    const h = { 'Content-Type': 'application/json' }, k = apiKey || W.key; if (k) h['x-api-key'] = k;
     const r = await fetch(W.api + '/ingest', { method: 'POST', headers: h, body: JSON.stringify(msg) });
     $('vitals-note').innerHTML = r.ok ? `Sent ${new Date().toLocaleTimeString()} <span class="tag">source: simulated</span>` : `The API said ${r.status}${r.status === 401 ? ': it needs the API key' : ''}.`;
     if (r.ok) { fx.tx = performance.now(); fx.txRadio = W.cut ? 'lora' : 'wifi'; addRing(fx.txRadio, 0.5); showMsg(msg, fx.txRadio, 1); }

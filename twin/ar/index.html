@@ -245,13 +245,20 @@ $('b-size').onclick = () => { sizeI = (sizeI + 1) % 3; $('b-size').textContent =
 // ---------------- camera
 let stream = null, facing = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'environment' : 'user', landmarker = null, running = false, demo = false;
 async function startCamera() {
-  stopCamera();
+  stopTracks();
   stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
   video.srcObject = stream; await video.play();
   stage.classList.toggle('mirror', facing === 'user');
   layout();
 }
-function stopCamera() { if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; } running = false; }
+function stopTracks() { if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; } }
+function stopCamera() {
+  stopTracks();
+  running = false; demo = false;
+  // back to the start card, so the camera can be opened again
+  $('start').style.display = ''; $('bar').style.display = 'none'; $('prompt').style.display = 'none';
+  $('go').disabled = false; $('go').textContent = 'Open the camera';
+}
 $('b-flip').onclick = async () => { facing = facing === 'user' ? 'environment' : 'user'; try { await startCamera(); running = true; } catch (e) { toast('That camera is not available.'); } };
 
 async function loadTracker() {
@@ -268,14 +275,14 @@ $('go').onclick = async () => {
     await startCamera();
     $('go').textContent = 'Loading hand tracking…';
     landmarker = landmarker || await loadTracker();
-    $('start').style.display = 'none'; $('bar').style.display = 'flex'; $('prompt').style.display = 'block';
+    $('start').style.display = 'none'; $('bar').style.display = 'flex'; $('prompt').style.display = 'block'; $('b-flip').style.display = '';
     loadFrame(); running = true; demo = false;
   } catch (e) {
     $('go').disabled = false; $('go').textContent = 'Open the camera';
     $('start-note').textContent = e && e.name === 'NotAllowedError' ? 'The camera was blocked. Allow it in the browser\'s settings for this site, then try again.' : `Could not start: ${e && e.message ? e.message : e}`;
   }
 };
-$('demo').onclick = e => { e.preventDefault(); demo = true; running = true; loadFrame(); $('start').style.display = 'none'; $('bar').style.display = 'flex'; stage.classList.remove('mirror'); layout(); };
+$('demo').onclick = e => { e.preventDefault(); demo = true; running = true; loadFrame(); $('start').style.display = 'none'; $('bar').style.display = 'flex'; $('b-flip').style.display = 'none'; stage.classList.remove('mirror'); layout(); };
 
 // The stage is the camera picture, scaled to cover the screen. The 3D canvas and the screen layer use the
 // picture's own pixels, so a landmark at (x, y) of the picture lands on the same spot of the 3D view.

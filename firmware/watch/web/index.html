@@ -528,10 +528,12 @@ async function flush() {
     if (r.ok || r.status === 422) {
       const rejected = new Map((body.rejected || []).map(x => [x.id, x.problems]));
       queue = queue.filter(m => !batch.includes(m)); store.set(S('queue'), queue);
-      const first = parse(batch[0].values.status || 'help');
-      const what = first.type === 'safe' ? "you're safe" : first.type === 'help' ? 'you need help' : `“${esc(first.text)}”`;
+      // what the family was told: the first check-in in the batch. A symptom report alone goes to the API, not the family.
+      const said = batch.find(m => m.kind === 'checkin'), first = said ? parse(said.values.status) : null;
+      const what = !first ? '' : first.type === 'safe' ? "you're safe" : first.type === 'help' ? 'you need help' : `“${esc(first.text)}”`;
       hw({ type: 'tx', radio: byRadio ? 'lora' : 'wifi', count: batch.length, msg: batch[0] });
       if (rejected.size) say('<b>Not accepted:</b> ' + esc([...rejected.values()][0].join('; ')));
+      else if (!first) say(`<b>Symptom reported${byRadio ? ' by radio' : ''} ✓</b><br>It counts toward the residents' own sickness numbers.`);
       else if (byRadio) { routeDone = true; drawRoute(3); say(`<b>Sent by radio ✓</b><br>Family knows ${what}.`); }
       else say(`<b>Sent ✓</b> ${hhmm(batch[0].time)}<br>Family knows ${what}.`);
       registerFamily();
@@ -793,7 +795,7 @@ window.addEventListener('message', e => {
   }
   else if (m.type === 'hello') report();
 });
-function report() { hw({ type: 'state', cut, queue: queue.length, api: api(), device: cfg.device, name: cfg.name, block: cfg.block, reachable }); }
+function report() { hw({ type: 'state', cut, queue: queue.length, api: api(), key: cfg.key, device: cfg.device, name: cfg.name, block: cfg.block, reachable }); }
 if (EMBED) setInterval(report, 1000);
 
 window.addEventListener('online', () => { flush(); poll(); });
