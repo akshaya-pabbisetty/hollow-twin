@@ -1,0 +1,531 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-20T12:00:00Z",
+  "title": "Design System: Hollow Twin — Relay Line",
+  "scope": {
+    "covers": [
+      "firmware/watch/web/index.html",
+      "twin/watch/index.html"
+    ],
+    "excludes": [
+      "twin/index.html (older control-room grey system)",
+      "twin/scout/"
+    ]
+  },
+  "extensions": {
+    "colorMeta": {
+      "safety-yellow": {
+        "role": "primary",
+        "displayName": "Safety Yellow",
+        "tonalRamp": [
+          "#150800",
+          "#391F00",
+          "#613800",
+          "#8A5500",
+          "#AE7800",
+          "#D39B00",
+          "#EFC35A",
+          "#FFEBA8"
+        ],
+        "canonical": "#FFC627",
+        "oklch": "oklch(85.4% 0.167 86.3)"
+      },
+      "on-yellow": {
+        "role": "primary",
+        "displayName": "On-Yellow",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ],
+        "canonical": "#141414",
+        "oklch": "oklch(19.1% 0.000 89.9)"
+      },
+      "yellow-wash": {
+        "role": "primary",
+        "displayName": "Yellow Wash",
+        "tonalRamp": [
+          "#150800",
+          "#391F00",
+          "#613800",
+          "#8A5500",
+          "#AE7800",
+          "#D39B00",
+          "#EFC35A",
+          "#FFEBA8"
+        ],
+        "canonical": "rgba(255,198,39,.13)",
+        "note": "13% tint of #FFC627 over graphite"
+      },
+      "signal-green": {
+        "role": "secondary",
+        "displayName": "Signal Green",
+        "tonalRamp": [
+          "#001103",
+          "#003110",
+          "#005421",
+          "#007936",
+          "#009C57",
+          "#3BC179",
+          "#83E1A6",
+          "#C1FFD6"
+        ],
+        "canonical": "#3CC27A",
+        "oklch": "oklch(72.5% 0.156 155.3)"
+      },
+      "signal-red": {
+        "role": "secondary",
+        "displayName": "Signal Red",
+        "tonalRamp": [
+          "#210000",
+          "#520000",
+          "#880000",
+          "#BE0000",
+          "#E7342D",
+          "#FF5F52",
+          "#FF9989",
+          "#FFD0C3"
+        ],
+        "canonical": "#FF4D42",
+        "oklch": "oklch(67.2% 0.216 28.0)"
+      },
+      "red-wash": {
+        "role": "secondary",
+        "displayName": "Red Wash",
+        "tonalRamp": [
+          "#210000",
+          "#520000",
+          "#880000",
+          "#BE0000",
+          "#E7342D",
+          "#FF5F52",
+          "#FF9989",
+          "#FFD0C3"
+        ],
+        "canonical": "rgba(255,77,66,.13)",
+        "note": "13% tint of #FF4D42 over graphite"
+      },
+      "power-amber": {
+        "role": "secondary",
+        "displayName": "Power Amber",
+        "tonalRamp": [
+          "#1A0400",
+          "#431500",
+          "#712900",
+          "#9F4200",
+          "#C56500",
+          "#EC890C",
+          "#FFB56C",
+          "#FFE2B1"
+        ],
+        "canonical": "#FF9A2E",
+        "oklch": "oklch(77.5% 0.164 61.6)"
+      },
+      "graphite-ground": {
+        "role": "neutral",
+        "displayName": "Graphite Ground",
+        "tonalRamp": [
+          "#0B0B0A",
+          "#262524",
+          "#434240",
+          "#62615E",
+          "#83827F",
+          "#A6A5A2",
+          "#CAC9C7",
+          "#EFEEED"
+        ],
+        "canonical": "#11100E",
+        "oklch": "oklch(17.3% 0.004 84.6)"
+      },
+      "graphite-face": {
+        "role": "neutral",
+        "displayName": "Graphite Face",
+        "tonalRamp": [
+          "#0B0B0A",
+          "#262524",
+          "#434240",
+          "#62615F",
+          "#83827F",
+          "#A6A5A2",
+          "#CAC9C7",
+          "#EFEEED"
+        ],
+        "canonical": "#191816",
+        "oklch": "oklch(20.9% 0.004 84.6)"
+      },
+      "graphite-raise": {
+        "role": "neutral",
+        "displayName": "Graphite Raise",
+        "tonalRamp": [
+          "#0B0B0A",
+          "#262523",
+          "#43423F",
+          "#62615E",
+          "#83827E",
+          "#A6A5A1",
+          "#CAC9C6",
+          "#EFEEEC"
+        ],
+        "canonical": "#201F1C",
+        "oklch": "oklch(23.9% 0.006 91.6)"
+      },
+      "graphite-sunk": {
+        "role": "neutral",
+        "displayName": "Graphite Sunk",
+        "tonalRamp": [
+          "#0B0B0A",
+          "#262524",
+          "#434240",
+          "#62615E",
+          "#83827F",
+          "#A6A5A2",
+          "#CAC9C7",
+          "#EFEEED"
+        ],
+        "canonical": "#131210",
+        "oklch": "oklch(18.3% 0.004 84.6)"
+      },
+      "bezel": {
+        "role": "neutral",
+        "displayName": "Bezel",
+        "tonalRamp": [
+          "#0C0B0A",
+          "#262524",
+          "#434240",
+          "#63615E",
+          "#84827F",
+          "#A7A4A2",
+          "#CBC9C7",
+          "#F0EEED"
+        ],
+        "canonical": "#282624",
+        "oklch": "oklch(27.0% 0.005 67.6)"
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Rule",
+        "tonalRamp": [
+          "#0C0B0A",
+          "#262523",
+          "#43423E",
+          "#63615D",
+          "#84827D",
+          "#A7A5A0",
+          "#CBC9C5",
+          "#F0EEEB"
+        ],
+        "canonical": "#383632",
+        "oklch": "oklch(33.4% 0.007 84.6)"
+      },
+      "rule-strong": {
+        "role": "neutral",
+        "displayName": "Rule Strong",
+        "tonalRamp": [
+          "#0C0B0A",
+          "#262522",
+          "#44423E",
+          "#64615C",
+          "#85827C",
+          "#A8A49F",
+          "#CBC9C4",
+          "#F0EEEB"
+        ],
+        "canonical": "#4E4B46",
+        "oklch": "oklch(41.4% 0.009 80.7)"
+      },
+      "chalk": {
+        "role": "neutral",
+        "displayName": "Chalk",
+        "tonalRamp": [
+          "#0C0B0A",
+          "#262522",
+          "#43423E",
+          "#63615C",
+          "#84827D",
+          "#A7A59F",
+          "#CBC9C4",
+          "#EFEEEB"
+        ],
+        "canonical": "#EEECE6",
+        "oklch": "oklch(94.3% 0.008 91.5)"
+      },
+      "chalk-dim": {
+        "role": "neutral",
+        "displayName": "Chalk Dim",
+        "tonalRamp": [
+          "#0C0B09",
+          "#262521",
+          "#43423C",
+          "#63615A",
+          "#84827B",
+          "#A7A59D",
+          "#CBC9C3",
+          "#F0EEEA"
+        ],
+        "canonical": "#A6A49C",
+        "oklch": "oklch(71.8% 0.012 95.2)"
+      },
+      "chalk-faint": {
+        "role": "neutral",
+        "displayName": "Chalk Faint",
+        "tonalRamp": [
+          "#0C0B0A",
+          "#262522",
+          "#43423D",
+          "#63615B",
+          "#84827B",
+          "#A7A59E",
+          "#CBC9C3",
+          "#F0EEEA"
+        ],
+        "canonical": "#8E8C85",
+        "oklch": "oklch(64.0% 0.011 93.6)"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Clock",
+        "purpose": "The clock on the watch face."
+      },
+      "headline": {
+        "displayName": "App Name",
+        "purpose": "Hollow Family in the yellow header band; I'M OK disc at 23px."
+      },
+      "title": {
+        "displayName": "Alert",
+        "purpose": "Text of an arriving alert; dialog headers at 18px uppercase."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Sentences, with tabular numerals."
+      },
+      "body-strong": {
+        "displayName": "Body Strong",
+        "purpose": "Names and card leads."
+      },
+      "body-small": {
+        "displayName": "Secondary",
+        "purpose": "Card sublines, places, net status."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Status tags, station names, power line; uppercase."
+      },
+      "section-label": {
+        "displayName": "Section Label",
+        "purpose": "App section headings; uppercase, Chalk Dim."
+      },
+      "code": {
+        "displayName": "Morse",
+        "purpose": "Morse code in Safety Yellow."
+      }
+    },
+    "shadows": [
+      {
+        "name": "watch-body",
+        "value": "0 0 0 2px #000, 0 18px 48px rgba(0,0,0,.55)",
+        "purpose": "The watch face as an object on the page."
+      },
+      {
+        "name": "pressable-disc",
+        "value": "0 6px 16px rgba(0,0,0,.45)",
+        "purpose": "The I'M OK disc only."
+      },
+      {
+        "name": "pip-cutout",
+        "value": "0 0 0 2px #191816",
+        "purpose": "Separates the unread pip from its tab."
+      }
+    ],
+    "motion": [
+      {
+        "name": "press",
+        "value": "transform .08s ease-out; scale(.95) on :active",
+        "purpose": "Every pressable on the face."
+      },
+      {
+        "name": "state",
+        "value": ".2s ease-out",
+        "purpose": "I'M OK busy colour change."
+      },
+      {
+        "name": "route-light",
+        "value": ".3s ease-out",
+        "purpose": "Route stations and segments lighting; strip rim fading in on cut."
+      },
+      {
+        "name": "help-blink",
+        "value": "1s steps(2) infinite, 50% opacity .3",
+        "purpose": "A family member's help dot."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "prefers-reduced-motion: reduce disables transitions and animations",
+        "purpose": "Accessibility."
+      }
+    ],
+    "patterns": [
+      {
+        "name": "caution-strip",
+        "value": "repeating-linear-gradient(-45deg, #FFC627 0 6px, #141414 6px 12px)",
+        "purpose": "Real states only: network cut, help armed, warning alert."
+      },
+      {
+        "name": "alarm-strip",
+        "value": "repeating-linear-gradient(-45deg, #FF4D42 0 6px, #141414 6px 12px)",
+        "purpose": "Alarm cards and danger alerts."
+      },
+      {
+        "name": "radio-segment",
+        "value": "repeating-linear-gradient(90deg, <colour> 0 5px, transparent 5px 9px)",
+        "purpose": "Route segments travelled by radio (drawn, not radioed)."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "watch-column",
+        "value": "min(88vw, 360px)"
+      },
+      {
+        "name": "app-column",
+        "value": "min(92vw, 380px)"
+      },
+      {
+        "name": "embed",
+        "value": "?embed=1: face only, 100vw, no border or shadow"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "I'M OK Disc",
+      "kind": "button",
+      "refersTo": "button-ok",
+      "description": "The primary action on the face: one press tells the family you are safe.",
+      "html": "<button class=\"ds-ok\">I'M OK</button> <button class=\"ds-ok ds-ok-busy\">SENDING</button>",
+      "css": ".ds-ok{width:120px;aspect-ratio:1;border-radius:50%;border:0;background:#FFC627;color:#141414;font:700 23px/1 'Barlow Condensed', 'Arial Narrow', sans-serif;letter-spacing:.03em;box-shadow:0 6px 16px rgba(0,0,0,.45);cursor:pointer;transition:transform .08s ease-out,background-color .2s ease-out}.ds-ok:active{transform:scale(.95)}.ds-ok:focus-visible{outline:2px solid #FFC627;outline-offset:2px}.ds-ok-busy{background:#131210;color:#FFC627;box-shadow:inset 0 0 0 3px #FFC627}"
+    },
+    {
+      "name": "Need Help Button",
+      "kind": "button",
+      "refersTo": "button-help",
+      "description": "Help takes two taps; the armed state carries a caution strip.",
+      "html": "<button class=\"ds-help\">NEED HELP</button> <button class=\"ds-help ds-help-arm\">NEED HELP</button>",
+      "css": ".ds-help{padding:5px 12px 4px;border-radius:3px;border:1.5px solid #FF4D42;background:rgba(255,77,66,.13);color:#FF8F87;font:700 14px/1.2 'Barlow Condensed', 'Arial Narrow', sans-serif;letter-spacing:.1em;cursor:pointer;transition:transform .08s ease-out}.ds-help:active{transform:scale(.95)}.ds-help:focus-visible{outline:2px solid #FFC627;outline-offset:2px}.ds-help-arm{color:#fff;padding-bottom:9px;background:linear-gradient(#FF4D42,#FF4D42) top/100% calc(100% - 5px) no-repeat,repeating-linear-gradient(-45deg,#141414 0 5px,#FFC627 5px 10px)}"
+    },
+    {
+      "name": "Secondary and Cut Toggle",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Panel buttons under the watch; the cut toggle wears a strip border while the network is cut.",
+      "html": "<button class=\"ds-btn\">Settings</button> <button class=\"ds-btn ds-btn-on\">Cut network</button> <button class=\"ds-btn ds-btn-primary\">Save</button>",
+      "css": ".ds-btn{background:#201F1C;color:#EEECE6;border:1px solid #4E4B46;border-radius:3px;padding:8px 16px;font:600 13px/1.4 Barlow, system-ui, sans-serif;cursor:pointer}.ds-btn:hover{border-color:#A6A49C}.ds-btn:focus-visible{outline:2px solid #FFC627;outline-offset:2px}.ds-btn-on{background:#131210;color:#FFC627;border:3px solid;border-image:repeating-linear-gradient(-45deg,#FFC627 0 6px,#141414 6px 12px) 3;padding:6px 14px}.ds-btn-primary{background:#FFC627;border-color:#FFC627;color:#141414}"
+    },
+    {
+      "name": "Watch Tabs",
+      "kind": "nav",
+      "refersTo": "tab",
+      "description": "Three drawn-icon tabs at the foot of the face; red pip marks unread family news.",
+      "html": "<div class=\"ds-tabs\"><button class=\"ds-tab ds-tab-on\" aria-label=\"Home\"><svg viewBox=\"0 0 24 24\"><path d=\"M4 11l8-6 8 6v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z\"/></svg></button><button class=\"ds-tab\" aria-label=\"Family\"><svg viewBox=\"0 0 24 24\"><circle cx=\"8\" cy=\"8\" r=\"3\"/><circle cx=\"16.5\" cy=\"9.5\" r=\"2.5\"/><path d=\"M3 19c0-3 2.2-5 5-5s5 2 5 5M13.5 19c.2-2.4 1.5-4 3.5-4s3.4 1.6 3.5 4\"/></svg><span class=\"ds-pip\"></span></button><button class=\"ds-tab\" aria-label=\"Talk\"><svg viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"1.6\"/><path d=\"M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8\"/></svg></button></div>",
+      "css": ".ds-tabs{display:flex;gap:6px;padding:12px;background:#191816}.ds-tab{position:relative;width:42px;height:28px;border-radius:3px;border:1px solid #383632;background:#131210;color:#A6A49C;display:grid;place-items:center;cursor:pointer}.ds-tab svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.ds-tab:hover{color:#EEECE6}.ds-tab:focus-visible{outline:2px solid #FFC627;outline-offset:2px}.ds-tab-on{background:#FFC627;border-color:#FFC627;color:#141414}.ds-tab-on:hover{color:#141414}.ds-pip{position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:50%;background:#FF4D42;box-shadow:0 0 0 2px #191816}"
+    },
+    {
+      "name": "Route Line",
+      "kind": "custom",
+      "refersTo": "route-line",
+      "description": "Signature: the line the last message travelled, watch to relay to family; dashed segments are radio hops.",
+      "html": "<ol class=\"ds-route\"><li class=\"lit\"><i></i><span>Watch<small>L7 Chalk Cut</small></span></li><li class=\"lit radio\"><i></i><span>Relay<small>by radio</small></span></li><li class=\"radio\"><i></i><span>Relay<small>by radio</small></span></li><li class=\"end\"><i></i><span>Family<small>L1</small></span></li></ol>",
+      "css": ".ds-route{display:flex;width:320px;margin:0;padding:16px 0;list-style:none;background:#11100E}.ds-route li{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}.ds-route li::before{content:'';position:absolute;top:6px;right:50%;width:100%;height:3px;background:#383632;transition:background-color .3s ease-out}.ds-route li:first-child::before{display:none}.ds-route li.lit::before{background:#FFC627}.ds-route li.radio::before{background:repeating-linear-gradient(90deg,#383632 0 5px,transparent 5px 9px)}.ds-route li.radio.lit::before{background:repeating-linear-gradient(90deg,#FFC627 0 5px,transparent 5px 9px)}.ds-route i{position:relative;z-index:1;width:15px;height:15px;border-radius:50%;background:#11100E;border:3px solid #4E4B46;transition:all .3s ease-out}.ds-route li.lit i{border-color:#FFC627;background:#FFC627}.ds-route li.end i{border-radius:3px}.ds-route span{font:700 11px/1.15 'Barlow Condensed', 'Arial Narrow', sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#8E8C85}.ds-route li.lit span{color:#EEECE6}.ds-route small{display:block;font:400 11px/1.2 Barlow, system-ui, sans-serif;letter-spacing:0;text-transform:none;color:#8E8C85}"
+    },
+    {
+      "name": "Family Member Row",
+      "kind": "card",
+      "refersTo": "status-tag",
+      "description": "Who's safe: name, place, status tag and a miniature route line.",
+      "html": "<div class=\"ds-member\"><span class=\"ds-s ds-safe\"></span><div class=\"ds-who\"><b>Mom</b><span>L1 Winch Gallery</span></div><span class=\"ds-tag ds-tag-safe\">Safe</span><div class=\"ds-mini\"><i></i><b></b><i></i><b class=\"r\"></b><i></i><em>2 relays</em></div></div>",
+      "css": ".ds-member{display:grid;grid-template-columns:9px 1fr auto;align-items:center;gap:4px 11px;padding:11px 0;border-top:1px solid #383632;border-bottom:1px solid #383632;background:#191816;color:#EEECE6;font:15px/1.4 Barlow, system-ui, sans-serif;width:340px}.ds-s{width:9px;height:9px;border-radius:50%}.ds-safe{background:#3CC27A}.ds-who b{display:block;font-weight:600}.ds-who span{font-size:12.5px;color:#A6A49C}.ds-tag{font:700 11px/1 'Barlow Condensed', 'Arial Narrow', sans-serif;letter-spacing:.08em;text-transform:uppercase;padding:4px 7px 3px;border-radius:2px;background:#131210;color:#8E8C85;border:1px solid #383632}.ds-tag-safe{background:#3CC27A;color:#07210F;border-color:#3CC27A}.ds-mini{grid-column:2/-1;display:flex;align-items:center;height:9px;margin-top:2px}.ds-mini i{width:9px;height:9px;border-radius:50%;border:2px solid #FFC627;background:#FFC627;box-sizing:border-box}.ds-mini b{flex:1;max-width:30px;height:2px;background:#FFC627}.ds-mini b.r{background:repeating-linear-gradient(90deg,#FFC627 0 3px,transparent 3px 5px)}.ds-mini em{font:700 10px/1 'Barlow Condensed', 'Arial Narrow', sans-serif;font-style:normal;letter-spacing:.08em;text-transform:uppercase;color:#8E8C85;margin-left:8px}"
+    },
+    {
+      "name": "State Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Block power and help-call cards; the border carries the state, alarm adds a red strip.",
+      "html": "<div class=\"ds-card ds-warn\"><b>14 h of power left</b><span>Below the team's 24 h warning level. Simulated.</span></div><div class=\"ds-card ds-alarm\"><b>Help call queued</b><span>Waiting for a relay.</span></div>",
+      "css": ".ds-card{position:relative;overflow:hidden;margin:8px 0;width:340px;padding:10px 12px;border-radius:3px;background:#201F1C;border:1px solid #383632;color:#EEECE6;font:13.5px/1.4 Barlow, system-ui, sans-serif}.ds-card b{display:block;font-size:15px;font-weight:600;margin-bottom:2px}.ds-card span{display:block;font-size:12.5px;color:#A6A49C;margin-top:3px}.ds-warn{border-color:#FF9A2E}.ds-alarm{border-color:#FF4D42;padding-top:16px}.ds-alarm::before{content:'';position:absolute;left:0;right:0;top:0;height:6px;background:repeating-linear-gradient(-45deg,#FF4D42 0 6px,#141414 6px 12px)}"
+    },
+    {
+      "name": "App Header and Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Yellow shell band over a graphite form field, as in the settings dialog.",
+      "html": "<div class=\"ds-dlg\"><h2>Watch settings</h2><div class=\"ds-body\"><label for=\"ds-f\">API address</label><input id=\"ds-f\" class=\"ds-input\" placeholder=\"http://localhost:8787\"><small>Leave empty to use the watch on its own.</small></div></div>",
+      "css": ".ds-dlg{width:340px;background:#191816;border:1px solid #4E4B46;border-radius:6px;overflow:hidden;color:#EEECE6;font:15px/1.4 Barlow, system-ui, sans-serif}.ds-dlg h2{margin:0;padding:12px 18px;background:#FFC627;color:#141414;font:700 18px/1 'Barlow Condensed', 'Arial Narrow', sans-serif;letter-spacing:.06em;text-transform:uppercase}.ds-body{padding:6px 18px 18px}.ds-dlg label{display:block;font-size:12px;font-weight:600;color:#A6A49C;margin:10px 0 4px}.ds-input{width:100%;box-sizing:border-box;padding:8px 10px;background:#131210;color:#EEECE6;border:1px solid #4E4B46;border-radius:3px;font:inherit}.ds-input:hover{border-color:#A6A49C}.ds-input:focus-visible{outline:2px solid #FFC627;outline-offset:2px}.ds-dlg small{color:#8E8C85;font-size:12px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Relay Line",
+    "overview": "A message is a journey, not a toast. The world reads like a transit line painted on a tunnel wall: a near-black, faintly warm graphite ground, one committed shell colour (safety yellow), and road-sign type in tabular numerals. Every check-in shows the line it travelled (watch, relay, family) as stations and segments, and the line lights up in yellow as the message moves. When the Directorate cuts the network, yellow-and-black caution strips appear on the rim of the watch, on the cut switch, and on an armed help button, and the line's segments turn dashed because the hops are now radio.\n\n**Scope.** This system currently covers two surfaces only: the round family watch face and the Hollow Family phone app beside it (`firmware/watch/web/index.html`, copied byte-for-byte to `twin/watch/index.html`, also rendered alone inside the 3D watch's circular screen with `?embed=1`). The main 3D twin (`twin/index.html`) and `/scout` use an older, separate control-room grey system and are not governed by this file. Do not port Relay Line tokens into the twin, and do not treat the twin's styles as part of this world, until someone decides to migrate it.\n\nDensity is a wristwatch's: few words, big tap targets on the face, short condensed labels. The phone app below is a calm column of cards and lists under a yellow header band. It is flat and tonal; the only things that cast shadows are physical objects (the watch face and its I'M OK disc).",
+    "keyCharacteristics": [
+      "Graphite ground, safety-yellow shell, signal colours reserved for meaning.",
+      "Caution strips only on real states: network cut, help armed, alarm.",
+      "Barlow for sentences, Barlow Condensed 700 uppercase for labels, clock and headings; tabular numerals throughout.",
+      "The route line (stations and segments) is the signature, at full size under the watch and in miniature on every family member.",
+      "Squared 2-3 px corners on everything rectangular; true circles only for the face, the I'M OK disc, the Morse key and status dots.",
+      "Drawn single-stroke SVG icons (1.8 stroke, round caps)."
+    ],
+    "rules": [
+      {
+        "name": "The Yellow Shell Rule",
+        "body": "Safety Yellow is the container and the call to act, never a status. It never means \"safe\" and never means \"warning\"; that is what the signal colours are for.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Meaning Rule",
+        "body": "Green is only \"safe\", red is only help or alarm, amber is only a power or connection warning. A colour that appears without its meaning is a bug.",
+        "section": "colors"
+      },
+      {
+        "name": "The Real-State Strip Rule",
+        "body": "The caution strip (45 degree yellow/black, 6 px bands) appears only when the state is real: the rim of the face while the network is cut, the Cut network toggle while on, the help button while armed. The alarm variant swaps yellow for Signal Red (on the top edge of an alarm card and the rim of a danger alert). Never use it as decoration, a divider or a section header.",
+        "section": "colors"
+      },
+      {
+        "name": "The Road-Sign Rule",
+        "body": "Anything a person scans (a time, a state, a station, a heading) is Barlow Condensed 700 in capitals. Anything a person reads as a sentence is Barlow in sentence case.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Rule",
+        "body": "Numerals are tabular everywhere (set on the body), so clocks, hours of power and counts do not jitter as they change.",
+        "section": "typography"
+      },
+      {
+        "name": "The Objects-Only Rule",
+        "body": "Cards, rows, messages and dialogs are flat. If it is not a physical part of the watch, it does not cast a shadow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep this system to the watch and phone app surfaces until a migration of `twin/index.html` is decided.",
+      "Do show the route for every check-in, lit in Safety Yellow, dashed for radio hops.",
+      "Do put text on Safety Yellow in On-Yellow (#141414), never white.",
+      "Do use the caution strip only for network cut, help armed and alarm (Real-State Strip Rule), with the red variant for alarm and danger.",
+      "Do use Barlow Condensed 700 caps for anything scanned and Barlow for sentences, with tabular numerals.",
+      "Do keep text on signal colours at 4.5:1 or better; dark text on green (as built), and dark text on red where the label is small.",
+      "Do honour reduced motion: transitions and the help blink switch off."
+    ],
+    "donts": [
+      "Don't build the category default: a GitHub-dark smartwatch with a glowing green button, emoji tabs and pill chips everywhere.",
+      "Don't use Safety Yellow to mean \"safe\" or \"warning\", or green and red for anything but safe and help.",
+      "Don't use rounded pill shapes on rectangular controls; corners stay at 2–3px (6px for the app and dialog containers).",
+      "Don't add shadows to cards, rows or dialogs.",
+      "Don't use emoji or icon fonts; icons are drawn single-stroke SVG.",
+      "Don't add uppercase eyebrows or kickers above headings; the condensed section labels are the headings."
+    ]
+  }
+}
