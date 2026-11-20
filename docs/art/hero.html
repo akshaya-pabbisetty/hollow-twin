@@ -21,17 +21,22 @@ body { position: relative; font-family: 'IBM Plex Mono', monospace; }
 .poster .band { position: absolute; left: 0; right: 0; top: 0; height: 58px; background: var(--ink); color: var(--cream); display: flex; align-items: center; justify-content: space-between; padding: 0 26px; font: 16px 'IBM Plex Mono'; letter-spacing: 3px; }
 .poster .band b { color: var(--red); }
 .poster .slogan { position: absolute; left: 34px; right: 34px; bottom: 120px; font-family: 'Anton'; color: var(--ink); line-height: .86; text-transform: uppercase; }
-.poster .slogan .l1 { font-size: 124px; } .poster .slogan .l2 { font-size: 124px; } .poster .slogan .l3 { font-size: 142px; }
+.poster .slogan .l1 { font-size: 116px; } .poster .slogan .l2 { font-size: 116px; } .poster .slogan .l3 { font-size: 134px; }
 .poster .foot { position: absolute; left: 34px; right: 34px; bottom: 42px; display: flex; justify-content: space-between; font: 17px 'IBM Plex Mono'; letter-spacing: 3px; color: var(--ink); border-top: 4px solid var(--ink); padding-top: 14px; }
-.poster svg.stack { position: absolute; left: 50%; top: 74px; transform: translateX(-50%); }
+.poster svg.stack { position: absolute; left: 50%; top: 70px; transform: translateX(-50%); }
 
 /* the residents' answer, pasted over it */
 .tape { position: absolute; width: 150px; height: 44px; background: rgba(226, 220, 196, .78); box-shadow: 0 2px 4px rgba(0,0,0,.25); }
-.false { position: absolute; left: 112px; top: 470px; transform: rotate(-11deg); font-family: 'Archivo Black'; font-size: 124px; color: #B00C24; letter-spacing: 8px;
-  border: 13px solid #B00C24; padding: 0 30px; line-height: 1.1; filter: url(#stamp); }
+.false { position: absolute; left: 232px; top: 168px; transform: rotate(-7deg); font-family: 'Archivo Black'; font-size: 100px; line-height: 1; color: #C8102E; letter-spacing: 10px;
+  background: #FFFFFF; padding: 14px 40px 18px; border: 6px solid #141210; box-shadow: 0 10px 22px rgba(0,0,0,.45); }
+.false small { display: block; font: 21px 'IBM Plex Mono'; letter-spacing: 3px; color: #141210; margin-top: 6px; text-align: center; }
 .scrap { position: absolute; background: #F4F1E8; color: #111; font-family: 'Special Elite'; box-shadow: 0 8px 18px rgba(0,0,0,.45); filter: url(#torn); }
-.scrap.s1 { left: 604px; top: 548px; width: 330px; padding: 20px 22px 22px; transform: rotate(4deg); font-size: 25px; line-height: 1.25; }
-.scrap.s1 b { font-family: 'Archivo Black'; font-size: 46px; color: var(--red); display: block; line-height: 1; margin-bottom: 4px; }
+.scrap.s1 { left: 532px; top: 506px; width: 336px; padding: 16px 24px 18px 22px; transform: rotate(3deg); font-size: 22px; line-height: 1.3; }
+.scrap.s1 b.h { font-family: 'Archivo Black'; font-size: 36px; color: #C8102E; display: block; line-height: 1; margin-bottom: 8px; letter-spacing: 1px; }
+.scrap.s1 .row { display: grid; grid-template-columns: 1fr auto; align-items: baseline; border-top: 2px dashed #999; padding-top: 6px; margin-top: 6px; }
+.scrap.s1 .row b { font-family: 'Archivo Black'; font-size: 34px; }
+.scrap.s1 .row.bad b { color: #C8102E; } .scrap.s1 .row.good b { color: #2c6e3e; }
+.scrap.s1 .sm { font-size: 18px; color: #444; margin-top: 8px; }
 
 /* ---------- the zine ---------- */
 .zine { position: absolute; right: 64px; top: 70px; width: 640px; height: 760px; background: #F7F5EF; transform: rotate(1.3deg); box-shadow: 0 30px 60px rgba(0,0,0,.65); overflow: hidden; }
@@ -79,7 +84,7 @@ body { position: relative; font-family: 'IBM Plex Mono', monospace; }
   <div class="paper"></div>
   <div class="band"><span>BULLETIN 2124 · <b>THE DIRECTORATE</b></span><span>LEVEL 0 · OFFICIAL</span></div>
   <!-- the eye over the nine levels, all "lit" in the Directorate's picture -->
-  <svg class="stack" width="300" height="252" viewBox="0 0 430 360">
+  <svg class="stack" width="246" height="206" viewBox="0 0 430 360">
     <g transform="translate(215 58)">
       <ellipse rx="92" ry="44" fill="#141210"/><ellipse rx="70" ry="44" fill="#EADFC8"/><circle r="30" fill="#141210"/><circle r="11" fill="#C8102E"/>
     </g>
@@ -99,9 +104,12 @@ body { position: relative; font-family: 'IBM Plex Mono', monospace; }
 </div>
 
 <!-- the residents' answer, over the poster -->
-<div class="false">FALSE</div>
-<div class="tape" style="left: 590px; top: 536px; transform: rotate(-24deg)"></div>
-<div class="scrap s1"><b>12 BLOCKS DARK</b>by hour 30 under their rule. Deepwell, Bore Bend, Lamp Cut… <br>Same supply, shared fairly: <b style="display:inline;font-size:30px;color:#111">0.</b></div>
+<div class="false">FALSE<small>SIGNED, THE RESIDENTS</small></div>
+<div class="tape" style="left: 526px; top: 498px; transform: rotate(-24deg)"></div>
+<div class="scrap s1"><b class="h">THE TRUTH</b>The power plant fails. Blocks left in the dark:
+  <div class="row bad"><span>Their rule</span><b>12</b></div>
+  <div class="row good"><span>Shared fairly</span><b>0</b></div>
+  <div class="sm">Same failure, same power. 8.5 million people kept their air.</div></div>
 
 <div class="zine">
   <div class="xerox"></div>

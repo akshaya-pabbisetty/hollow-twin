@@ -1,6 +1,6 @@
 # Hollow Twin
 
-![The Directorate's poster says every level is served equally. The residents stamp it FALSE: 12 blocks dark by hour 30 under its rule, 0 when the same supply is shared fairly.](docs/img/hollow-twin-hero.jpg)
+![The Directorate's poster says every level is served equally. The residents stick FALSE on it, with the truth: when the power plant fails, their rule leaves 12 blocks in the dark; sharing the same power fairly leaves 0.](docs/img/hollow-twin-hero.jpg)
 
 **When the power fails in the Hollow, the deep levels go dark first. When the Directorate cuts the network, nobody can tell their family they are alive. Hollow Twin warns each block before it goes dark, shares the power that is left fairly, and gets "I'm OK" through anyway: over relay boxes in every block, and where even they cannot reach, on a rover that drives the tunnels.**
 
