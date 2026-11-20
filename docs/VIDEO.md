@@ -17,7 +17,7 @@ About 350 spoken words: a calm pace, not a rush.
 | 5 | 1:25–1:55 | The family watch on a phone, filmed in a hand: tap I'M OK, the family list; cut the network, hold HELP; the radio route lights up; Mom's watch turns red | "Families wear our watch. One tap says I'm OK, and everyone in the family sees who is safe. When the Directorate cuts the network, the watches keep talking. A help call hops radio relay to relay until it reaches the family." |
 | 6 | 1:55–2:15 | The 3D watch page: "Lung sickness" preset, HELP held, the help queue ranks the call at 115 | "Every help call joins the rescue queue, ranked by the caller's blood oxygen and pulse using NEWS2, the early warning score hospitals use. This caller's oxygen is eighty-nine, so they go to the top." |
 | 7 | 2:15–2:35 | AR: the watch on a real wrist through the phone camera; the scout rover placed on a real floor. Then the twin: the rover riding the lift to Deepwell | "You can try the watch on your own wrist, right in your browser. And where even the relays can't reach, our scout rover drives the tunnels with a med kit, and brings the cut-off block's messages back out." |
-| 8 | 2:35–2:50 | The Arduino and Pi on the desk; the API tests passing (135); the 3D watch's Parts tab | "Under the hood: a real Arduino and Raspberry Pi relay, a live API on Azure with a hundred thirty-five tests, and a watch designed part by part in CAD, about sixty-four dollars to build." |
+| 8 | 2:35–2:50 | The "How it works" diagram; the Arduino and Pi on the desk; the public `/forgeries` log showing a rejected fake reading; the 3D watch's Parts tab | "Under the hood: a real Arduino and Raspberry Pi relay, a live API on Azure where every reading is signed, so a faked one is caught and logged in public, and a watch designed part by part in CAD, about sixty-four dollars to build." |
 | 9 | 2:50–3:05 | The README's "What is real and what is simulated" table, then the end card ([`img/end-card.jpg`](img/end-card.jpg)) | "Every alert cites a published safety standard, and every number says where it came from. The Arduino and Pi are real; the rover and radios are designed, not built. Hollow Twin. We count ourselves." |
 
 ## Getting each shot
@@ -27,13 +27,13 @@ About 350 spoken words: a calm pace, not a rush.
 - **Beat 5:** `/watch/` on a phone in demo mode: I'M OK, then cut the network, then hold HELP.
 - **Beat 6:** `/watch/device/?api=<API>` with the key in **Connect**, the "Lung sickness" preset on, and HELP held. The API scores that call 115.
 - **Beat 7:** `/ar/` on a phone. For the wrist: good light, the back of the wrist toward the camera. For the rover: **View in your room**, pointed at the floor. Screen-record the phone.
-- **Beat 8:** screen-record `npm test` in `api/` (135 passing), then the Parts tab on `/watch/device/`.
+- **Beat 8:** the README's "How it works" diagram, then `<API>/forgeries` in a browser after sending one reading with a bad signature, then the Parts tab on `/watch/device/`. No terminal scrolling.
 
 ## Before uploading
 
 - [ ] Runtime is under 3:15.
 - [ ] The first 15 seconds make sense with the sound off.
-- [ ] Every number spoken is on screen in that take (12 blocks, hour 30, 8.5 million, 115, 135 tests).
+- [ ] Every number spoken is on screen in that take (12 blocks, hour 30, 8.5 million, 115).
 - [ ] Nothing claims a device that does not exist: "designed, not built" for the rover and radios.
 - [ ] No API key is visible in any frame.
 - [ ] The captions are readable on a phone.
