@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#F2F2F7">
+<meta name="theme-color" content="#D3D4D0">
 <title>Hollow Twin: family watch (phone)</title>
 <link rel="icon" href="data:,">
 <style>
@@ -24,7 +24,7 @@
   html.embed, html.embed body { background: transparent; min-height: 0; overflow: hidden; }
   html.embed body { display: block; padding: 0; }
   html.embed .col { display: block; }
-  html.embed .col > :not(.face), html.embed .app { display: none !important; }
+  html.embed .col > :not(.face), html.embed .app, html.embed .brief { display: none !important; }
   html.embed .face { width: 100vw; border: 0; box-shadow: none; }
   .face { position: relative; width: min(88vw, 360px); aspect-ratio: 1; border-radius: 50%;
     background: radial-gradient(circle at 50% 35%, #161b22, var(--face) 70%);
@@ -150,147 +150,185 @@
   dialog .row button.primary { background: var(--ok); border-color: var(--ok); }
   dialog small { color: #6e7681; font-size: 11px; }
 
-  /* ---------- iOS-style finish ----------
-     System fonts (SF Pro on Apple devices, Segoe UI on Windows), grouped white cards on a soft gray, iOS system
-     colours, and spring curves taken from iOS sheets and buttons. No web fonts, so nothing waits on a font server. */
+  /* ---------- the residents' kit: control-room colours, made with care ----------
+     Warm grey panels, ink text, hazard yellow, and motion tuned like Apple's: transform and opacity only,
+     ease-out curves that settle softly, quick presses that release slowly. Fonts are served from the repo. */
+  @font-face { font-family: Plex; font-weight: 400; font-display: swap; src: url(../fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2"); }
+  @font-face { font-family: Plex; font-weight: 500; font-display: swap; src: url(../fonts/ibm-plex-sans-latin-500-normal.woff2) format("woff2"); }
+  @font-face { font-family: Plex; font-weight: 600; font-display: swap; src: url(../fonts/ibm-plex-sans-latin-600-normal.woff2) format("woff2"); }
+  @font-face { font-family: PlexMono; font-weight: 400; font-display: swap; src: url(../fonts/ibm-plex-mono-latin-400-normal.woff2) format("woff2"); }
+  @font-face { font-family: PlexMono; font-weight: 500; font-display: swap; src: url(../fonts/ibm-plex-mono-latin-500-normal.woff2) format("woff2"); }
   :root {
-    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-    --round: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-    --label: #1C1C1E; --label2: rgba(60,60,67,.62); --label3: rgba(60,60,67,.36); --sep: rgba(60,60,67,.16);
-    --fill: rgba(118,118,128,.12); --fill-dark: rgba(118,118,128,.26);
-    --blue: #007AFF; --green: #34C759; --red: #FF3B30; --orange: #FF9500;
-    --spring: cubic-bezier(.32,.72,0,1); --bounce: cubic-bezier(.34,1.56,.64,1);
-    --ok: #30D158; --ok-hi: #30D158; --danger: #FF453A; --danger-lo: #FF453A; --warn: #FF9F0A; --info: #64D2FF;
+    --font: Plex, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: PlexMono, ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --bg: #D3D4D0; --panel: #E2E3DF; --card: #ECEDE9; --ink: #1F2326; --dim: #565B60; --faint: #85898D; --line: #BABCB7; --line2: #9DA09B;
+    --yellow: #F2B705; --red: #C8102E; --green: #3F7D4F; --blue: #2D6FB7;
+    --ease: cubic-bezier(.22,1,.36,1);          /* ease-out quint: fast start, long soft landing */
+    --spring: cubic-bezier(.32,.72,0,1);        /* iOS sheet curve */
+    --lift: 0 1px 0 rgba(255,255,255,.7) inset, 0 1px 2px rgba(31,35,38,.06), 0 2px 8px rgba(31,35,38,.04);
+    --ok: #2ea043; --ok-hi: #3fb950; --danger: #f85149; --danger-lo: #da3633; --warn: #d29922; --info: #58a6ff;
   }
   html, body, button, input, select { font-family: var(--font); }
-  body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-  html:not(.embed), html:not(.embed) body { background: #F2F2F7; color: var(--label); }
-  html:not(.embed) { background: #ECECF1; }
-  html:not(.embed) body { min-height: 100vh; background: radial-gradient(1200px 700px at 30% -10%, #FFFFFF 0%, #F2F2F7 50%, #ECECF1 100%) no-repeat; padding-top: calc(32px + env(safe-area-inset-top)); gap: 40px; }
-  button { transition: transform .35s var(--bounce), background-color .25s, color .25s, box-shadow .25s; }
-  button:active { transform: scale(.96); transition-duration: .08s; }
-  button:focus-visible { outline: 3px solid rgba(0,122,255,.5); outline-offset: 2px; }
+  body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
+  html:not(.embed) { background: var(--bg); }
+  html:not(.embed) body { background: var(--bg); color: var(--ink); display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 390px); justify-content: center; align-items: start; gap: 28px 44px; padding-top: calc(28px + env(safe-area-inset-top)); }
+  @media (max-width: 860px) { html:not(.embed) body { grid-template-columns: minmax(0, 420px); } }
+  button { transition: transform .45s var(--ease), background-color .3s var(--ease), color .3s var(--ease), border-color .3s var(--ease), box-shadow .3s var(--ease); }
+  button:active { transform: scale(.97); transition-duration: .12s; }
+  button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
-  /* the watch: a black face in a graphite case, like the real thing */
-  .face { background: #000; border: 0; color: #fff; font-family: var(--font); }
-  html:not(.embed) .face { box-shadow: 0 0 0 9px #2C2C2E, 0 0 0 10px #48484A, 0 0 0 11px #1C1C1E, 0 30px 60px -10px rgba(0,0,0,.35), 0 12px 24px -8px rgba(0,0,0,.25); }
-  html:not(.embed) .face.cut { box-shadow: 0 0 0 9px #2C2C2E, 0 0 0 10px #FF453A, 0 0 0 11px #1C1C1E, 0 30px 60px -10px rgba(255,59,48,.30), 0 12px 24px -8px rgba(0,0,0,.25); }
-  .clock { font-family: var(--round); font-size: 26px; font-weight: 600; letter-spacing: -.3px; font-variant-numeric: tabular-nums; }
-  .where, .pwr, .talk-hint { font-family: var(--round); letter-spacing: .4px; }
-  .where { color: rgba(235,235,245,.55); }
-  .radio-badge { color: #FF6961; font-family: var(--round); font-weight: 600; }
-  .radio-badge svg { width: 11px; height: 11px; vertical-align: -1px; margin-right: 3px; }
-  .okbtn { font-family: var(--round); font-weight: 700; letter-spacing: -.2px; background: linear-gradient(180deg, #4ADE6B, #28B446);
-    box-shadow: 0 0 0 6px rgba(48,209,88,.16), 0 10px 26px rgba(48,209,88,.32), inset 0 1px 0 rgba(255,255,255,.35); transition: transform .4s var(--bounce), box-shadow .3s; }
-  .okbtn:active { transform: scale(.9); }
-  .okbtn.busy { background: linear-gradient(180deg, #FFB340, #FF9500); box-shadow: 0 0 0 6px rgba(255,159,10,.18); animation: breathe 1.6s ease-in-out infinite; }
-  @keyframes breathe { 50% { box-shadow: 0 0 0 12px rgba(255,159,10,.08); } }
-  .helpbtn { border: 0; background: rgba(255,69,58,.22); color: #FF6961; font-family: var(--round); letter-spacing: .4px; padding: 7px 18px; }
-  .helpbtn.arm { background: #FF453A; color: #fff; animation: pulse 1s ease-in-out infinite; }
-  @keyframes pulse { 50% { box-shadow: 0 0 0 8px rgba(255,69,58,.25); } }
-  .sickbtn { border: 0; background: var(--fill-dark); color: rgba(235,235,245,.85); opacity: 1; padding: 5px 14px; }
-  .status { color: rgba(235,235,245,.6); }
-  .status b { color: #fff; }
-  .tabs { gap: 10px; }
-  .tabs button { border: 0; width: 38px; height: 28px; background: var(--fill-dark); color: rgba(235,235,245,.6); display: inline-flex; align-items: center; justify-content: center; }
-  .tabs button.on { background: #fff; color: #000; }
+  /* what this page solves, and three steps that tick themselves off */
+  .brief { grid-column: 1 / -1; display: grid; grid-template-columns: 1.15fr 1fr; gap: 18px; background: var(--panel); border-radius: 14px; padding: 18px 20px; box-shadow: var(--lift), 0 0 0 1px var(--line); position: relative; overflow: hidden; animation: rise .7s var(--ease) both; }
+  .brief::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: repeating-linear-gradient(-45deg, var(--ink) 0 8px, var(--yellow) 8px 16px); }
+  .brief .eyebrow { flex-wrap: wrap; font: 500 11px/1 var(--mono); letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim); display: flex; gap: 8px; align-items: center; }
+  .brief .eyebrow i { white-space: nowrap; font-style: normal; background: var(--ink); color: var(--yellow); padding: 3px 6px; border-radius: 4px; }
+  .brief h1 { font-size: 21px; line-height: 1.25; font-weight: 600; letter-spacing: -.2px; margin: 10px 0 8px; }
+  .brief p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--dim); }
+  .brief p b { color: var(--ink); font-weight: 600; }
+  .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .steps .hd { font: 500 11px/1 var(--mono); letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim); margin-bottom: 4px; }
+  .step { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--card); box-shadow: 0 0 0 1px var(--line); transition: background-color .5s var(--ease), box-shadow .5s var(--ease); }
+  .step b { display: block; font-size: 13.5px; font-weight: 600; } .step span { display: block; font-size: 12px; color: var(--dim); }
+  .step .ck { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 600 12px var(--mono); background: var(--bg); color: var(--dim); box-shadow: 0 0 0 1px var(--line2) inset; transition: background-color .45s var(--ease), color .45s var(--ease), box-shadow .45s var(--ease), transform .5s var(--ease); }
+  .step .ck svg { width: 14px; height: 14px; display: none; }
+  .step .ck path { stroke-dasharray: 20; stroke-dashoffset: 20; }
+  .step.done { background: #DDE9DF; box-shadow: 0 0 0 1px #A9C7B0; }
+  .step.done .ck { background: var(--green); color: #fff; box-shadow: none; transform: scale(1.06); }
+  .step.done .ck em { display: none; } .step.done .ck svg { display: block; }
+  .step.done .ck path { animation: draw .5s .1s var(--ease) forwards; }
+  .step.next { box-shadow: 0 0 0 2px var(--ink); }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  .steps .fin { font-size: 12.5px; color: var(--dim); padding: 2px 2px 0; opacity: 0; transform: translateY(4px); transition: opacity .5s var(--ease), transform .5s var(--ease); }
+  .steps .fin.show { opacity: 1; transform: none; }
+  .steps .fin a, .brief a { color: var(--blue); font-weight: 600; text-decoration: none; }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @media (max-width: 760px) { .brief { grid-template-columns: 1fr; } }
+
+  /* the watch */
+  .col { justify-self: center; animation: rise .7s .08s var(--ease) both; }
+  .face { color: #e6edf3; font-family: var(--font); }
+  html:not(.embed) .face { border: 0; box-shadow: 0 0 0 10px #34383C, 0 0 0 11px #4A4F54, 0 0 0 13px #1F2326, 0 24px 48px -12px rgba(31,35,38,.45), 0 8px 18px -6px rgba(31,35,38,.3); transition: box-shadow .6s var(--ease); }
+  html:not(.embed) .face.cut { box-shadow: 0 0 0 10px #34383C, 0 0 0 11px var(--red), 0 0 0 13px #1F2326, 0 24px 48px -12px rgba(200,16,46,.35), 0 8px 18px -6px rgba(31,35,38,.3); }
+  .clock { font-variant-numeric: tabular-nums; letter-spacing: 0; }
+  .where, .pwr, .talk-hint, .radio-badge { font-family: var(--mono); letter-spacing: .8px; }
+  .where { color: #9AA4AE; }
+  .radio-badge svg { width: 11px; height: 11px; vertical-align: -1px; margin-right: 4px; }
+  .okbtn { transition: transform .5s var(--ease), box-shadow .4s var(--ease), background .4s; }
+  .okbtn:active { transform: scale(.93); transition-duration: .12s; }
+  .okbtn.busy { animation: breathe 1.8s ease-in-out infinite; }
+  @keyframes breathe { 50% { box-shadow: 0 0 0 11px rgba(210,153,34,.08); } }
+  .helpbtn.arm { animation: pulse 1.1s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 7px rgba(248,81,73,.22); } }
+  .tabs { gap: 6px; }
+  .tabs .seg { position: relative; display: flex; gap: 6px; padding: 3px; border-radius: 999px; background: rgba(255,255,255,.06); }
+  .tabs .ind { position: absolute; top: 3px; left: 3px; width: 40px; height: 30px; border-radius: 999px; background: #2b333d; box-shadow: 0 0 0 1px #484f58 inset; transition: transform .5s var(--spring); }
+  .tabs button { position: relative; z-index: 1; border: 0; background: none; display: inline-flex; align-items: center; justify-content: center; }
+  .tabs button.on { background: none; color: #fff; }
   .tabs button svg { width: 16px; height: 16px; }
-  .tabs button .pip { position: absolute; top: 3px; right: 6px; }
-  .tabs button { position: relative; }
-  .fam .row { background: rgba(118,118,128,.20); border: 0; border-radius: 12px; }
-  .fam .row span { color: rgba(235,235,245,.6); }
-  .row.help { background: rgba(255,69,58,.22); }
-  .chip { border: 0; background: rgba(118,118,128,.24); border-radius: 14px; color: #fff; }
-  .chip.morse { border: 0; background: rgba(10,132,255,.28); color: #9BD1FF; }
-  .key { border: 0; background: rgba(10,132,255,.22); color: #9BD1FF; box-shadow: inset 0 0 0 2px rgba(10,132,255,.6); transition: transform .3s var(--bounce), background-color .1s; }
-  .key.down { background: #0A84FF; transform: scale(.94); }
-  .mrow button { border: 0; background: rgba(118,118,128,.24); }
-  .mrow .send { background: #0A84FF; }
-  .alert { background: rgba(0,0,0,.92); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
-  .alert.show { animation: alertIn .5s var(--bounce); }
-  .alert .txt { font-family: var(--round); letter-spacing: -.2px; }
-  @keyframes alertIn { from { opacity: 0; transform: scale(.86); } to { opacity: 1; transform: none; } }
-  .screen.on { animation: screenIn .45s var(--spring); }
-  @keyframes screenIn { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
-  .s.help { animation: none; box-shadow: 0 0 0 0 rgba(255,59,48,.6); animation: ring 1.4s ease-out infinite; }
-  @keyframes ring { from { box-shadow: 0 0 0 0 rgba(255,59,48,.55); } to { box-shadow: 0 0 0 8px rgba(255,59,48,0); } }
+  .tabs button .pip { position: absolute; top: 4px; right: 7px; }
+  .screen.on { animation: screenIn .5s var(--ease); }
+  @keyframes screenIn { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
+  .alert.show { animation: alertIn .45s var(--ease); }
+  @keyframes alertIn { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+  .key { transition: transform .35s var(--ease), background-color .1s; } .key.down { transform: scale(.95); }
+  .s.help { animation: ring 1.5s ease-out infinite; }
+  @keyframes ring { from { box-shadow: 0 0 0 0 rgba(200,16,46,.5); } to { box-shadow: 0 0 0 8px rgba(200,16,46,0); } }
 
-  /* under the watch */
-  .devlabel { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 8px; border-radius: 999px; background: rgba(255,255,255,.75);
-    -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); box-shadow: 0 0 0 .5px var(--sep), 0 2px 8px rgba(0,0,0,.05);
-    font-size: 12px; font-weight: 500; color: var(--label2); margin-bottom: 6px; }
-  .devlabel b { display: inline-flex; align-items: center; gap: 5px; color: var(--label); font-weight: 600; }
-  .devlabel b::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(52,199,89,.18); }
-  .devlabel span::before { content: "· "; }
-  html:not(.embed) .net { color: var(--label2); font-size: 13px; margin-top: 10px; }
-  .dot.up { background: var(--green); } .dot.down { background: var(--red); } .dot.none { background: var(--orange); }
-  html:not(.embed) .bar button { border: 0; border-radius: 12px; padding: 10px 18px; background: var(--fill); color: var(--blue); font-size: 15px; font-weight: 600; }
-  html:not(.embed) .bar button:hover { background: rgba(118,118,128,.18); }
-  html:not(.embed) .bar button.on { background: rgba(255,59,48,.12); color: var(--red); }
-  html:not(.embed) .route { gap: 0; }
-  html:not(.embed) .route .n { border: 0; border-radius: 999px; padding: 5px 10px; background: var(--fill); color: var(--label2); font-size: 12px; font-weight: 500; transition: background-color .4s var(--spring), color .4s; }
-  html:not(.embed) .route .n.lit { background: var(--blue); color: #fff; box-shadow: 0 4px 12px rgba(0,122,255,.3); }
-  .route .w { display: inline-block; width: 18px; height: 2px; border-radius: 1px; background: rgba(60,60,67,.2); transition: background-color .4s; }
-  .route .w.lit { background: var(--blue); }
+  /* the device label and the controls under the watch */
+  .devlabel { display: inline-flex; align-items: stretch; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1.5px var(--ink), 0 2px 6px rgba(31,35,38,.08); background: var(--card); font: 500 11px/1.2 var(--mono); letter-spacing: 1px; text-transform: uppercase; }
+  .devlabel b { background: var(--yellow); color: var(--ink); padding: 5px 9px; font-weight: 500; box-shadow: 1.5px 0 0 var(--ink); }
+  .devlabel span { padding: 5px 9px; color: var(--dim); }
+  html:not(.embed) .net { color: var(--dim); font-size: 12.5px; margin-top: 12px; }
+  .dot { transition: background-color .4s var(--ease); }
+  .dot.up { background: var(--green); } .dot.down { background: var(--red); animation: ring 1.5s ease-out infinite; } .dot.none { background: #D99A00; }
+  html:not(.embed) .bar { gap: 8px; }
+  html:not(.embed) .bar button { display: grid; text-align: left; gap: 1px; min-width: 150px; padding: 9px 14px 9px 12px; border: 0; border-radius: 10px; background: var(--card); color: var(--ink); box-shadow: var(--lift), 0 0 0 1px var(--line); }
+  html:not(.embed) .bar button b { font-size: 13.5px; font-weight: 600; } html:not(.embed) .bar button small { font-size: 11.5px; color: var(--dim); }
+  html:not(.embed) .bar button:hover { box-shadow: var(--lift), 0 0 0 1px var(--line2); }
+  html:not(.embed) .bar button.on { background: var(--red); box-shadow: 0 0 0 1px var(--red), 0 6px 16px -6px rgba(200,16,46,.6); }
+  html:not(.embed) .bar button.on b, html:not(.embed) .bar button.on small { color: #fff; }
+  html:not(.embed) .route { gap: 0; margin-top: 2px; }
+  html:not(.embed) .route .n { border: 0; border-radius: 999px; padding: 4px 10px; background: var(--card); color: var(--dim); box-shadow: 0 0 0 1px var(--line); font: 500 11px var(--mono); transition: background-color .45s var(--ease), color .45s var(--ease), box-shadow .45s var(--ease); }
+  html:not(.embed) .route .n.lit { background: var(--blue); color: #fff; box-shadow: 0 0 0 1px var(--blue), 0 4px 12px -4px rgba(45,111,183,.6); }
+  .route .w { display: inline-block; width: 16px; height: 2px; background: var(--line2); position: relative; overflow: hidden; }
+  .route .w::after { content: ""; position: absolute; inset: 0; background: var(--blue); transform: scaleX(0); transform-origin: left; transition: transform .45s var(--ease); }
+  .route .w.lit::after { transform: scaleX(1); }
 
-  /* the family app: an iOS inset-grouped screen */
-  .app { width: min(92vw, 390px); background: rgba(242,242,247,.86); -webkit-backdrop-filter: blur(30px) saturate(180%); backdrop-filter: blur(30px) saturate(180%);
-    border: 0; border-radius: 36px; padding: 26px 18px 22px; color: var(--label); overflow: hidden;
-    box-shadow: 0 0 0 .5px rgba(0,0,0,.08), 0 40px 80px -20px rgba(0,0,0,.22), 0 16px 32px -12px rgba(0,0,0,.12); }
-  .app::before { content: none; }
-  .app h1 { font-size: 30px; font-weight: 700; letter-spacing: -.6px; margin: 0 0 0 4px; }
-  .app .sub { color: var(--label2); font-size: 13px; margin: 2px 0 6px 4px; }
-  .app h2 { font-size: 13px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--label2); margin: 20px 0 7px 16px; }
-  .card { background: #fff; border: 0; border-radius: 14px; padding: 12px 16px; font-size: 15px; color: var(--label); position: relative; overflow: hidden; }
-  .card b { font-size: 15px; font-weight: 600; } .card span { color: var(--label2); font-size: 13px; }
-  .card.warn, .card.alarm, .card.ok { border: 0; padding-left: 22px; }
-  .card.warn::before, .card.alarm::before, .card.ok::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; }
-  .card.warn::before { background: var(--orange); } .card.alarm::before { background: var(--red); } .card.ok::before { background: var(--green); }
-  #fam-app { background: #fff; border-radius: 14px; overflow: hidden; }
-  .member { background: none; border: 0; border-radius: 0; margin: 0; padding: 11px 16px; gap: 12px; position: relative; }
-  .member + .member::before { content: ""; position: absolute; top: 0; left: 60px; right: 0; height: .5px; background: var(--sep); }
-  .member .s { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; font-style: normal; font-size: 14px; font-weight: 600; color: #fff;
-    background: linear-gradient(180deg, #AEAEB2, #8E8E93); box-shadow: none; }
-  .member .s.safe { background: linear-gradient(180deg, #4CD964, #30B94D); }
-  .member .s.help { background: linear-gradient(180deg, #FF6B5E, #FF3B30); }
-  .member .who b { font-size: 16px; font-weight: 500; } .member .who span { color: var(--label2); font-size: 13px; }
-  .member .tag { border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 600; background: var(--fill); color: var(--label2); }
-  .member .tag.safe { background: rgba(52,199,89,.14); color: #248A3D; } .member .tag.help { background: rgba(255,59,48,.12); color: #D70015; }
-  .member.help { border: 0; }
-  .log { gap: 4px; padding: 2px 2px 0; }
-  .msg { border: 0; border-radius: 18px; padding: 8px 13px; font-size: 15px; background: #fff; color: var(--label); max-width: 80%; align-self: flex-start; }
-  .msg.me { align-self: flex-end; background: var(--blue); color: #fff; }
-  .msg.me .meta { color: rgba(255,255,255,.75); }
-  .msg.help { background: var(--red); color: #fff; border: 0; } .msg.help .meta { color: rgba(255,255,255,.8); }
-  .msg.safe:not(.me) { background: #E3F6E8; }
-  .msg .meta { color: var(--label2); font-size: 11px; }
+  /* the family app */
+  .app { width: 100%; background: var(--panel); border: 0; border-radius: 14px; padding: 0 16px 16px; color: var(--ink); overflow: hidden; box-shadow: var(--lift), 0 0 0 1px var(--line), 0 18px 40px -20px rgba(31,35,38,.35); animation: rise .7s .16s var(--ease) both; }
+  .app::before { content: ""; display: block; height: 10px; margin: 0 -16px 0; background: repeating-linear-gradient(-45deg, var(--ink) 0 10px, var(--yellow) 10px 20px); }
+  .app .apphead { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; padding-top: 14px; }
+  .app h1 { font-size: 19px; font-weight: 600; letter-spacing: -.1px; margin: 0; }
+  .app .paired { font: 500 10.5px/1 var(--mono); letter-spacing: .8px; text-transform: uppercase; color: var(--green); background: #DDE9DF; padding: 4px 7px; border-radius: 999px; white-space: nowrap; }
+  .app .paired::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-right: 5px; vertical-align: 1px; }
+  .app .sub { color: var(--dim); font: 400 11.5px var(--mono); margin: 4px 0 6px; }
+  .app h2 { display: flex; justify-content: space-between; align-items: baseline; font: 500 11px var(--mono); letter-spacing: 1px; text-transform: uppercase; color: var(--ink); margin: 16px 2px 7px; }
+  .app h2 em { font: 400 11.5px var(--font); font-style: normal; letter-spacing: 0; text-transform: none; color: var(--faint); }
+  .card { background: var(--card); border: 0; border-radius: 10px; padding: 10px 12px; box-shadow: 0 0 0 1px var(--line); position: relative; overflow: hidden; transition: box-shadow .4s var(--ease); }
+  .card span { color: var(--dim); }
+  .card.warn, .card.alarm, .card.ok { border: 0; padding-left: 16px; }
+  .card.warn::before, .card.alarm::before, .card.ok::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+  .card.warn::before { background: #E5A100; } .card.alarm::before { background: var(--red); } .card.ok::before { background: var(--green); }
+  #fam-app { border-radius: 10px; overflow: hidden; background: var(--card); box-shadow: 0 0 0 1px var(--line); }
+  .member { background: none; border: 0; border-radius: 0; margin: 0; padding: 10px 12px; gap: 11px; position: relative; transition: background-color .5s var(--ease); }
+  .member + .member::before { content: ""; position: absolute; top: 0; left: 54px; right: 0; height: 1px; background: #D9DAD6; }
+  .member .s { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; font: 600 13px var(--font); font-style: normal; color: #fff; background: #9DA09B; box-shadow: none; transition: background-color .5s var(--ease); }
+  .member .s.safe { background: var(--green); } .member .s.help { background: var(--red); }
+  .member.help { background: #F6E3E6; }
+  .member .who b { font-size: 14px; font-weight: 600; } .member .who span { color: var(--dim); font-size: 12px; }
+  .member .tag { border-radius: 999px; padding: 3px 9px; font: 500 10.5px var(--mono); letter-spacing: .6px; text-transform: uppercase; background: var(--bg); color: var(--dim); transition: background-color .5s var(--ease), color .5s var(--ease); }
+  .member .tag.safe { background: var(--green); color: #fff; } .member .tag.help { background: var(--red); color: #fff; }
+  .log { gap: 5px; }
+  .msg { border: 0; border-radius: 12px; padding: 7px 11px; font-size: 13.5px; background: var(--card); color: var(--ink); box-shadow: 0 0 0 1px var(--line); max-width: 82%; align-self: flex-start; }
+  .msg.me { align-self: flex-end; background: var(--ink); color: #fff; box-shadow: none; border-bottom-right-radius: 4px; }
+  .msg:not(.me) { border-bottom-left-radius: 4px; }
+  .msg.me .meta { color: rgba(255,255,255,.6); }
+  .msg.help { background: var(--red); color: #fff; box-shadow: none; } .msg.help .meta { color: rgba(255,255,255,.75); }
+  .msg.safe:not(.me) { background: #DDE9DF; box-shadow: 0 0 0 1px #A9C7B0; }
+  .msg .meta { font: 400 10.5px var(--mono); color: var(--dim); }
   .msg .code { font-family: var(--mono); color: inherit; opacity: .8; }
-  .log .msg:first-child { animation: bubbleIn .5s var(--bounce); transform-origin: bottom left; }
+  .log .msg:first-child { animation: bubble .55s var(--ease); transform-origin: bottom left; }
   .log .msg.me:first-child { transform-origin: bottom right; }
-  @keyframes bubbleIn { from { opacity: 0; transform: scale(.7) translateY(10px); } to { opacity: 1; transform: none; } }
-  .empty { color: var(--label3); font-size: 14px; padding: 4px 16px; }
-  .note { color: var(--label3); font-size: 12px; margin: 14px 6px 0; line-height: 1.45; }
+  @keyframes bubble { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+  .empty { color: var(--faint); font-size: 12.5px; padding: 2px; }
+  .note { color: var(--faint); font-size: 11.5px; margin-top: 14px; line-height: 1.5; }
   .note code { font-family: var(--mono); font-size: 11px; }
-  .app .pagenav { color: var(--label2); } .app .pagenav a { color: var(--blue); font-weight: 500; text-decoration: none; }
+  .app .pagenav { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--dim); }
+  .app .pagenav a { color: var(--ink); font-weight: 500; text-decoration: none; padding: 4px 9px; border-radius: 999px; background: var(--card); box-shadow: 0 0 0 1px var(--line); transition: box-shadow .3s var(--ease), background-color .3s var(--ease); }
+  .app .pagenav a:hover { box-shadow: 0 0 0 1px var(--ink); }
 
-  /* settings: an iOS sheet */
-  dialog { background: #F2F2F7; color: var(--label); border: 0; border-radius: 22px; padding: 22px 20px; width: min(92vw, 440px);
-    box-shadow: 0 40px 100px rgba(0,0,0,.3); }
-  dialog[open] { animation: sheetIn .55s var(--spring); }
-  @keyframes sheetIn { from { opacity: 0; transform: translateY(40px) scale(.97); } to { opacity: 1; transform: none; } }
-  dialog::backdrop { background: rgba(0,0,0,.25); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
-  dialog h2 { font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
-  dialog label { color: var(--label2); font-size: 13px; margin: 14px 0 6px 4px; }
-  dialog small { color: var(--label3); font-size: 12px; display: block; margin: 6px 4px 0; }
-  dialog input, dialog select { background: #fff; color: var(--label); border: 0; border-radius: 10px; padding: 11px 12px; font-size: 15px; box-shadow: 0 0 0 .5px var(--sep); }
-  dialog input:focus, dialog select:focus { outline: none; box-shadow: 0 0 0 3px rgba(0,122,255,.35); }
-  dialog .row button { border: 0; border-radius: 12px; padding: 11px 20px; background: var(--fill); color: var(--blue); font-weight: 600; font-size: 15px; }
-  dialog .row button.primary { background: var(--blue); color: #fff; }
-  @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
+  /* settings */
+  dialog { background: var(--panel); color: var(--ink); border: 0; border-radius: 14px; padding: 0 18px 18px; overflow: hidden; box-shadow: 0 0 0 1px var(--line), 0 30px 80px rgba(31,35,38,.35); }
+  dialog::before { content: ""; display: block; height: 8px; margin: 0 -18px 16px; background: repeating-linear-gradient(-45deg, var(--ink) 0 10px, var(--yellow) 10px 20px); }
+  dialog[open] { animation: sheet .5s var(--spring); }
+  @keyframes sheet { from { opacity: 0; transform: translateY(24px) scale(.98); } to { opacity: 1; transform: none; } }
+  dialog::backdrop { background: rgba(31,35,38,.35); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+  dialog h2 { font-size: 17px; font-weight: 600; }
+  dialog label { color: var(--dim); font-size: 12px; }
+  dialog small { color: var(--faint); }
+  dialog input, dialog select { background: var(--card); color: var(--ink); border: 0; border-radius: 8px; box-shadow: 0 0 0 1px var(--line2); transition: box-shadow .25s var(--ease); }
+  dialog input:focus, dialog select:focus { outline: none; box-shadow: 0 0 0 2px var(--ink); }
+  dialog .row button { border: 0; border-radius: 9px; padding: 9px 16px; background: var(--card); color: var(--ink); box-shadow: 0 0 0 1px var(--line2); }
+  dialog .row button.primary { background: var(--ink); color: #fff; box-shadow: none; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
+
+<section class="brief" id="brief" aria-label="What this solves">
+  <div>
+    <div class="eyebrow"><i>Problems 7 + 8</i>Hollow Twin · family watch</div>
+    <h1>When the Directorate cuts the network, families still know who is safe.</h1>
+    <p>Every resident wears a watch. One tap tells the whole family <b>"I'm OK"</b>. If the network goes down, messages <b>hop by radio from relay to relay</b> until one still has a line out, and a help call joins the <b>rescue queue</b>, ranked by the caller's vitals.</p>
+  </div>
+  <ol class="steps" id="steps">
+    <li class="hd">Try it: 30 seconds</li>
+    <li class="step next" data-k="ok"><i class="ck"><em>1</em><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg></i><div><b>Tap I'M OK on the watch</b><span>Your family sees you're safe, and answers.</span></div></li>
+    <li class="step" data-k="cut"><i class="ck"><em>2</em><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg></i><div><b>Press Cut network</b><span>This is the Directorate's shutdown.</span></div></li>
+    <li class="step" data-k="help"><i class="ck"><em>3</em><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg></i><div><b>Tap NEED HELP twice</b><span>It still gets out, relay to relay.</span></div></li>
+    <li class="fin" id="fin">That's the idea. Next: <a href="device/">the watch in 3D</a> or <a href="../">the twin</a>.</li>
+  </ol>
+</section>
 
 <div class="col">
   <div class="devlabel" id="devlabel"><b>Resident device</b><span>Not Directorate issue</span></div>
@@ -329,11 +367,11 @@
       </div>
     </div>
 
-    <div class="tabs">
+    <div class="tabs"><div class="seg" id="seg"><span class="ind" id="tabind"></span>
       <button data-s="home" class="on" aria-label="Home"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.2 2.8 11a1 1 0 0 0 1.3 1.5l.9-.8V20a1 1 0 0 0 1 1h4v-5.5h4V21h4a1 1 0 0 0 1-1v-8.3l.9.8a1 1 0 1 0 1.3-1.5Z"/></svg></button>
       <button data-s="family" aria-label="Family"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="8" r="3.6"/><circle cx="17" cy="9.5" r="2.8"/><path d="M2.5 19.5c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6v.5h-13Z"/><path d="M16.5 20h5v-.4c0-2.8-2-4.6-4.6-4.6-.8 0-1.5.1-2.1.4 1 1.1 1.7 2.6 1.7 4.6Z"/></svg><span class="pip"></span></button>
       <button data-s="talk" aria-label="Talk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M8.5 15.5a5 5 0 0 1 0-7M15.5 8.5a5 5 0 0 1 0 7M5.6 18.4a9 9 0 0 1 0-12.8M18.4 5.6a9 9 0 0 1 0 12.8"/></svg></button>
-    </div>
+    </div></div>
 
     <div class="alert" id="alert" role="alert">
       <div class="lvl" id="a-lvl"></div>
@@ -347,24 +385,24 @@
   <div class="net" id="net"><span class="dot"></span>…</div>
   <div class="route" id="route" aria-label="Radio route"></div>
   <div class="bar">
-    <button id="cut" title="Simulates the Directorate switching the network off. Messages then go by radio, relay to relay.">Cut network</button>
-    <button id="cfg">Settings</button>
+    <button id="cut" title="Simulates the Directorate switching the network off. Messages then go by radio, relay to relay."><b>Cut network</b><small>Simulate the shutdown</small></button>
+    <button id="cfg"><b>Settings</b><small>Name, family, live API</small></button>
   </div>
 </div>
 
 <!-- the family app the watch pairs with -->
 <div class="app">
-  <h1>Hollow Family</h1>
+  <div class="apphead"><h1>Hollow Family</h1><span class="paired">Paired</span></div>
   <div class="sub" id="app-sub">—</div>
-  <h2>Your block</h2>
+  <h2>Your block <em>power forecast</em></h2>
   <div class="card" id="blk"><span>Connect the API to see your block's power forecast.</span></div>
-  <h2>Your help call</h2>
+  <h2>Your help call <em>rescue queue</em></h2>
   <div class="card" id="hlp"><span>None. Tap NEED HELP twice on the watch to call for help.</span></div>
-  <h2>Who's safe</h2>
+  <h2>Who's safe <em>your family</em></h2>
   <div id="fam-app"></div>
-  <h2>Radio messages</h2>
+  <h2>Messages <em>newest first</em></h2>
   <div class="log" id="log"><div class="empty">Nothing yet. Check-ins, help calls and radio messages from your family land here.</div></div>
-  <div class="note pagenav">More of Hollow Twin: <a href="../">the twin</a> · <a href="device/">the watch in 3D</a> · <a href="../ar/">try it on in AR</a></div>
+  <div class="note pagenav">See more: <a href="../">The twin</a><a href="device/">Watch in 3D</a><a href="../ar/">Try it on in AR</a></div>
   <div class="note">Hollow Twin watch and family app, prototyped on a phone. Every message is a contract <code>checkin</code> (CONTRACT.md), sent to the team's API, or kept in this browser in local mode. When the network is cut, the radio relays are simulated and the screen says so.</div>
 </div>
 
@@ -607,12 +645,24 @@ $('m-send').addEventListener('click', () => {
   send(`morse:${t}`); mText = ''; paintMorse(); show('home');
 });
 
+// the judge's three steps above the watch: each ticks itself off when it happens
+const done = new Set();
+function tick(k) {
+  if (done.has(k)) return; done.add(k);
+  const steps = [...document.querySelectorAll('.step')];
+  steps.forEach(li => li.classList.toggle('done', done.has(li.dataset.k)));
+  const next = steps.find(li => !done.has(li.dataset.k));
+  steps.forEach(li => li.classList.toggle('next', li === next));
+  $('fin').classList.toggle('show', !next);
+}
+
 // ---------- sending ----------
 function message(status) {
   return { id: nextId(), device: cfg.device, block: cfg.block, time: new Date().toISOString(), kind: 'checkin',
     values: { status, family: cfg.family, to: members().map(m => m.device) }, hops: 0, via: [], source: 'live' };
 }
 function send(status) {
+  if (status === 'ok') tick('ok'); else if (status === 'help') tick('help');
   const out = [message(status)];
   // a help call also goes to the rescue queue (GET /help), not only to the family
   if (status === 'help') out.push({ ...message(status), id: nextId(), kind: 'button', values: { button: 'help', family: cfg.family } });
@@ -787,6 +837,7 @@ function show(name) {
   for (const s of ['home', 'family', 'talk', 'morse']) $('s-' + s).classList.toggle('on', s === name);
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.s === (name === 'morse' ? 'talk' : name)));
   if (name === 'family') document.querySelector('[data-s="family"]').classList.remove('ping');
+  const on = document.querySelector('.tabs button.on'); if (on) $('tabind').style.transform = `translateX(${on.offsetLeft - 3}px)`;
 }
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => show(b.dataset.s)));
 for (const t of PRESETS) { const c = document.createElement('button'); c.className = 'chip'; c.textContent = t; c.onclick = () => { send(`msg:${t}`); show('home'); }; $('chips').appendChild(c); }
@@ -810,8 +861,9 @@ function paint() {
   $('clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   $('where').textContent = pretty(cfg.block) + ' · ' + cfg.name;
   $('face').classList.toggle('cut', cut);
+  if (cut) tick('cut');
   $('cut').classList.toggle('on', cut);
-  $('cut').textContent = cut ? 'Restore network' : 'Cut network';
+  $('cut').innerHTML = cut ? '<b>Restore network</b><small>Back to normal</small>' : '<b>Cut network</b><small>Simulate the shutdown</small>';
   $('ok').classList.toggle('busy', flushing || queue.length > 0);
 
   const net = $('net');
