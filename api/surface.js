@@ -1,6 +1,7 @@
 // Surface truth (track problems 13 and 14): is it safe to go up, and who goes first?
 // Pure functions over the stored readings. Every limit comes from shared/limits.json with its source.
 const LIM = require("./limits");
+const O = require("./order");
 
 const t = (r) => Date.parse(r.time);
 const isNum = (x) => typeof x === "number" && !Number.isNaN(x);
@@ -46,7 +47,7 @@ function surface(readings) {
     for (const c of CHECKS) {
       const x = r.values[c.value];
       if (!isNum(x)) continue;
-      if (!latest[c.value] || t(r) >= t(latest[c.value].r)) latest[c.value] = { x, r };
+      if (!latest[c.value] || O.newer(r, latest[c.value].r)) latest[c.value] = { x, r };
     }
   }
   const rows = CHECKS.map((c) => {
@@ -93,7 +94,8 @@ function surface(readings) {
 // The public record: every surface reading and every verdict change, in the order the backend stored them.
 function surfaceHistory(readings) {
   return readings.filter((r) => r.kind === "surface" || (r.kind === "alert" && r.values.surface_verdict)).map((r) => r.kind === "surface"
-    ? { seq: r.seq, type: "reading", time: r.time, id: r.id, device: r.device, block: r.block, values: r.values, source: r.source, verified: r.verified === true }
+    ? { seq: r.seq, type: "reading", time: r.time, id: r.id, device: r.device, block: r.block, values: r.values, source: r.source, verified: r.verified === true,
+      ...(r.plausible === false ? { plausible: false, sensor_error: r.sensor_error } : {}) }
     : { seq: r.seq, type: "verdict", time: r.time, id: r.id, verdict: r.values.surface_verdict, previous: r.values.previous,
       reasons: r.values.reasons, cause: r.values.cause, source: r.source });
 }
@@ -109,7 +111,7 @@ const PLAIN = {
 function broadcast(readings) {
   const sv = surface(readings);
   const have = sv.readings.filter((r) => r.value !== null);
-  const photos = readings.filter((r) => r.kind === "surface" && typeof r.values.photo_url === "string" && r.values.photo_url).sort((a, b) => t(b) - t(a));
+  const photos = readings.filter((r) => r.kind === "surface" && typeof r.values.photo_url === "string" && r.values.photo_url).sort(O.newestFirst);
   const text = sv.verdict === NO_DATA
     ? `No verdict yet: ${sv.missing.length} of the 3 surface readings the contract requires ${sv.missing.length === 1 ? "has" : "have"} not been measured (${sv.missing.join(", ")}). The API does not guess.`
     : PLAIN[sv.verdict];
@@ -147,7 +149,7 @@ function firstwave(readings, openHelp, register, n = LIM.val("firstwave_default_
     else if (p.sole_caregiver) out.push("sole caregiver: never sent up");
     else reasons.push("not a sole caregiver");
     if (openHelp.has(device)) out.push("has an open help request"); else reasons.push("no open help request");
-    const v = readings.filter((r) => r.device === device && r.kind === "vitals").sort((a, b) => t(b) - t(a))[0];
+    const v = O.newest(readings.filter((r) => r.device === device && r.kind === "vitals"));
     if (!v) out.push("not enough data: no vitals on record");
     else if (now - t(v) > maxAgeH * 3600e3) out.push(`not enough data: latest vitals are older than ${maxAgeH} h`);
     else {

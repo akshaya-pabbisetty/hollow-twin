@@ -229,11 +229,11 @@
     },
     "battery_warn_hours": {
       "value": 24, "unit": "h", "op": "<", "type": "design choice",
-      "reason": "CONTRACT.md section 6, the twin's warning level: a full day to plan around. No published limit exists for battery hours."
+      "reason": "CONTRACT.md section 6.1, agreed by the team: a full day to plan around. No published limit exists for battery hours."
     },
     "battery_alarm_hours": {
       "value": 8, "unit": "h", "op": "<", "type": "design choice",
-      "reason": "CONTRACT.md section 6, the twin's alarm level: one sleep or work shift, the last chance to charge watches, fill water and move people."
+      "reason": "CONTRACT.md section 6.1, agreed by the team: one sleep or work shift, the last chance to charge watches, fill water and move people."
     },
     "battery_rearm_margin_hours": {
       "value": 2, "unit": "h", "type": "design choice",
@@ -295,9 +295,17 @@
       "value": 20, "unit": "requests/s per device", "type": "design choice",
       "reason": "No real device needs more than 20 single posts a second; a backlog sent as one array counts as one request and is never dropped. Override with the RATE_LIMIT env var."
     },
-    "ingest_max_future_min": {
-      "value": 5, "unit": "min", "type": "design choice",
-      "reason": "A reading stamped more than 5 minutes ahead of the server clock is a broken clock or a forgery, and would corrupt forecasts, so it is rejected."
+    "forgery_max_values_bytes": {
+      "value": 2048, "unit": "bytes", "type": "design choice",
+      "reason": "A forged message's claimed id, time, values and route are shown publicly (GET /forgeries, event: forgery on /live). A real contract message's values are well under 300 bytes; past 2 KB the claim is replaced by its size, so the public log cannot be used to push large payloads to every screen."
+    },
+    "forgery_log_max": {
+      "value": 1000, "unit": "entries", "type": "design choice",
+      "reason": "GET /forgeries serves the newest 1,000 forgeries (about 0.5 MB); the twin only flashes the newest, and the data file still keeps every one. Bounds memory when someone keeps forging."
+    },
+    "ingest_clock_warn_ahead_ms": {
+      "value": 1000, "unit": "ms", "type": "design choice",
+      "reason": "Any time ahead of the receive time is replaced by the receive time and marked time_estimated (CONTRACT.md 1.3). The warning that the device's clock is fast is only added when it is more than 1 second ahead: two honest clocks always disagree by a few milliseconds (NTP-synced devices by tens of milliseconds, two Node processes on one Windows machine by 1 to 3 ms), and a warning the builder cannot act on is noise."
     },
     "ingest_min_valid_time": {
       "value": "2020-01-01T00:00:00Z", "unit": "UTC time", "type": "design choice",
@@ -330,6 +338,158 @@
     "truth_window_h": {
       "value": 24, "unit": "h", "type": "design choice",
       "reason": "The residents' case count covers the last 24 hours, matching a daily official bulletin."
+    },
+    "plausible_vitals_spo2_pct": {
+      "value": [0,100], "unit": "%", "op": "outside", "type": "design choice",
+      "reason": "Blood oxygen is a percentage: a value over 100 or under 0 is a sensor or firmware error, not a patient."
+    },
+    "plausible_vitals_hr_bpm": {
+      "value": [20,250], "unit": "bpm", "op": "outside", "type": "design choice",
+      "reason": "A pulse under 20 or over 250 is outside what a living wearer produces; a watch reporting it is reading noise."
+    },
+    "plausible_vitals_temp_c": {
+      "value": [20,45], "unit": "C", "op": "outside", "type": "design choice",
+      "reason": "Skin temperature under 20 C or over 45 C is outside what a worn sensor sees on a living person."
+    },
+    "plausible_air_co2_ppm": {
+      "value": [0,1000000], "unit": "ppm", "op": "outside", "type": "design choice",
+      "reason": "Parts per million of air cannot be negative or exceed one million."
+    },
+    "plausible_air_temp_c": {
+      "value": [-50,80], "unit": "C", "op": "outside", "type": "design choice",
+      "reason": "Air in the Hollow is never colder than -50 C or hotter than 80 C; beyond that the sensor is broken."
+    },
+    "plausible_air_humidity_pct": {
+      "value": [0,100], "unit": "%", "op": "outside", "type": "design choice",
+      "reason": "Relative humidity is a percentage."
+    },
+    "plausible_water_tds_ppm": {
+      "value": [0,50000], "unit": "ppm", "op": "outside", "type": "design choice",
+      "reason": "Dissolved solids cannot be negative; 50,000 ppm is saltier than seawater (about 35,000), beyond any tap line."
+    },
+    "plausible_water_turbidity_ntu": {
+      "value": [0,4000], "unit": "NTU", "op": "outside", "type": "design choice",
+      "reason": "Turbidity cannot be negative; 4,000 NTU is the top of the range hobby probes report."
+    },
+    "plausible_flood_depth_cm": {
+      "value": [0,1000], "unit": "cm", "op": "outside", "type": "design choice",
+      "reason": "A depth cannot be negative, and a tunnel is not 10 m deep in water."
+    },
+    "plausible_power_battery_wh": {
+      "value": [0,1000000000000], "unit": "Wh", "op": "outside", "type": "design choice",
+      "reason": "A battery cannot hold a negative charge; the upper bound only rules out overflow."
+    },
+    "plausible_power_battery_pct": {
+      "value": [0,100], "unit": "%", "op": "outside", "type": "design choice",
+      "reason": "Battery charge is a percentage."
+    },
+    "plausible_power_draw_w": {
+      "value": [0,1000000000000], "unit": "W", "op": "outside", "type": "design choice",
+      "reason": "A draw cannot be negative; the upper bound only rules out overflow."
+    },
+    "plausible_power_supply_w": {
+      "value": [0,1000000000000], "unit": "W", "op": "outside", "type": "design choice",
+      "reason": "A supply cannot be negative; the upper bound only rules out overflow."
+    },
+    "plausible_power_grid_hz": {
+      "value": [40,70], "unit": "Hz", "op": "outside", "type": "design choice",
+      "reason": "A 60 Hz grid that reads under 40 or over 70 Hz is a broken frequency sensor, not a grid."
+    },
+    "plausible_surface_co2_ppm": {
+      "value": [0,1000000], "unit": "ppm", "op": "outside", "type": "design choice",
+      "reason": "Parts per million of air cannot be negative or exceed one million."
+    },
+    "plausible_surface_temp_c": {
+      "value": [-90,70], "unit": "C", "op": "outside", "type": "design choice",
+      "reason": "Earth's recorded extremes are about -89 C and 57 C; beyond -90 or 70 the scout's thermometer is broken."
+    },
+    "plausible_surface_radiation_usv_h": {
+      "value": [0,1000000], "unit": "µSv/h", "op": "outside", "type": "design choice",
+      "reason": "A dose rate cannot be negative; the upper bound only rules out overflow."
+    },
+    "plausible_surface_o2_pct": {
+      "value": [0,100], "unit": "%", "op": "outside", "type": "design choice",
+      "reason": "Oxygen by volume is a percentage."
+    },
+    "plausible_surface_pm25_ugm3": {
+      "value": [0,100000], "unit": "µg/m3", "op": "outside", "type": "design choice",
+      "reason": "Fine dust cannot be negative; 100,000 µg/m3 is beyond any instrument's range."
+    },
+    "jump_vitals_spo2_pct": {
+      "value": 15, "unit": "%", "op": ">", "type": "design choice",
+      "reason": "Blood oxygen does not fall or rise by more than 15 points between two readings a few minutes apart; a bigger step is a loose or misplaced sensor."
+    },
+    "jump_vitals_hr_bpm": {
+      "value": 80, "unit": "bpm", "op": ">", "type": "design choice",
+      "reason": "A pulse does not change by more than 80 bpm between readings; a bigger step is motion noise on the optical sensor."
+    },
+    "jump_vitals_temp_c": {
+      "value": 2, "unit": "C", "op": ">", "type": "design choice",
+      "reason": "Skin temperature moves slowly; a step over 2 C between readings is a sensor that came off the skin."
+    },
+    "jump_air_co2_ppm": {
+      "value": 3000, "unit": "ppm", "op": ">", "type": "design choice",
+      "reason": "Even a crowd walking in raises CO2 by hundreds of ppm per reading, not thousands."
+    },
+    "jump_air_temp_c": {
+      "value": 10, "unit": "C", "op": ">", "type": "design choice",
+      "reason": "Air in a block does not warm or cool 10 C between readings a minute apart."
+    },
+    "jump_air_humidity_pct": {
+      "value": 30, "unit": "%", "op": ">", "type": "design choice",
+      "reason": "Humidity in a block does not swing 30 points between readings."
+    },
+    "jump_water_tds_ppm": {
+      "value": 5000, "unit": "ppm", "op": ">", "type": "design choice",
+      "reason": "A tap line changes by hundreds of ppm when the supply changes; a 5,000 ppm step is a probe fault (the clean-cup, salty-cup test is about 1,200 ppm)."
+    },
+    "jump_water_turbidity_ntu": {
+      "value": 50, "unit": "NTU", "op": ">", "type": "design choice",
+      "reason": "A cloudy burst is tens of NTU; a 50 NTU step between readings is a probe fault."
+    },
+    "jump_flood_depth_cm": {
+      "value": 30, "unit": "cm", "op": ">", "type": "design choice",
+      "reason": "Water rises centimetres a minute, not 30 cm between readings; a bigger step is the ultrasonic sensor seeing something else."
+    },
+    "jump_power_grid_hz": {
+      "value": 1, "unit": "Hz", "op": ">", "type": "design choice",
+      "reason": "A grid frequency step over 1 Hz between readings is impossible without a blackout; the sensor glitched."
+    },
+    "jump_surface_radiation_usv_h": {
+      "value": 10, "unit": "µSv/h", "op": ">", "type": "design choice",
+      "reason": "Background radiation does not change by 10 µSv/h between readings from the same spot."
+    },
+    "jump_max_gap_min": {
+      "value": 60, "unit": "min", "op": ">", "type": "design choice",
+      "reason": "Two readings more than an hour apart are not consecutive enough to call a change a jump."
+    },
+    "drift_air_co2_ppm": {
+      "value": 500, "unit": "ppm", "op": ">", "type": "design choice",
+      "reason": "Blocks on one level share air handling; a sensor that walks more than 500 ppm away from its neighbours is drifting."
+    },
+    "drift_air_temp_c": {
+      "value": 5, "unit": "C", "op": ">", "type": "design choice",
+      "reason": "Blocks on one level sit in the same rock; 5 C away from the neighbours is a drifting thermometer."
+    },
+    "drift_air_humidity_pct": {
+      "value": 20, "unit": "%", "op": ">", "type": "design choice",
+      "reason": "Blocks on one level share air handling; 20 points away from the neighbours is a drifting sensor."
+    },
+    "drift_water_tds_ppm": {
+      "value": 300, "unit": "ppm", "op": ">", "type": "design choice",
+      "reason": "Blocks on one level share a water line; 300 ppm away from the neighbours is a drifting probe."
+    },
+    "drift_water_turbidity_ntu": {
+      "value": 3, "unit": "NTU", "op": ">", "type": "design choice",
+      "reason": "Blocks on one level share a water line; 3 NTU away from the neighbours is a drifting probe."
+    },
+    "drift_flood_depth_cm": {
+      "value": 20, "unit": "cm", "op": ">", "type": "design choice",
+      "reason": "Tunnels on one level flood together; a sensor 20 cm away from its neighbours and still moving is suspect."
+    },
+    "drift_readings": {
+      "value": 4, "unit": "readings", "type": "design choice",
+      "reason": "Drift needs four readings in a row moving the same way away from the level's other sensors, so one odd reading is not called drift."
     }
   }
 }

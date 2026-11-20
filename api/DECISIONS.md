@@ -381,3 +381,128 @@ contract carries the same table for the team.
   the demo shot prints that table and the measured section.
 - Implausible power messages (`plausible: false`, task 3) are left out of `measured`.
 - No new limits.
+
+# Third brief (branch `lane1-clocks-and-contract`)
+
+Started from `main` at 057e262. `lane1-wip` (one commit, 34778d4) held the bad-sensor checks
+(`sensors.js`, its tests, 38 design-choice limits, an `outside` range operator in `limits.js`, and a
+`usable` list in `server.js` that leaves implausible readings out of all logic). `main` had not touched `api/`
+since that branch was cut, so task 4 brings it over as it was, adapted where tasks 1 to 3 changed the same code.
+
+## Task 1: the clock rule
+
+- **Any time ahead of the receive time is replaced**, not only one more than 5 minutes ahead. Reason: nothing can be
+  measured after the API receives it, so a time ahead is always a fast clock. With the 5-minute allowance a watch
+  running 4 minutes fast held "latest" for its block and kind for 4 minutes, hiding every honest reading sent in
+  that time. The reading is still kept; `time` becomes the receive time, `time_estimated: true`,
+  `device_time` keeps what the device sent, and the warning says so. No tolerance number is needed, so the
+  `ingest_max_future_min` limit (5 min) is removed from `shared/limits.json`; nothing else read it (checked
+  in `api/`, `twin/`, `tools/`).
+- **The warning has a threshold; the rule does not.** Running the suite 5 times showed the scenario tool's
+  readings, stamped with `Date.now()` in one process, arriving 1 to 3 ms "ahead" of the server's `Date.now()` in
+  another (Windows). Any honest NTP-synced device will do the same by tens of milliseconds. Such a reading is still
+  replaced and marked `time_estimated` (exactly the brief's rule), but the "device clock fast" warning is only
+  added past `ingest_clock_warn_ahead_ms` (1000 ms, design choice, reason in `shared/limits.json`): a warning
+  nobody can act on is noise, and it would have made every scenario message "unclean".
+- `tools/scenario.js` stamped three readings `Date.now() + 1..3` ms so they would sort after the one before.
+  That is now a time ahead of the receive time, and no longer needed (equal times go to the higher seq), so the
+  offsets are removed.
+- **Latest = greatest stored time, ties broken by seq**, in one place: `api/order.js`. Every "latest" or
+  "newest" now goes through it: `/blocks/<id>/latest`, `/blocks`, `/status` blocks, `/forecast` and the
+  battery alerts, `/fairshare` measured, the surface verdict, the broadcast photo, triage vitals, first-wave
+  vitals, `/family` last check-in, and the order of `/history`. Before, most of these happened to break ties by
+  array order, and `/blocks` kept the *older* of two readings with the same time.
+- A late relay backlog already could not become "latest" by time; the new tests pin that down across every view,
+  and check that it raises no battery alarm and no surface verdict change (both judge the latest reading).
+  An old backlog reading that crosses a limit on its own (for example water) still raises its alert: that alert
+  is a true statement about the past and carries the reading's id as `cause`.
+- Timing: the tests compare the receive time with a second of slack (two processes reading the clock), and an
+  "honest" reading in the fast-clock test is never dated before the fast reading's stored time, so the run does
+  not depend on which millisecond the server reads.
+
+## Task 2: contract section 6, agreed
+
+- Section 6 is now "Thresholds (agreed by the team)"; 6.1 is the agreed table with one column per row for the
+  limit and one for its status ("agreed by the team, source: ..."). The numbers are unchanged; only their status
+  changed. The twin's old table (CO2 2,000 / 4,000 ppm, air 39 / 43 °C dry, flood 25 / 45 cm) and the
+  "water is still open" line are removed, and the opening paragraph names the retired numbers once so a reader
+  of an old screenshot can tell what changed.
+- 6.2 (water) is left as lane 1's proposal: the brief agreed 6.1 only, and 6.2 still waits on lane 3 checking the
+  calibrated probe. Its heading lost "the open item above", which no longer exists.
+- The changelog said "Additions only. Nothing above was renamed or removed." That is no longer true, so it now
+  says removals are marked **Removed** in their row, and the column is "Change" instead of "Added".
+- The battery-hour limits' reasons in `shared/limits.json` said "the twin's warning/alarm level"; they now say
+  "CONTRACT.md section 6.1, agreed by the team". Values unchanged.
+- `tests/thresholds.test.js` parses the 6.1 table row by row and checks each limit cell against
+  `shared/limits.json`, each status cell for "agreed by the team" and its source, that the old rows are gone, and
+  that the changelog row is there. README, FIRMWARE.md and TWIN.md (lane 4) no longer describe two sets of numbers.
+
+## Task 3: forged readings are visible
+
+- Where: `accept()` already refused a wrong `sig` for a device with a key on file. It now also returns the public
+  record of the forgery, and the ingest handler publishes it (`publishForgery`). Nothing else changed in the
+  refusal: same reason sentence, same `rejected` entry, same `422` when nothing else in the request was stored.
+- A forgery is not a record: no `seq`, not in `readings`, not in `seen`. Reasons: a seq would make it part of the
+  replayable timeline and of every `Last-Event-ID` (the brief says never store it as a reading); and if its id
+  were marked seen, anyone could forge a message id first and get the genuine message dropped as a duplicate.
+  The test posts the genuine message with the same id afterwards and it is accepted.
+- `event: forgery` goes to `/live` clients only, with no `id:` line. `/feed` sends unnamed events that older
+  clients treat as records; and an event without an id leaves the browser's Last-Event-ID alone, so reconnects
+  stay exact. Missed forgeries are fetched from `GET /forgeries?after=<n>`.
+- Persisted as `{ "_forgery": ... }` lines in the data file (like `_meta`), so the public log survives a restart;
+  `load()` skips them as readings. Entries are numbered `n` across restarts.
+- **Rate limit, like ingest:** the same number (20 per device per second, `RATE_LIMIT` overrides it), the same
+  one-second window, keyed by the claimed device. One deliberate difference: ingest never limits an array
+  (a backlog is real data that must not be lost); for forgeries every message counts, also inside an array,
+  because one array of thousands would otherwise flash thousands of times on every screen. Over-limit forgeries
+  are still refused and listed in the reply's `rejected`; they are only not logged, and are counted in
+  `rate_limited` (in memory, since the server started). The table is keyed by devices that have a key on file
+  (only those can produce a forgery), so it cannot grow without bound.
+- Two new design-choice limits: `forgery_max_values_bytes` (2 KB: past it the claim is replaced by its size, so
+  the public log cannot carry large payloads to every screen) and `forgery_log_max` (1,000 entries served and
+  held in memory; the data file keeps all).
+- Docs: CONTRACT.md 1.1, 4.1 (the event and the log), 4.2 (the endpoint), changelog; README; TWIN.md (lane 4)
+  has the listener and how to show "FORGED: rejected". It warns not to pass a forgery through the guide's
+  `once()` helper, which marks ids as seen and would then skip the genuine message.
+- Not done: `GET /status` does not count forgeries. Not asked for; the twin gets them from `/live`, and
+  `GET /forgeries` has the count.
+
+## Task 4: sensor checks from lane1-wip
+
+- **What lane1-wip had:** `sensors.js` with the three checks, `tests/sensors.test.js`, 38 design-choice limits
+  (19 `plausible_*` ranges, 12 `jump_*` steps plus `jump_max_gap_min`, 6 `drift_*` distances plus
+  `drift_readings`), an `outside` operator in `limits.js` for `[low, high]` ranges, and a `usable` list in
+  `server.js` that every forecast, verdict, queue and count reads instead of `readings`. Brought over: the limits
+  (values and reasons unchanged, written in main's compact layout; lane1-wip had reformatted the whole file),
+  `limits.js` as it was, the `usable` list and the ingest order (check, store, then rules only if usable), and
+  `surfaceHistory` marking sensor errors.
+- **Where it was incomplete against the brief:** only impossible values were stored `plausible: false` and left out.
+  Jumps and drift were "suspected sensor faults": the reading still counted and an info alert went out. The brief
+  says all three are stored `plausible: false` with a `sensor_error`, raise no alert, and are left out of all
+  logic, so they now are. The info alert ("Suspected sensor fault") is gone. Every error carries `sensor_flags`
+  (`range`, `jump` or `drift`, with the numbers) so the twin can still tag the sensor.
+- **Jumps need a confirmation rule once they are left out.** Measured only against the last usable reading, a real
+  step (a fire, a burst main, a scout walking into a hot spot) would be a "jump" forever, since the last usable
+  reading stays on the old side. So a step is a jump only when it is too far from the device's last usable
+  reading AND from its immediately previous reading. A one-off spike is caught; a second reading at the new level
+  confirms the change and counts. **Safety cost, accepted:** a real sudden danger (CO2 850 to 9,000 ppm) alerts one
+  reading late. The test "a fire is real" pins this down. Known gap: a sensor that falls off and reads the same
+  wrong value twice is confirmed as real; drift does not catch that either.
+- **Drift and backlogs:** the device's last readings and the other sensors' newest readings are taken at or before
+  the message's own time, so a backlog is judged as it was at the time, not against readings from after it.
+  A device's own drifting readings stay in its history (excluded only from logic), so a sensor that keeps
+  drifting keeps being caught.
+- **Speed:** lane1-wip scanned and sorted all readings for every incoming message; a 2,000-reading backlog took
+  about 4 s and failed the load test (3 s limit). `sensors.index()` keeps each device's messages sorted by time
+  (binary insertion) and the devices per kind and level, so a check only walks back the few readings it needs.
+  The backlog now takes about 1.0 to 1.2 s (main: about 0.85 s).
+- **Tests adapted:** the surface verdict tests (`surface.test.js`, the broadcast test in `endpoints.test.js`) step
+  one scout from 0.2 to 30 µSv/h within a second, which is now a jump. They are about the verdict, which takes the
+  latest value across all scouts, so each reading now comes from its own scout id. The CO2 threshold test in
+  `limits.test.js` posts its three readings two hours apart for the same reason. `status.test.js` has the new
+  `readings.implausible` count (lane1-wip's `flagged` count is gone with the info alerts).
+- **A lane1-wip test that could not fail:** `SENS.jumps(a, b)` takes (new reading, last good one); the wip test
+  passed them the other way round, so the "exactly the limit is not a jump" check returned nothing whatever the
+  limit. Fixed, with a second line that must find the jump one ppm above the limit.
+- The scenario tool's readings and the contract samples raise no sensor error (the scenario test asserts every
+  scenario message is stored with no warning at all).

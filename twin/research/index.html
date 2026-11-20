@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Research Data</title>
+<meta name="description" content="Vitals and symptom reports from residents' watches, with identities removed, for researchers studying what living underground does to people.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --app: #D3D4D0; --panel: #E2E3DF; --well: #ECEDE9; --line: #BABCB7; --line-2: #9DA09B; --ink: #1F2326; --dim: #565B60; --faint: #85898D; --warn: #b07a00; --alarm: #C8102E; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--app); color: var(--ink); }
+  body { font: 15px/1.5 'IBM Plex Sans', system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 22px; margin: 0; font-weight: 600; }
+  h2 { font-size: 13px; font-weight: 600; color: var(--dim); margin: 28px 0 8px; }
+  a { color: inherit; }
+  .sub { color: var(--dim); font-size: 13px; margin: 4px 0 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 16px 18px; margin-top: 18px; }
+  .big { font-size: 20px; font-weight: 600; }
+  .scroll { overflow-x: auto; }
+  table { width: 100%; min-width: 600px; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 14px; white-space: nowrap; }
+  th { font-size: 12px; color: var(--dim); font-weight: 600; }
+  td.n, th.n { text-align: right; }
+  .warn { color: var(--warn); font-weight: 600; } .alarm { color: var(--alarm); font-weight: 600; }
+  .note { color: var(--dim); font-size: 13px; }
+  ul.note { padding-left: 18px; margin: 8px 0 0; }
+  .row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  input { font: inherit; font-size: 13px; flex: 1; min-width: 200px; padding: 5px 8px; border: 1px solid var(--line-2); background: var(--well); border-radius: 2px; color: var(--ink); }
+  button { font: inherit; font-size: 13px; padding: 5px 10px; border: 1px solid var(--line-2); background: var(--well); border-radius: 2px; cursor: pointer; color: var(--ink); }
+  button.primary { background: var(--ink); color: var(--well); border-color: var(--ink); }
+  button:disabled { opacity: .5; cursor: default; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Research Data</h1>
+      <p class="sub">Vitals and symptom reports from residents' watches, with identities removed, for researchers studying what living underground does to people.</p>
+    </div>
+    <a href="../" class="note">Back to the twin</a>
+  </header>
+
+  <div id="body"><div class="card">Loading.</div></div>
+
+  <h2>How identities are removed</h2>
+  <ul class="note">
+    <li>Each watch becomes a study number (P001, P002 and so on). The numbering is made in this browser for each export and is not kept, so two exports cannot be joined back to a watch.</li>
+    <li>Family groups, who a message went to, free-text messages and the relay route are never included.</li>
+    <li>What stays: the level and block, the time, the readings, whether the reading came from a device or a script, and whether the device's signature checked out.</li>
+  </ul>
+
+  <h2>Data source</h2>
+  <div class="row"><input id="api" placeholder="API address, e.g. http://localhost:8787" aria-label="API address"><button id="go">Connect</button></div>
+  <p class="note" id="src"></p>
+</main>
+<script>
+// Reads GET /history?kind=vitals, GET /history?kind=button and GET /limits from the Hollow Twin API.
+// Everything shown comes from the API's response; text from it is always escaped.
+const $ = id => document.getElementById(id);
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const LEVELS = ['L0 Gatehouse', 'L1 Crown', 'L2 Arcade', 'L3 Foundry', 'L4 Cistern', 'L5 Millrace', 'L6 Undercroft', 'L7 Marrow', 'L8 Deepwell'];
+const levelOf = b => { const m = /^l(\d)-/.exec(b || ''); return m ? +m[1] : null; };
+const median = a => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y), h = s.length >> 1; return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2; };
+const num = v => typeof v === 'number' && isFinite(v);
+
+let API = '', rows = [], LIM = {};
+try { const q = new URLSearchParams(location.search).get('api'); API = q === 'off' ? '' : q || localStorage.getItem('hollow.api') || ''; } catch (e) { API = ''; }
+API = API.replace(/\/+$/, '');
+$('api').value = API;
+$('go').onclick = () => {
+  API = $('api').value.trim().replace(/\/+$/, '');
+  try { if (API) localStorage.setItem('hollow.api', API); } catch (e) { /* not remembered */ }
+  load();
+};
+
+async function load() {
+  if (!API) {
+    $('body').innerHTML = `<div class="card"><div class="big">No API connected</div><p>This page reads residents' vitals and symptom reports from the Hollow Twin API. Enter its address below. The twin and this page share it.</p><p class="note">For a demo run, start the API (<code>cd api &amp;&amp; npm start</code>) and send the scripted care and outbreak data (<code>npm run scenario -- care</code>, then <code>npm run scenario -- outbreak</code>).</p></div>`;
+    $('src').textContent = 'No API connected.';
+    return;
+  }
+  try {
+    const get = p => fetch(API + p).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    const [v, b, l] = await Promise.all([get('/history?kind=vitals'), get('/history?kind=button'), get('/limits').catch(() => ({}))]);
+    LIM = l || {};
+    build([...(Array.isArray(v) ? v : []), ...(Array.isArray(b) ? b.filter(m => m.values && m.values.button === 'symptom') : [])]);
+    render();
+    $('src').textContent = `Connected to ${API}.`;
+  } catch (e) {
+    $('body').innerHTML = `<div class="card"><div class="big">Cannot reach the API</div><p>${esc(API)} did not answer. Check the address below.</p></div>`;
+    $('src').textContent = `Could not reach ${API}.`;
+  }
+}
+
+function build(msgs) {
+  msgs.sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
+  const ids = new Map();   // watch -> study number, made fresh for every load
+  const pid = d => { if (!ids.has(d)) ids.set(d, 'P' + String(ids.size + 1).padStart(3, '0')); return ids.get(d); };
+  rows = msgs.map(m => {
+    const v = m.values || {}, lv = levelOf(m.block);
+    return {
+      participant: pid(m.device), level: lv, block: m.block, time: m.time, kind: m.kind === 'vitals' ? 'vitals' : 'symptom',
+      hr_bpm: num(v.hr_bpm) ? v.hr_bpm : '', spo2_pct: num(v.spo2_pct) ? v.spo2_pct : '', temp_c: num(v.temp_c) ? v.temp_c : '',
+      from: m.source === 'live' ? 'device' : 'scripted', verified: m.verified ? 'yes' : 'no', plausible: m.plausible === false ? 'no' : 'yes',
+    };
+  });
+}
+
+function render() {
+  const lowKey = LIM.vitals_spo2_low_below_pct, low = lowKey && num(lowKey.value) ? lowKey.value : 94;
+  const out = [];
+  if (!rows.length) {
+    out.push('<div class="card"><div class="big">No vitals or symptom reports yet</div><p class="note">They appear here as watches send them.</p></div>');
+    $('body').innerHTML = out.join('');
+    return;
+  }
+  const people = new Set(rows.map(r => r.participant)).size, scripted = rows.filter(r => r.from === 'scripted').length;
+  out.push(`<div class="card"><div class="big">${rows.length} records from ${people} people</div>
+    <p class="note">${scripted === rows.length ? 'All of them are scripted readings for the demo, not from real wearers.' : scripted ? `${scripted} of them are scripted readings for the demo; the rest came from devices.` : 'All of them came from devices.'} Readings a sensor check flagged as impossible are kept in the file, marked, and left out of the table below.</p>
+    <div class="row"><button class="primary" id="csv">Download the data (CSV)</button></div></div>`);
+
+  out.push(`<h2>By level</h2><div class="scroll"><table><thead><tr><th>Level</th><th class="n">People</th><th class="n">Vitals readings</th><th class="n">Median pulse</th><th class="n">Median blood oxygen</th><th class="n">Readings under ${esc(low)}%</th><th class="n">Symptom reports</th></tr></thead><tbody>`);
+  for (let lv = 0; lv < LEVELS.length; lv++) {
+    const r = rows.filter(x => x.level === lv);
+    if (!r.length) continue;
+    const vit = r.filter(x => x.kind === 'vitals' && x.plausible === 'yes');
+    const hr = median(vit.map(x => x.hr_bpm).filter(num)), sp = median(vit.map(x => x.spo2_pct).filter(num));
+    const lowN = vit.filter(x => num(x.spo2_pct) && x.spo2_pct < low).length;
+    out.push(`<tr><td>${esc(LEVELS[lv])}</td><td class="n">${new Set(r.map(x => x.participant)).size}</td><td class="n">${vit.length}</td><td class="n">${hr == null ? '' : Math.round(hr) + ' bpm'}</td><td class="n ${sp != null && sp < low ? 'alarm' : ''}">${sp == null ? '' : sp + '%'}</td><td class="n ${lowN ? 'warn' : ''}">${lowN}</td><td class="n">${r.filter(x => x.kind === 'symptom').length}</td></tr>`);
+  }
+  out.push('</tbody></table></div>');
+  if (lowKey && lowKey.source) out.push(`<p class="note">Low blood oxygen is under ${esc(low)}%: ${lowKey.url ? `<a href="${esc(lowKey.url)}" target="_blank" rel="noopener">${esc(lowKey.source)}</a>` : esc(lowKey.source)}.</p>`);
+  $('body').innerHTML = out.join('');
+  $('csv').onclick = download;
+}
+
+function download() {
+  const cols = ['participant', 'level', 'block', 'time', 'kind', 'hr_bpm', 'spo2_pct', 'temp_c', 'from', 'verified', 'plausible'];
+  const cell = v => { const t = String(v ?? ''); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+  const text = [cols.join(','), ...rows.map(r => cols.map(c => cell(r[c])).join(','))].join('\n') + '\n';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
+  a.download = `hollow-research-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>
+  // Relative paths (scout.glb, ../watch/) need the folder form: /ar/, not /ar.
+  if (!location.pathname.endsWith('/') && !location.pathname.endsWith('.html')) location.replace(location.pathname + '/' + location.search + location.hash);
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E0F10">
+<title>Hollow Twin in AR</title>
+<meta name="description" content="Try the Hollow Twin family watch on your wrist with your camera, and put the scout rover in your room at real size.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%231A1C1E'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23B9BDC1' stroke-width='2.5'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%233F9A57'/%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --app: #D3D4D0; --panel: #E2E3DF; --well: #ECEDE9; --line: #BABCB7; --line-2: #9DA09B; --ink: #1F2326; --dim: #565B60;
+    --alarm: #C8102E; --ok: #3F9A57; --radio: #2D6FB7; --scene: #0E0F10; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--scene); color: var(--ink); overflow: hidden; }
+  body { font: 14px/1.45 'IBM Plex Sans', system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
+  button { font: inherit; cursor: pointer; border-radius: 999px; border: 1px solid var(--line-2); background: var(--well); color: var(--ink); padding: 9px 14px; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  button.on { background: #33383D; color: #fff; border-color: #33383D; }
+  header { position: fixed; top: 0; left: 0; right: 0; z-index: 20; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: calc(8px + env(safe-area-inset-top)) 12px 8px; background: rgba(226,227,223,.94); border-bottom: 1px solid var(--line); }
+  .brand { font-weight: 600; } .brand a { color: var(--dim); text-decoration: none; font-weight: 400; }
+  .tabs { display: flex; gap: 4px; } .tabs button { padding: 6px 12px; font-size: 13px; }
+  .spacer { flex: 1; }
+  header .links { font-size: 12px; color: var(--dim); } header .links a { color: var(--dim); }
+  section { position: fixed; inset: 0; display: none; }
+  body[data-mode="watch"] #s-watch, body[data-mode="robot"] #s-robot { display: block; }
+
+  /* ---------- try on the watch ---------- */
+  #stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  #stage video, #stage canvas, #stage #css { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #stage video { object-fit: fill; background: #000; }
+  #stage.mirror video { transform: scaleX(-1); }
+  #css { pointer-events: none; }
+  #css iframe { border: 0; border-radius: 50%; background: transparent; pointer-events: auto; }
+  .card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(92vw, 440px); background: var(--panel); border-radius: 16px; padding: 22px; text-align: center; z-index: 10; }
+  .card h1 { font-size: 20px; margin: 0 0 6px; } .card p { color: var(--dim); margin: 6px 0; font-size: 14px; }
+  .card .big { font-size: 16px; font-weight: 600; padding: 12px 22px; margin-top: 10px; background: #33383D; color: #fff; border-color: #33383D; }
+  .card small { display: block; color: var(--dim); margin-top: 10px; font-size: 12px; }
+  #prompt { position: absolute; left: 50%; top: calc(76px + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 9; background: rgba(14,15,16,.72); color: #fff;
+    padding: 8px 14px; border-radius: 999px; font-size: 14px; white-space: nowrap; display: none; }
+  #bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 9; display: none; gap: 8px; justify-content: center; flex-wrap: wrap;
+    padding: 10px 10px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(transparent, rgba(0,0,0,.55)); }
+  #bar button { background: rgba(236,237,233,.95); font-weight: 600; }
+  #bar .okb { color: #2c6e3e; border-color: var(--ok); } #bar .okb:active { background: var(--ok); color: #fff; }
+  #bar .helpb { color: var(--alarm); border-color: var(--alarm); } #bar .helpb.down { background: var(--alarm); color: #fff; }
+  #bar .cutb.on { background: var(--alarm); color: #fff; border-color: var(--alarm); }
+  #bar .small { font-weight: 400; padding: 9px 12px; }
+  #toast { position: absolute; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 9; background: rgba(14,15,16,.8); color: #fff;
+    padding: 8px 14px; border-radius: 10px; font-size: 13px; max-width: 92vw; text-align: center; display: none; }
+
+  /* ---------- robot in your room ---------- */
+  #s-robot { background: radial-gradient(circle at 50% 40%, #2a2d30, #0e0f10 70%); }
+  model-viewer { position: absolute; inset: 0; width: 100%; height: 100%; --poster-color: transparent; }
+  .arbtn { position: absolute; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom)); transform: translateX(-50%); font-size: 17px; font-weight: 600; padding: 14px 26px;
+    background: #fff; border: 0; box-shadow: 0 6px 24px rgba(0,0,0,.4); white-space: nowrap; }
+  #models { position: absolute; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: flex; gap: 6px; z-index: 5; }
+  #models button { background: rgba(236,237,233,.92); }
+  #models button.on { background: #33383D; color: #fff; }
+  #robot-info { position: absolute; left: 12px; top: calc(70px + env(safe-area-inset-top)); color: #C9CBC6; font-size: 13px; max-width: 360px; z-index: 5; text-shadow: 0 1px 2px #000; }
+  #robot-info b { color: #fff; }
+  #qr { position: absolute; right: 16px; bottom: 24px; background: #fff; padding: 10px; border-radius: 10px; text-align: center; font-size: 12px; color: var(--dim); display: none; z-index: 5; width: 168px; }
+  #qr canvas, #qr img { display: block; margin: 0 auto 6px; }
+  @media (max-width: 700px) { header .links { display: none; } #robot-info { display: none; } }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+</head>
+<body data-mode="watch">
+<header>
+  <div class="brand"><a href="../">Hollow Twin</a> / AR</div>
+  <div class="tabs"><button id="t-watch" class="on">Try on the watch</button><button id="t-robot">Robot in your room</button></div>
+  <div class="spacer"></div>
+  <div class="links"><a href="../watch/device/">Watch in 3D</a> · <a href="../scout/">Scout rover</a></div>
+</header>
+
+<section id="s-watch">
+  <div id="stage"><video id="video" playsinline muted></video><div id="css"></div></div>
+  <div class="card" id="start">
+    <h1>Try on the family watch</h1>
+    <p>Point your camera at your wrist, back of the hand toward the camera. The watch goes on your wrist, and its screen is the real watch, connected to the family.</p>
+    <button class="big" id="go">Open the camera</button>
+    <small id="start-note">Hand tracking runs on this phone: nothing from the camera leaves it.</small>
+    <small><a href="#" id="demo">No camera? Watch a demo instead</a></small>
+  </div>
+  <div id="prompt">Show the back of your wrist</div>
+  <div id="toast"></div>
+  <div id="bar">
+    <button class="okb" id="b-ok">I'M OK</button>
+    <button class="helpb" id="b-help">HELP (hold)</button>
+    <button class="cutb" id="b-cut">Cut network</button>
+    <button class="small" id="b-fall">Fall</button>
+    <button class="small" id="b-flip" title="Switch between the front and back cameras">Flip camera</button>
+    <button class="small" id="b-size" title="Wrist size">Size M</button>
+  </div>
+</section>
+
+<section id="s-robot">
+  <model-viewer id="mv" src="scout.glb" alt="The Hollow Twin scout rover" ar ar-modes="webxr scene-viewer quick-look" ar-scale="fixed" ar-placement="floor"
+    camera-controls touch-action="pan-y" auto-rotate autoplay shadow-intensity="1.1" shadow-softness="0.8" exposure="1.05" environment-image="neutral"
+    camera-orbit="35deg 72deg 1.8m" min-camera-orbit="auto auto 0.3m" interaction-prompt="none">
+    <button slot="ar-button" class="arbtn" id="arbtn">View in your room</button>
+  </model-viewer>
+  <div id="robot-info"></div>
+  <div id="models"><button data-m="scout" class="on">Scout rover</button><button data-m="watch">Family watch</button></div>
+  <div id="qr"><div id="qr-code"></div>Open on your phone to put it in your room</div>
+</section>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
+
+const $ = id => document.getElementById(id);
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } } };
+let toastT = null;
+function toast(t, ms = 3200) { const el = $('toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(toastT); toastT = setTimeout(() => el.style.display = 'none', ms); }
+
+// ------------------------------------------------------------------ tabs
+function mode(m) {
+  document.body.dataset.mode = m;
+  $('t-watch').classList.toggle('on', m === 'watch'); $('t-robot').classList.toggle('on', m === 'robot');
+  if (location.hash !== '#' + m) history.replaceState(null, '', '#' + m);
+  if (m === 'robot') robotInfo(); else stopCamera();
+}
+$('t-watch').onclick = () => mode('watch');
+$('t-robot').onclick = () => mode('robot');
+
+// ------------------------------------------------------------------ robot in your room (model-viewer: Quick Look on iPhone, Scene Viewer or WebXR on Android)
+const MODELS = {
+  scout: { src: 'scout.glb', alt: 'The Hollow Twin scout rover', orbit: '35deg 72deg 1.8m',
+    info: '<b>Scout rover, real size</b> (64 x 54 x 75 cm). On a phone, tap <b>View in your room</b> and point at the floor. Walk round it. On Android its wheels turn, the lidar spins and the camera head looks round.' },
+  watch: { src: 'watch.glb', alt: 'The Hollow Twin family watch', orbit: '20deg 60deg 0.16m',
+    info: '<b>Family watch, real size</b> (45 mm). Put it on your table and get close.' },
+};
+const mv = $('mv');
+document.querySelectorAll('#models button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#models button').forEach(x => x.classList.toggle('on', x === b));
+  const M = MODELS[b.dataset.m]; mv.src = M.src; mv.alt = M.alt; mv.cameraOrbit = M.orbit; mv.minCameraOrbit = b.dataset.m === 'watch' ? 'auto auto 0.05m' : 'auto auto 0.3m';
+  robotInfo();
+});
+function robotInfo() {
+  const m = document.querySelector('#models button.on').dataset.m;
+  $('robot-info').innerHTML = MODELS[m].info;
+}
+// a laptop can't place things in a room: show a code to open this page on a phone
+async function showQr() {
+  const phone = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform));
+  if (phone) return;
+  try {
+    await new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js'; sc.onload = ok; sc.onerror = no; document.head.appendChild(sc); });
+    const qr = window.qrcode(0, 'M'); qr.addData(location.href.split('#')[0] + '#robot'); qr.make();
+    $('qr-code').innerHTML = qr.createImgTag(4, 0); $('qr').style.display = 'block';
+  } catch (e) {}
+}
+mv.addEventListener('ar-status', e => { if (e.detail.status === 'failed') toast('AR could not start on this device. Try Chrome on Android or Safari on iPhone.'); });
+
+// ------------------------------------------------------------------ try on the watch: camera, hand tracking, the watch on the wrist
+const stage = $('stage'), video = $('video');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+stage.insertBefore(renderer.domElement, $('css'));
+const css = new CSS3DRenderer({ element: $('css') });
+const scene = new THREE.Scene();
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(0.3, 1, 1); scene.add(key);
+const camera = new THREE.PerspectiveCamera(50, 1, 10, 10000);   // millimetres (the screen layer needs sizes near pixels); the camera at the origin, looking down -Z
+const MM = 1000;
+
+// the watch, in the CAD's own axes (X 3 o'clock, Y 12 o'clock, Z out of the screen), in millimetres
+const wrist = new THREE.Group(); wrist.visible = false; scene.add(wrist);
+const watchCad = new THREE.Group(); wrist.add(watchCad);
+const gltf = await new GLTFLoader().loadAsync('watch.glb');
+gltf.scene.rotation.x = Math.PI / 2;                            // the .glb is Y up; put the CAD's Z back out of the screen
+gltf.scene.scale.setScalar(MM);                                  // and its metres back to millimetres
+watchCad.add(gltf.scene);
+let staticScreen = null;
+gltf.scene.traverse(o => { if (o.isMesh) { o.renderOrder = 1; if (o.name === 'screen') staticScreen = o; } });
+// the wrist: invisible, but it hides the strap behind it
+const occluder = new THREE.Mesh(new THREE.CylinderGeometry(26, 26, 200, 48), new THREE.MeshBasicMaterial({ colorWrite: false }));
+occluder.rotation.z = Math.PI / 2; occluder.position.set(0, 0, -26); occluder.renderOrder = 0; watchCad.add(occluder);
+
+// the live screen: the real watch, in embed mode
+let spec = { size: { active_r: 16.2, screen_z: 12.6 } };
+try { const r = await fetch('../watch/device/cad/watch.json'); if (r.ok) spec = await r.json(); } catch (e) {}
+const FACE_PX = 360, frame = document.createElement('iframe');
+frame.width = FACE_PX; frame.height = FACE_PX; frame.title = 'Watch screen';
+const screenObj = new CSS3DObject(frame);
+screenObj.scale.setScalar(2 * spec.size.active_r / FACE_PX);
+screenObj.position.z = spec.size.screen_z + 0.3;
+watchCad.add(screenObj);
+let frameReady = false;
+function loadFrame() {
+  if (frameReady) return; frameReady = true;
+  const u = new URL('../watch/', location.href); u.searchParams.set('embed', '1'); u.searchParams.set('device', 'watch-0071');
+  const api = store.get('hollow.api', ''); if (api) u.searchParams.set('api', api);
+  frame.src = u.toString();
+}
+const toWatch = m => { try { frame.contentWindow.postMessage({ hollowHw: 1, ...m }, location.origin); } catch (e) {} };
+
+// radio rings off the wrist when the watch sends
+const rings = [], ringGeo = new THREE.RingGeometry(0.96, 1, 96);
+function addRings(radio) {
+  for (let k = 0; k < (radio === 'lora' ? 3 : 1); k++) {
+    const m = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: radio === 'lora' ? 0x4b8fe0 : 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
+    m.position.z = 8; m.renderOrder = 3; watchCad.add(m);
+    rings.push({ m, t0: performance.now() + k * 260, life: radio === 'lora' ? 1600 : 900, max: radio === 'lora' ? 160 : 80 });
+  }
+}
+let netCut = false, shake = 0;
+addEventListener('message', e => {
+  if (e.origin !== location.origin || !e.data || !e.data.hollowWatch) return;
+  const m = e.data;
+  if (m.type === 'tx') { addRings(m.radio); const st = (m.msg && m.msg.values && m.msg.values.status) || ''; toast(m.radio === 'lora' ? `Sent by LoRa radio: the network is cut, the radio isn't.` : st === 'help' ? 'Help call sent: family told, rescue queue too.' : 'Sent. The family has it.'); }
+  if (m.type === 'vibrate') shake = performance.now() + 700;
+  if (m.type === 'alert') toast(`${m.lvl}: ${m.txt}`);
+  if (m.type === 'state') { netCut = m.cut; $('b-cut').classList.toggle('on', netCut); $('b-cut').textContent = netCut ? 'Network is cut' : 'Cut network'; }
+});
+
+// buttons under the camera view
+$('b-ok').onclick = () => toWatch({ type: 'button', which: 'ok' });
+let helpT = null, helpAt = 0;
+$('b-help').addEventListener('pointerdown', e => { e.preventDefault(); helpAt = performance.now(); $('b-help').classList.add('down'); helpT = setTimeout(() => { helpT = null; toWatch({ type: 'button', which: 'help' }); }, 1500); });
+for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) $('b-help').addEventListener(ev, () => {
+  $('b-help').classList.remove('down');
+  if (helpT) { clearTimeout(helpT); helpT = null; if (performance.now() - helpAt >= 1500) toWatch({ type: 'button', which: 'help' }); else if (ev === 'pointerup') toast('Hold HELP for 1.5 seconds.'); }
+});
+$('b-cut').onclick = () => toWatch({ type: 'cut', on: !netCut });
+$('b-fall').onclick = () => { toWatch({ type: 'fall' }); shake = performance.now() + 500; };
+const SIZES = [['S', 0.9], ['M', 1], ['L', 1.12]];
+let sizeI = 1;
+$('b-size').onclick = () => { sizeI = (sizeI + 1) % 3; $('b-size').textContent = `Size ${SIZES[sizeI][0]}`; };
+
+// ---------------- camera
+let stream = null, facing = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'environment' : 'user', landmarker = null, running = false, demo = false;
+async function startCamera() {
+  stopTracks();
+  stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+  video.srcObject = stream; await video.play();
+  stage.classList.toggle('mirror', facing === 'user');
+  layout();
+}
+function stopTracks() { if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; } }
+function stopCamera() {
+  stopTracks();
+  running = false; demo = false;
+  // back to the start card, so the camera can be opened again
+  $('start').style.display = ''; $('bar').style.display = 'none'; $('prompt').style.display = 'none';
+  $('go').disabled = false; $('go').textContent = 'Open the camera';
+}
+$('b-flip').onclick = async () => { facing = facing === 'user' ? 'environment' : 'user'; try { await startCamera(); running = true; } catch (e) { toast('That camera is not available.'); } };
+
+async function loadTracker() {
+  const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
+  const files = await vision.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+  const opts = { baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task', delegate: 'GPU' },
+    runningMode: 'VIDEO', numHands: 1, minHandDetectionConfidence: 0.5, minHandPresenceConfidence: 0.5, minTrackingConfidence: 0.5 };
+  try { return await vision.HandLandmarker.createFromOptions(files, opts); }
+  catch (e) { opts.baseOptions.delegate = 'CPU'; return await vision.HandLandmarker.createFromOptions(files, opts); }
+}
+$('go').onclick = async () => {
+  $('go').disabled = true; $('go').textContent = 'Starting…';
+  try {
+    await startCamera();
+    $('go').textContent = 'Loading hand tracking…';
+    landmarker = landmarker || await loadTracker();
+    $('start').style.display = 'none'; $('bar').style.display = 'flex'; $('prompt').style.display = 'block'; $('b-flip').style.display = '';
+    loadFrame(); running = true; demo = false;
+  } catch (e) {
+    $('go').disabled = false; $('go').textContent = 'Open the camera';
+    $('start-note').textContent = e && e.name === 'NotAllowedError' ? 'The camera was blocked. Allow it in the browser\'s settings for this site, then try again.' : `Could not start: ${e && e.message ? e.message : e}`;
+  }
+};
+$('demo').onclick = e => { e.preventDefault(); demo = true; running = true; loadFrame(); $('start').style.display = 'none'; $('bar').style.display = 'flex'; $('b-flip').style.display = 'none'; stage.classList.remove('mirror'); layout(); };
+
+// The stage is the camera picture, scaled to cover the screen. The 3D canvas and the screen layer use the
+// picture's own pixels, so a landmark at (x, y) of the picture lands on the same spot of the 3D view.
+let VW = 1280, VH = 720, F = 1;
+const HFOV = 63;     // a typical phone or laptop camera's horizontal field of view, in degrees
+function layout() {
+  VW = video.videoWidth || 1280; VH = video.videoHeight || 720;
+  const s = Math.max(innerWidth / VW, innerHeight / VH);
+  stage.style.width = VW + 'px'; stage.style.height = VH + 'px';
+  stage.style.transform = `translate(${(innerWidth - VW * s) / 2}px, ${(innerHeight - VH * s) / 2}px) scale(${s})`;
+  renderer.setSize(VW, VH, false); css.setSize(VW, VH);
+  F = (VW / 2) / Math.tan(THREE.MathUtils.degToRad(HFOV / 2));                 // focal length in picture pixels
+  camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan((VH / 2) / F)); camera.aspect = VW / VH; camera.updateProjectionMatrix();
+}
+addEventListener('resize', layout);
+
+// ---------------- from hand landmarks to the watch's place and turn
+const V = (p, mirror) => new THREE.Vector3(mirror ? -p.x : p.x, -p.y, -p.z);       // MediaPipe world (x right, y down) to three
+const target = { pos: new THREE.Vector3(), quat: new THREE.Quaternion(), seen: 0 };
+let upSign = 1;
+function poseFrom(lm, world, mirror) {
+  const px = i => new THREE.Vector2((mirror ? 1 - lm[i].x : lm[i].x) * VW, lm[i].y * VH);
+  const w = i => V(world[i], mirror);
+  // depth from the least foreshortened bone: real length (metres, from MediaPipe) over its length in the picture
+  let best = Infinity;
+  for (const [a, b] of [[0, 5], [0, 17], [5, 17], [0, 9], [5, 9]]) {
+    const l2 = px(a).distanceTo(px(b)), l3 = w(a).distanceTo(w(b));
+    if (l2 > 4) best = Math.min(best, F * l3 / l2);
+  }
+  if (!isFinite(best)) return false;
+  const D = best;
+  // axes: along the arm toward the fingers, across the knuckles, and out of the back of the hand toward the camera
+  const along = w(9).sub(w(0)).normalize(), across = w(5).sub(w(17)).normalize();
+  const n = new THREE.Vector3().crossVectors(along, across).normalize();
+  if (n.z < 0) n.negate();
+  // the watch's 3 o'clock lies along the arm; pick the way that keeps 12 o'clock up on the screen, with some stickiness
+  let X = along.clone();
+  let Y = new THREE.Vector3().crossVectors(n, X);
+  if (Y.y * upSign < -0.25) upSign = -upSign;
+  if (upSign < 0) { X.negate(); Y.negate(); }
+  const Z = new THREE.Vector3().crossVectors(X, Y).normalize();
+  Y = new THREE.Vector3().crossVectors(Z, X).normalize();
+  target.quat.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, Y, Z));
+  // place: the wrist landmark, then back along the arm toward the elbow and up off the skin
+  const p0 = px(0);
+  const pos = new THREE.Vector3((p0.x - VW / 2) / F * D, -(p0.y - VH / 2) / F * D, -D);
+  pos.addScaledVector(along, -0.028 * SIZES[sizeI][1]).addScaledVector(n, 0.004);
+  target.pos.copy(pos).multiplyScalar(MM); target.seen = performance.now();
+  return true;
+}
+
+// ---------------- frame loop
+let lastVideoTime = -1;
+const tmpN = new THREE.Vector3(), tmpC = new THREE.Vector3();
+function loop() {
+  const now = performance.now();
+  if (running && !demo && landmarker && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
+    lastVideoTime = video.currentTime;
+    const r = landmarker.detectForVideo(video, now);
+    if (r.landmarks && r.landmarks.length && r.worldLandmarks && r.worldLandmarks.length) poseFrom(r.landmarks[0], r.worldLandmarks[0], stage.classList.contains('mirror'));
+  }
+  if (running && demo) {        // no camera: the watch turns slowly in front of you, as if on a wrist
+    const t = now / 1000;
+    target.pos.set(0, -10, -320);
+    target.quat.setFromEuler(new THREE.Euler(-0.55 + 0.18 * Math.sin(t * 0.7), 0.5 * Math.sin(t * 0.45), 0.08 * Math.sin(t * 0.9)));
+    target.seen = now;
+  }
+  const visible = running && now - target.seen < 400;
+  if (visible && !wrist.visible) { wrist.position.copy(target.pos); wrist.quaternion.copy(target.quat); }
+  wrist.visible = visible;
+  $('prompt').style.display = running && !demo && !visible ? 'block' : 'none';
+  if (visible) {
+    wrist.position.lerp(target.pos, 0.45); wrist.quaternion.slerp(target.quat, 0.35);
+    const s = SIZES[sizeI][1]; wrist.scale.setScalar(s);
+    if (now < shake) { wrist.position.x += Math.sin(now * 0.9) * 0.6; wrist.position.y += Math.cos(now * 1.3) * 0.4; }
+  }
+  for (const r of rings.slice()) {
+    const u = (now - r.t0) / r.life; if (u < 0) continue;
+    if (u >= 1) { watchCad.remove(r.m); r.m.material.dispose(); rings.splice(rings.indexOf(r), 1); continue; }
+    r.m.scale.setScalar(26 + (r.max - 26) * u); r.m.material.opacity = (1 - u) * 0.75;
+  }
+  // the live screen shows only when the face is turned toward the camera
+  wrist.updateMatrixWorld();
+  tmpN.set(0, 0, 1).transformDirection(watchCad.matrixWorld); screenObj.getWorldPosition(tmpC);
+  const facing = tmpN.dot(tmpC.clone().negate().normalize());
+  screenObj.visible = visible && facing > 0.2 && frameReady;
+  frame.style.opacity = Math.min(1, Math.max(0, (facing - 0.2) * 5));
+  if (staticScreen) staticScreen.visible = !(screenObj.visible && parseFloat(frame.style.opacity) > 0.5);
+  renderer.render(scene, camera); css.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+layout(); requestAnimationFrame(loop);
+showQr();
+mode(location.hash === '#robot' ? 'robot' : 'watch');
+// for tests: feed landmarks without a camera
+window.__hollowAR = { target, wrist, poseFrom: (lm, world, mirror = false) => { running = true; loadFrame(); $('start').style.display = 'none'; $('bar').style.display = 'flex'; return poseFrom(lm, world, mirror); }, VW: () => VW };
+</script>
+</body>
+</html>

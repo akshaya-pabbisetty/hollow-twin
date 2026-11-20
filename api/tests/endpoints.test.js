@@ -194,7 +194,9 @@ test("GET /broadcast: the latest surface readings, each against its limit, the v
   const b = makeServer();
   await b.start();
   try {
-    const scout = (values, ms = 0) => b.post("/ingest", b.R("surface-01", "surface", "surface", values, Date.now() + ms));
+    // a different scout per reading: this is about the page, not the jump check (tests/sensors.test.js)
+    let scoutNo = 10;
+    const scout = (values, ms = 0) => b.post("/ingest", b.R(`surface-${scoutNo++}`, "surface", "surface", values, Date.now() + ms));
     let page = await b.get("/broadcast");
     assert.deepStrictEqual([page.verdict, page.photo, page.time, page.history], ["not enough data", null, null, "/surface/history"]);
     assert.match(page.text, /^No verdict yet: 3 of the 3 surface readings the contract requires have not been measured \(radiation_usv_h, co2_ppm, temp_c\)/);

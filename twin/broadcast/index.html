@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Surface Broadcast</title>
+<meta name="description" content="What the surface scouts measured, each reading against its published safety limit, and which way back up the readings support. Anyone can read it; nobody can edit it.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --app: #D3D4D0; --panel: #E2E3DF; --well: #ECEDE9; --line: #BABCB7; --line-2: #9DA09B; --ink: #1F2326; --dim: #565B60; --faint: #85898D;
+    --ok: #1f7a4d; --domes: #b07a00; --outposts: #c25a00; --stay: #C8102E; --none: #6b6f73; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--app); color: var(--ink); }
+  body { font: 15px/1.5 'IBM Plex Sans', system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 22px; margin: 0; font-weight: 600; }
+  h2 { font-size: 13px; font-weight: 600; color: var(--dim); margin: 28px 0 8px; }
+  a { color: inherit; }
+  .sub { color: var(--dim); font-size: 13px; margin: 4px 0 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 16px 18px; }
+  .verdict { margin-top: 18px; border-left: 6px solid var(--none); }
+  .verdict .v { font-size: 26px; font-weight: 600; line-height: 1.2; }
+  .verdict p { margin: 8px 0 0; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 2px; background: var(--well); border: 1px solid var(--line-2); margin-left: 6px; vertical-align: middle; }
+  .scroll { overflow-x: auto; }
+  table { width: 100%; min-width: 560px; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 14px; }
+  th { font-size: 12px; color: var(--dim); font-weight: 600; }
+  td.val { white-space: nowrap; font-weight: 600; }
+  .st { font-weight: 600; white-space: nowrap; }
+  .lim { color: var(--dim); font-size: 12px; margin-top: 2px; }
+  .photo { display: grid; grid-template-columns: 220px 1fr; gap: 14px; align-items: start; }
+  .photo .frame { width: 220px; height: 140px; background: #1A1C1E; color: #9a9c98; display: flex; align-items: center; justify-content: center; font-size: 12px; text-align: center; padding: 8px; border-radius: 2px; overflow: hidden; }
+  .photo img { width: 100%; height: 100%; object-fit: cover; }
+  .hist div { padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .hist .t { color: var(--faint); margin-right: 8px; }
+  .note { color: var(--dim); font-size: 13px; }
+  .row { display: flex; gap: 6px; margin-top: 8px; }
+  input { font: inherit; font-size: 13px; flex: 1; min-width: 0; padding: 5px 8px; border: 1px solid var(--line-2); background: var(--well); border-radius: 2px; color: var(--ink); }
+  button { font: inherit; font-size: 13px; padding: 5px 10px; border: 1px solid var(--line-2); background: var(--well); border-radius: 2px; cursor: pointer; color: var(--ink); }
+  @media (max-width: 600px) { .photo { grid-template-columns: 1fr; } .photo .frame { width: 100%; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Surface Broadcast</h1>
+      <p class="sub">What the scouts measured on the surface, live, against published safety limits. Anyone can read this page. Nobody can edit it.</p>
+    </div>
+    <a href="../" class="note">Back to the twin</a>
+  </header>
+
+  <div id="body"><div class="card" style="margin-top:18px">Loading.</div></div>
+
+  <h2>Data source</h2>
+  <div class="row"><input id="api" placeholder="API address, e.g. http://localhost:8787" aria-label="API address"><button id="go">Connect</button></div>
+  <p class="note" id="src"></p>
+</main>
+<script>
+// Reads GET /broadcast and GET /surface/history from the Hollow Twin API (CONTRACT.md section 4.3).
+// Everything shown comes from the API's response; text from it is always set with textContent or escaped.
+const $ = id => document.getElementById(id);
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const COLOR = { 'suits OK': 'var(--ok)', 'sealed domes needed': 'var(--domes)', 'sealed outposts needed': 'var(--outposts)', 'stay underground': 'var(--stay)' };
+const WORDS = { 'suits OK': 'Go up in suits', 'sealed domes needed': 'Sealed domes needed', 'sealed outposts needed': 'Sealed outposts only', 'stay underground': 'Stay underground', 'not enough data': 'Not enough data yet' };
+const SOURCE = { live: 'From devices', simulated: 'Scripted readings', mixed: 'Part device, part scripted' };
+const when = iso => { if (!iso) return ''; const d = new Date(iso); return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+const fmt = (v, u) => v == null ? 'not measured' : `${(+v).toLocaleString('en-US', { maximumFractionDigits: 2 })} ${u || ''}`.trim();
+
+let API = '';
+try { const q = new URLSearchParams(location.search).get('api'); API = q === 'off' ? '' : q || localStorage.getItem('hollow.api') || ''; } catch (e) { API = ''; }
+API = API.replace(/\/+$/, '');
+$('api').value = API;
+$('go').onclick = () => {
+  API = $('api').value.trim().replace(/\/+$/, '');
+  try { if (API) localStorage.setItem('hollow.api', API); } catch (e) { /* not remembered */ }
+  load();
+};
+
+async function load() {
+  if (!API) {
+    $('body').innerHTML = `<div class="card verdict"><div class="v">No API connected</div><p>This page shows what the surface scouts measure, live from the Hollow Twin API. Enter its address below. The twin and this page share it, so a twin that is already connected connects this page too.</p><p class="note">For a demo run, start the API (<code>cd api &amp;&amp; npm start</code>) and send the scripted surface readings (<code>npm run scenario -- surface</code>).</p></div>`;
+    $('src').textContent = 'No API connected.';
+    return;
+  }
+  try {
+    const [b, hist] = await Promise.all([fetch(API + '/broadcast').then(r => r.json()), fetch(API + '/surface/history').then(r => r.json()).catch(() => [])]);
+    render(b, Array.isArray(hist) ? hist : []);
+    $('src').textContent = `Connected to ${API}. Refreshes every 10 seconds.`;
+  } catch (e) {
+    $('body').innerHTML = `<div class="card verdict"><div class="v">Cannot reach the API</div><p>${esc(API)} did not answer. Check the address below.</p></div>`;
+    $('src').textContent = `Could not reach ${API}.`;
+  }
+}
+
+function render(b, hist) {
+  const c = COLOR[b.verdict] || 'var(--none)';
+  const out = [];
+  out.push(`<div class="card verdict" style="border-left-color:${c}">
+    <div class="v" style="color:${c}">${esc(WORDS[b.verdict] || b.verdict)}${b.source ? `<span class="tag">${esc(SOURCE[b.source] || b.source)}</span>` : ''}</div>
+    <p>${esc(b.text)}</p>
+    ${b.time ? `<p class="note">Newest reading behind this verdict: ${esc(when(b.time))}.</p>` : ''}
+  </div>`);
+
+  out.push('<h2>Every reading against its limit</h2><div class="scroll"><table><thead><tr><th>Reading</th><th>Latest</th><th>Status</th><th>Limits and their sources</th></tr></thead><tbody>');
+  for (const r of b.readings || []) {
+    const sc = r.status === 'ok' ? 'var(--ok)' : COLOR[r.status] || 'var(--none)';
+    const st = r.status === 'ok' ? 'Inside every limit' : r.status === 'no data' ? 'No data yet' : r.status === 'not measured' ? 'Not measured (optional)' : WORDS[r.status] || r.status;
+    const lims = (r.limits || []).map(l => `<div class="lim">${esc(WORDS[l.option] || l.option)} if ${esc(l.op)} ${esc(l.value)} ${esc(l.unit)}: ${l.url ? `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.source)}</a>` : esc(l.source)}</div>`).join('');
+    out.push(`<tr><td>${esc(r.label)}${r.required ? '' : ' <span class="note">(optional)</span>'}</td><td class="val">${esc(fmt(r.value, r.unit))}${r.time ? `<div class="lim">${esc(when(r.time))}, ${esc(r.device)}${r.source === 'live' ? (r.verified ? ', verified device' : ', device') : ', scripted'}</div>` : ''}</td><td class="st" style="color:${sc}">${esc(st)}</td><td>${lims}</td></tr>`);
+  }
+  out.push('</tbody></table></div>');
+
+  const ph = b.photo;
+  out.push(`<h2>Latest picture</h2><div class="card photo"><div class="frame" id="frame">${ph ? 'Loading picture' : 'No picture yet'}</div><div>${ph ? `<div>${esc(when(ph.time))}, ${esc(ph.device)}</div><div class="note" style="word-break:break-all">${esc(ph.url)}</div>` : '<div class="note">A scout sends a <code>photo_url</code> with its readings.</div>'}</div></div>`);
+
+  const changes = hist.filter(h => h.type === 'verdict').slice(-8).reverse();
+  out.push('<h2>Public record of verdict changes</h2><div class="card hist">');
+  out.push(changes.length ? changes.map(h => `<div><span class="t">${esc(when(h.time))}</span><b>${esc(WORDS[h.verdict] || h.verdict)}</b>${h.previous ? ` <span class="note">(was ${esc(WORDS[h.previous] || h.previous)})</span>` : ''}${h.reasons && h.reasons[0] ? `<div class="note">${esc(h.reasons[0])}</div>` : ''}</div>`).join('') : '<div class="note">No verdict yet.</div>');
+  out.push(`</div><p class="note">${hist.filter(h => h.type === 'reading').length} surface readings on record. The API only adds to this record; nothing in it can be edited or deleted.</p>`);
+  $('body').innerHTML = out.join('');
+
+  if (ph && /^https?:\/\//.test(ph.url)) {
+    const img = new Image(); img.alt = 'Latest surface picture';
+    img.onload = () => { const f = $('frame'); if (f) { f.textContent = ''; f.appendChild(img); } };
+    img.onerror = () => { const f = $('frame'); if (f) f.textContent = 'The picture could not be loaded'; };
+    img.src = ph.url;
+  }
+}
+
+load();
+setInterval(() => { if (API) load(); }, 10000);
+</script>
+</body>
+</html>

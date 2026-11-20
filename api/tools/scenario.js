@@ -30,6 +30,8 @@ const say = (s) => out(`    ${s}`);
 function check(ok, text) { if (!ok) failed++; out(`    CHECK ${ok ? "ok    " : "FAILED"}: ${text}`); return ok; }
 
 // One contract message. hops and via are 0 and [] unless a relay carried it (see the networkcut shot).
+// time defaults to now. Never stamp a reading a few ms ahead to make it "newer": a time ahead of the API's receive time
+// is replaced (CONTRACT.md 1.3), and two readings with the same time are already ordered by seq.
 const R = (device, block, kind, values, time = Date.now(), route = {}) =>
   ({ id: `${device}-${RUN}-${++counter}`, device, block, time: new Date(time).toISOString(), kind, values, hops: 0, via: [], ...route, source: "simulated" });
 
@@ -211,7 +213,7 @@ shots.water = async () => {
   await beat();
 
   step("2. A salty cup");
-  await send(R(sensor, block, "water", { tds_ppm: 1450, turbidity_ntu: 1.1 }, Date.now() + 1));
+  await send(R(sensor, block, "water", { tds_ppm: 1450, turbidity_ntu: 1.1 }));
   say("dissolved solids 1450 ppm, turbidity 1.1 NTU");
   await beat();
   const got = await inboxNow();
@@ -314,7 +316,7 @@ shots.surface = async () => {
   await beat();
 
   step("2. The radiation reading completes the contract's three");
-  await send(R(scout, up, "surface", { radiation_usv_h: 0.3 }, Date.now() + 2));
+  await send(R(scout, up, "surface", { radiation_usv_h: 0.3 }));
   say("radiation 0.3 uSv/h");
   v = await show();
   for (const r of v.readings) say(`  ${pad(r.label, 12)} ${pad(r.value === null ? "-" : `${r.value} ${r.unit}`, 14)} ${r.status}`);
@@ -346,7 +348,7 @@ shots.surface = async () => {
   await beat();
 
   step("4. The scout moves on and radiation climbs");
-  await send(R(scout, up, "surface", { radiation_usv_h: 2.1 }, Date.now() + 3));
+  await send(R(scout, up, "surface", { radiation_usv_h: 2.1 }));
   say("radiation 2.1 uSv/h");
   v = await show();
   say(`why: ${v.reasons[0]}`);

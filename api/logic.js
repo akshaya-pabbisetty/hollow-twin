@@ -3,6 +3,7 @@
 // Every number comes from shared/limits.json (via ./limits); nothing here is a hard-coded threshold.
 const LIM = require("./limits");
 const B = require("./blocks");
+const O = require("./order");
 
 const HOUR = 3600e3;
 const t = (r) => Date.parse(r.time);
@@ -18,7 +19,7 @@ function gridWhy(hz) {
 const isNum = (x) => typeof x === "number" && !Number.isNaN(x);
 const isAmount = (x) => isNum(x) && x >= 0; // a measured quantity that cannot be negative
 const isPositive = (x) => isNum(x) && x > 0;
-const byTime = (a, b) => t(a) - t(b);
+const byTime = O.byTime; // oldest first; equal times by seq (CONTRACT.md section 1.3)
 
 // Least-squares slope of y against time, per hour. Negative = falling.
 function slopePerHour(pts, y) {
@@ -111,7 +112,7 @@ function sector(blocks = B.list) {
 function measured(readings) {
   const latest = {}; // block -> its newest power message
   for (const r of readings)
-    if (r.kind === "power" && r.plausible !== false && (!latest[r.block] || t(r) >= t(latest[r.block]))) latest[r.block] = r;
+    if (r.kind === "power" && r.plausible !== false && O.newer(r, latest[r.block])) latest[r.block] = r;
   return Object.values(latest).sort(byTime).map((p) => {
     const f = forecast(readings, p.block), b = B.get(p.block);
     return { block: p.block, name: b ? b.name : null, level: b ? b.level : null, people: b ? b.people : null,
@@ -201,19 +202,22 @@ const triage = (v) => triageDetail(v).score;
 // `assigned` maps a help message id to { to, time } once somebody has been sent. status: "open" (the default: nobody
 // sent yet), "assigned", or "all".
 function queue(readings, assigned, now = Date.now(), status = "open") {
+  // open = nobody sent yet; assigned = someone is on the way; delivered = they arrived (see POST /help/<id>/delivered)
+  const stateOf = (id) => { const a = assigned.get(id); return !a ? "open" : a.delivered_at ? "delivered" : "assigned"; };
   const helps = readings.filter((r) => r.kind === "button" && r.values.button === "help" &&
-    (status === "all" || assigned.has(r.id) === (status === "assigned")));
+    (status === "all" || stateOf(r.id) === status));
   const grace = LIM.val("triage_vitals_grace_s") * 1000, per = LIM.val("triage_wait_minutes_per_point");
   return helps.map((h) => {
-    const v = readings.filter((r) => r.device === h.device && r.kind === "vitals" && t(r) <= t(h) + grace)
-      .sort((a, b) => t(b) - t(a))[0];
+    const v = O.newest(readings.filter((r) => r.device === h.device && r.kind === "vitals" && t(r) <= t(h) + grace));
     const wait_min = Math.max(0, (now - t(h)) / 60e3);
     const d = triageDetail(v && v.values);
     const waited = Math.min(LIM.val("triage_wait_max_points"), Math.floor(wait_min / per)); // waiting long raises priority
     if (waited) d.reasons.push(`+${waited}: waited ${Math.floor(wait_min)} min (1 point per ${per} min, design choice)`);
     const a = assigned.get(h.id);
     return { id: h.id, device: h.device, block: h.block, time: h.time, score: d.score + waited, vitals: v ? v.values : null, reasons: d.reasons,
-      status: a ? "assigned" : "open", assigned_to: a ? a.to : null, assigned_at: a ? a.time : null, hops: h.hops, via: h.via, source: h.source };
+      status: stateOf(h.id), assigned_to: a ? a.to : null, assigned_at: a ? a.time : null,
+      delivered_by: a && a.delivered_at ? a.delivered_by : null, delivered_at: a && a.delivered_at ? a.delivered_at : null, note: a && a.note ? a.note : null,
+      hops: h.hops, via: h.via, source: h.source };
   }).sort((a, b) => b.score - a.score || t(a) - t(b));
 }
 

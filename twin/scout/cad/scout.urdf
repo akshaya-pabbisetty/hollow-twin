@@ -1,0 +1,206 @@
+<?xml version="1.0"?>
+<!-- Scout rover (rover-01). Written by robot/cad/scout.py: edit that, not this. Design only, never built. -->
+<robot name="scout_rover">
+  <material name="c0"><color rgba="0.824 0.627 0.118 1"/></material>
+  <material name="c1"><color rgba="0.204 0.220 0.235 1"/></material>
+  <material name="c2"><color rgba="0.725 0.741 0.757 1"/></material>
+  <material name="c3"><color rgba="0.173 0.373 0.525 1"/></material>
+  <material name="c4"><color rgba="0.184 0.420 0.271 1"/></material>
+  <material name="c5"><color rgba="0.090 0.094 0.102 1"/></material>
+  <material name="c6"><color rgba="0.341 0.820 0.478 1"/></material>
+  <material name="c7"><color rgba="0.851 0.859 0.839 1"/></material>
+  <material name="c8"><color rgba="0.702 0.075 0.122 1"/></material>
+  <material name="c9"><color rgba="0.878 0.541 0.000 1"/></material>
+  <material name="c10"><color rgba="0.690 0.553 0.235 1"/></material>
+  <material name="c11"><color rgba="0.114 0.118 0.125 1"/></material>
+  <material name="c12"><color rgba="0.055 0.102 0.141 1"/></material>
+  <material name="c13"><color rgba="1.000 0.953 0.839 1"/></material>
+  <link name="base">
+    <inertial><origin xyz="-0.0045 0.0000 0.0251"/><mass value="5.054"/><inertia ixx="0.055621" ixy="0" ixz="0" iyy="0.116315" iyz="0" izz="0.152424"/></inertial>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/chassis_tub.stl" scale="0.001 0.001 0.001"/></geometry><material name="c0"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/deck_lid.stl" scale="0.001 0.001 0.001"/></geometry><material name="c0"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/bumper.stl" scale="0.001 0.001 0.001"/></geometry><material name="c1"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/bearing_block.stl" scale="0.001 0.001 0.001"/></geometry><material name="c2"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 3.14159"/><geometry><mesh filename="meshes/bearing_block.stl" scale="0.001 0.001 0.001"/></geometry><material name="c2"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/differential.stl" scale="0.001 0.001 0.001"/></geometry><material name="c1"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/battery_pack.stl" scale="0.001 0.001 0.001"/></geometry><material name="c3"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/main_board.stl" scale="0.001 0.001 0.001"/></geometry><material name="c4"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/board_parts.stl" scale="0.001 0.001 0.001"/></geometry><material name="c2"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/motor_drivers.stl" scale="0.001 0.001 0.001"/></geometry><material name="c5"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/power_board.stl" scale="0.001 0.001 0.001"/></geometry><material name="c4"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/relay_box.stl" scale="0.001 0.001 0.001"/></geometry><material name="c1"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/relay_light.stl" scale="0.001 0.001 0.001"/></geometry><material name="c6"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/gas_pod.stl" scale="0.001 0.001 0.001"/></geometry><material name="c7"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/estop_base.stl" scale="0.001 0.001 0.001"/></geometry><material name="c0"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/estop_button.stl" scale="0.001 0.001 0.001"/></geometry><material name="c8"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/beacon_base.stl" scale="0.001 0.001 0.001"/></geometry><material name="c1"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/beacon_dome.stl" scale="0.001 0.001 0.001"/></geometry><material name="c9"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/charge_contacts.stl" scale="0.001 0.001 0.001"/></geometry><material name="c10"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/mast_base.stl" scale="0.001 0.001 0.001"/></geometry><material name="c1"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/mast_servo.stl" scale="0.001 0.001 0.001"/></geometry><material name="c5"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/probe_flange.stl" scale="0.001 0.001 0.001"/></geometry><material name="c1"/></visual>
+    <collision><geometry><box size="0.4400 0.2600 0.1000"/></geometry></collision>
+  </link>
+  <link name="rocker_L">
+    <inertial><origin xyz="0.0650 0.0245 -0.0780"/><mass value="0.831"/><inertia ixx="0.004115" ixy="0" ixz="0" iyy="0.014986" iyz="0" izz="0.012639"/></inertial>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/rocker_L.stl" scale="0.001 0.001 0.001"/></geometry><material name="c1"/></visual>
+    <visual><origin xyz="0.2400 0.0660 -0.1550" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/drive_unit.stl" scale="0.001 0.001 0.001"/></geometry><material name="c2"/></visual>
+  </link>
+  <link name="bogie_L">
+    <inertial><origin xyz="0.0000 0.0145 -0.0320"/><mass value="1.142"/><inertia ixx="0.002325" ixy="0" ixz="0" iyy="0.009790" iyz="0" izz="0.009895"/></inertial>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/bogie_L.stl" scale="0.001 0.001 0.001"/></geometry><material name="c1"/></visual>
+    <visual><origin xyz="0.1200 0.0560 -0.0550" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/drive_unit.stl" scale="0.001 0.001 0.001"/></geometry><material name="c2"/></visual>
+    <visual><origin xyz="-0.1200 0.0560 -0.0550" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/drive_unit.stl" scale="0.001 0.001 0.001"/></geometry><material name="c2"/></visual>
+  </link>
+  <link name="wheel_FL">
+    <inertial><origin xyz="0.0000 0.0000 0.0000"/><mass value="0.410"/><inertia ixx="0.001060" ixy="0" ixz="0" iyy="0.001784" iyz="0" izz="0.001060"/></inertial>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/rim.stl" scale="0.001 0.001 0.001"/></geometry><material name="c0"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/tyre.stl" scale="0.001 0.001 0.001"/></geometry><material name="c11"/></visual>
+    <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.0800" length="0.0700"/></geometry></collision>
+  </link>
+  <link name="wheel_ML">
+    <inertial><origin xyz="0.0000 0.0000 0.0000"/><mass value="0.410"/><inertia ixx="0.001060" ixy="0" ixz="0" iyy="0.001784" iyz="0" izz="0.001060"/></inertial>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/rim.stl" scale="0.001 0.001 0.001"/></geometry><material name="c0"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/tyre.stl" scale="0.001 0.001 0.001"/></geometry><material name="c11"/></visual>
+    <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.0800" length="0.0700"/></geometry></collision>
+  </link>
+  <link name="wheel_RL">
+    <inertial><origin xyz="0.0000 0.0000 0.0000"/><mass value="0.410"/><inertia ixx="0.001060" ixy="0" ixz="0" iyy="0.001784" iyz="0" izz="0.001060"/></inertial>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/rim.stl" scale="0.001 0.001 0.001"/></geometry><material name="c0"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/tyre.stl" scale="0.001 0.001 0.001"/></geometry><material name="c11"/></visual>
+    <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.0800" length="0.0700"/></geometry></collision>
+  </link>
+  <link name="rocker_R">
+    <inertial><origin xyz="0.0650 -0.0245 -0.0780"/><mass value="0.831"/><inertia ixx="0.004115" ixy="0" ixz="0" iyy="0.014986" iyz="0" izz="0.012639"/></inertial>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/rocker_R.stl" scale="0.001 0.001 0.001"/></geometry><material name="c1"/></visual>
+    <visual><origin xyz="0.2400 -0.0660 -0.1550" rpy="0 0 3.14159"/><geometry><mesh filename="meshes/drive_unit.stl" scale="0.001 0.001 0.001"/></geometry><material name="c2"/></visual>
+  </link>
+  <link name="bogie_R">
+    <inertial><origin xyz="0.0000 -0.0145 -0.0320"/><mass value="1.142"/><inertia ixx="0.002325" ixy="0" ixz="0" iyy="0.009790" iyz="0" izz="0.009895"/></inertial>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/bogie_R.stl" scale="0.001 0.001 0.001"/></geometry><material name="c1"/></visual>
+    <visual><origin xyz="0.1200 -0.0560 -0.0550" rpy="0 0 3.14159"/><geometry><mesh filename="meshes/drive_unit.stl" scale="0.001 0.001 0.001"/></geometry><material name="c2"/></visual>
+    <visual><origin xyz="-0.1200 -0.0560 -0.0550" rpy="0 0 3.14159"/><geometry><mesh filename="meshes/drive_unit.stl" scale="0.001 0.001 0.001"/></geometry><material name="c2"/></visual>
+  </link>
+  <link name="wheel_FR">
+    <inertial><origin xyz="0.0000 0.0000 0.0000"/><mass value="0.410"/><inertia ixx="0.001060" ixy="0" ixz="0" iyy="0.001784" iyz="0" izz="0.001060"/></inertial>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 3.14159"/><geometry><mesh filename="meshes/rim.stl" scale="0.001 0.001 0.001"/></geometry><material name="c0"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 3.14159"/><geometry><mesh filename="meshes/tyre.stl" scale="0.001 0.001 0.001"/></geometry><material name="c11"/></visual>
+    <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.0800" length="0.0700"/></geometry></collision>
+  </link>
+  <link name="wheel_MR">
+    <inertial><origin xyz="0.0000 0.0000 0.0000"/><mass value="0.410"/><inertia ixx="0.001060" ixy="0" ixz="0" iyy="0.001784" iyz="0" izz="0.001060"/></inertial>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 3.14159"/><geometry><mesh filename="meshes/rim.stl" scale="0.001 0.001 0.001"/></geometry><material name="c0"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 3.14159"/><geometry><mesh filename="meshes/tyre.stl" scale="0.001 0.001 0.001"/></geometry><material name="c11"/></visual>
+    <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.0800" length="0.0700"/></geometry></collision>
+  </link>
+  <link name="wheel_RR">
+    <inertial><origin xyz="0.0000 0.0000 0.0000"/><mass value="0.410"/><inertia ixx="0.001060" ixy="0" ixz="0" iyy="0.001784" iyz="0" izz="0.001060"/></inertial>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 3.14159"/><geometry><mesh filename="meshes/rim.stl" scale="0.001 0.001 0.001"/></geometry><material name="c0"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 3.14159"/><geometry><mesh filename="meshes/tyre.stl" scale="0.001 0.001 0.001"/></geometry><material name="c11"/></visual>
+    <collision><origin rpy="1.5708 0 0"/><geometry><cylinder radius="0.0800" length="0.0700"/></geometry></collision>
+  </link>
+  <link name="mast">
+    <inertial><origin xyz="-0.0025 0.0000 0.1595"/><mass value="0.142"/><inertia ixx="0.001458" ixy="0" ixz="0" iyy="0.001458" iyz="0" izz="0.000033"/></inertial>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/mast_tube.stl" scale="0.001 0.001 0.001"/></geometry><material name="c5"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/antenna.stl" scale="0.001 0.001 0.001"/></geometry><material name="c5"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/pan_servo.stl" scale="0.001 0.001 0.001"/></geometry><material name="c5"/></visual>
+  </link>
+  <link name="pan">
+    <inertial><origin xyz="0.0000 0.0060 0.0270"/><mass value="0.040"/><inertia ixx="0.000071" ixy="0" ixz="0" iyy="0.000015" iyz="0" izz="0.000067"/></inertial>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/yoke.stl" scale="0.001 0.001 0.001"/></geometry><material name="c1"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/tilt_servo.stl" scale="0.001 0.001 0.001"/></geometry><material name="c5"/></visual>
+  </link>
+  <link name="head">
+    <inertial><origin xyz="0.0090 0.0000 0.0050"/><mass value="0.179"/><inertia ixx="0.000226" ixy="0" ixz="0" iyy="0.000138" iyz="0" izz="0.000234"/></inertial>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/head_housing.stl" scale="0.001 0.001 0.001"/></geometry><material name="c0"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/head_lens.stl" scale="0.001 0.001 0.001"/></geometry><material name="c5"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/head_glass.stl" scale="0.001 0.001 0.001"/></geometry><material name="c12"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/lamp_bezel.stl" scale="0.001 0.001 0.001"/></geometry><material name="c2"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/lamp_lens.stl" scale="0.001 0.001 0.001"/></geometry><material name="c13"/></visual>
+  </link>
+  <link name="lidar">
+    <inertial><origin xyz="0.0000 0.0000 0.0115"/><mass value="0.050"/><inertia ixx="0.000010" ixy="0" ixz="0" iyy="0.000010" iyz="0" izz="0.000015"/></inertial>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/lidar_rotor.stl" scale="0.001 0.001 0.001"/></geometry><material name="c5"/></visual>
+  </link>
+  <link name="probe">
+    <inertial><origin xyz="0.0000 -0.0935 0.0000"/><mass value="0.070"/><inertia ixx="0.000263" ixy="0" ixz="0" iyy="0.000004" iyz="0" izz="0.000261"/></inertial>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/probe_arm.stl" scale="0.001 0.001 0.001"/></geometry><material name="c7"/></visual>
+    <visual><origin xyz="0.0000 0.0000 0.0000" rpy="0 0 0.00000"/><geometry><mesh filename="meshes/probe_strip.stl" scale="0.001 0.001 0.001"/></geometry><material name="c10"/></visual>
+  </link>
+  <joint name="rocker_left" type="revolute">
+    <parent link="base"/><child link="rocker_L"/>
+    <origin xyz="0.0000 0.1690 0.0000"/><axis xyz="0 1 0"/>
+    <limit lower="-0.4887" upper="0.4887" effort="0" velocity="3.0"/>
+  </joint>
+  <joint name="bogie_left" type="revolute">
+    <parent link="rocker_L"/><child link="bogie_L"/>
+    <origin xyz="-0.1200 0.0100 -0.1000"/><axis xyz="0 1 0"/>
+    <limit lower="-0.5585" upper="0.5585" effort="0" velocity="3.0"/>
+  </joint>
+  <joint name="drive_front_left" type="continuous">
+    <parent link="rocker_L"/><child link="wheel_FL"/>
+    <origin xyz="0.2400 0.0660 -0.1550"/><axis xyz="0 1 0"/>
+    <limit effort="6.0" velocity="7.85"/>
+  </joint>
+  <joint name="drive_mid_left" type="continuous">
+    <parent link="bogie_L"/><child link="wheel_ML"/>
+    <origin xyz="0.1200 0.0560 -0.0550"/><axis xyz="0 1 0"/>
+    <limit effort="6.0" velocity="7.85"/>
+  </joint>
+  <joint name="drive_rear_left" type="continuous">
+    <parent link="bogie_L"/><child link="wheel_RL"/>
+    <origin xyz="-0.1200 0.0560 -0.0550"/><axis xyz="0 1 0"/>
+    <limit effort="6.0" velocity="7.85"/>
+  </joint>
+  <joint name="rocker_right" type="revolute">
+    <parent link="base"/><child link="rocker_R"/>
+    <origin xyz="0.0000 -0.1690 0.0000"/><axis xyz="0 1 0"/>
+    <limit lower="-0.4887" upper="0.4887" effort="0" velocity="3.0"/>
+    <mimic joint="rocker_left" multiplier="-1"/>  <!-- the differential -->
+  </joint>
+  <joint name="bogie_right" type="revolute">
+    <parent link="rocker_R"/><child link="bogie_R"/>
+    <origin xyz="-0.1200 -0.0100 -0.1000"/><axis xyz="0 1 0"/>
+    <limit lower="-0.5585" upper="0.5585" effort="0" velocity="3.0"/>
+  </joint>
+  <joint name="drive_front_right" type="continuous">
+    <parent link="rocker_R"/><child link="wheel_FR"/>
+    <origin xyz="0.2400 -0.0660 -0.1550"/><axis xyz="0 1 0"/>
+    <limit effort="6.0" velocity="7.85"/>
+  </joint>
+  <joint name="drive_mid_right" type="continuous">
+    <parent link="bogie_R"/><child link="wheel_MR"/>
+    <origin xyz="0.1200 -0.0560 -0.0550"/><axis xyz="0 1 0"/>
+    <limit effort="6.0" velocity="7.85"/>
+  </joint>
+  <joint name="drive_rear_right" type="continuous">
+    <parent link="bogie_R"/><child link="wheel_RR"/>
+    <origin xyz="-0.1200 -0.0560 -0.0550"/><axis xyz="0 1 0"/>
+    <limit effort="6.0" velocity="7.85"/>
+  </joint>
+  <joint name="mast_fold" type="revolute">
+    <parent link="base"/><child link="mast"/>
+    <origin xyz="-0.1500 0.0000 0.0830"/><axis xyz="0 1 0"/>
+    <limit lower="0.0000" upper="1.5708" effort="2.4" velocity="3.0"/>
+  </joint>
+  <joint name="head_pan" type="revolute">
+    <parent link="mast"/><child link="pan"/>
+    <origin xyz="0.0000 0.0000 0.3340"/><axis xyz="0 0 1"/>
+    <limit lower="-2.6180" upper="2.6180" effort="0.2" velocity="3.0"/>
+  </joint>
+  <joint name="head_tilt" type="revolute">
+    <parent link="pan"/><child link="head"/>
+    <origin xyz="0.0000 0.0000 0.0400"/><axis xyz="0 1 0"/>
+    <limit lower="-1.7453" upper="0.8727" effort="0.2" velocity="3.0"/>
+  </joint>
+  <joint name="lidar_spin" type="continuous">
+    <parent link="head"/><child link="lidar"/>
+    <origin xyz="0.0060 0.0000 0.0380"/><axis xyz="0 0 1"/>
+    <limit effort="0.1" velocity="3.0"/>
+  </joint>
+  <joint name="probe_arm" type="revolute">
+    <parent link="base"/><child link="probe"/>
+    <origin xyz="0.2320 0.0900 -0.0350"/><axis xyz="1 0 0"/>
+    <limit lower="0.0000" upper="1.5708" effort="1.0" velocity="3.0"/>
+  </joint>
+</robot>

@@ -6,3 +6,4 @@ inspo/
 tools/received.ndjson
 .playwright-mcp/
 .claude/
+__pycache__/
