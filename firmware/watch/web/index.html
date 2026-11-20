@@ -3,8 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#D3D4D0">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#F2F2F7">
 <title>Hollow Twin: family watch (phone)</title>
 <link rel="icon" href="data:,">
 <style>
@@ -151,44 +150,144 @@
   dialog .row button.primary { background: var(--ok); border-color: var(--ok); }
   dialog small { color: #6e7681; font-size: 11px; }
 
-  /* ---------- the page around the watch: the same control-room look as the twin, the rover and the 3D watch ----------
-     The round screen keeps its own dark look; everything around it is the residents' kit, labelled like equipment. */
-  .face { color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  html:not(.embed), html:not(.embed) body { background: #D3D4D0; color: #1F2326; font-family: 'IBM Plex Sans', system-ui, sans-serif; }
-  html:not(.embed) .face { border-color: #34383C; box-shadow: 0 0 0 2px #1F2326, 0 18px 40px rgba(0,0,0,.35); }
-  html:not(.embed) .face.cut { border-color: #6b1220; }
-  .devlabel { display: flex; align-items: stretch; border: 2px solid #1F2326; background: #ECEDE9; font: 11px/1.2 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: 1px; text-transform: uppercase; }
-  .devlabel b { background: #F2B705; color: #1F2326; padding: 5px 8px; border-right: 2px solid #1F2326; font-weight: 600; }
-  .devlabel span { padding: 5px 8px; color: #565B60; }
-  html:not(.embed) .net { color: #565B60; }
-  html:not(.embed) .bar button { background: #ECEDE9; border: 1px solid #9DA09B; color: #1F2326; border-radius: 2px; }
-  html:not(.embed) .bar button:hover { border-color: #33383D; }
-  html:not(.embed) .bar button.on { background: #C8102E; border-color: #C8102E; color: #fff; }
-  html:not(.embed) .route .n { border-color: #9DA09B; color: #565B60; background: #ECEDE9; border-radius: 2px; }
-  html:not(.embed) .route .n.lit { border-color: #2D6FB7; color: #fff; background: #2D6FB7; box-shadow: none; }
-  html:not(.embed) .route .w { color: #9DA09B; } html:not(.embed) .route .w.lit { color: #2D6FB7; }
-  .app { background: #E2E3DF; border: 1px solid #BABCB7; border-radius: 2px; padding: 0 16px 16px; color: #1F2326; overflow: hidden; }
-  .app::before { content: ""; display: block; height: 12px; margin: 0 -16px 14px; background: repeating-linear-gradient(-45deg, #1F2326 0 10px, #F2B705 10px 20px); }
-  .app h1 { font-size: 17px; font-weight: 600; letter-spacing: .3px; }
-  .app .sub, .app h2 { color: #565B60; }
-  .app h2 { font-size: 11px; font-weight: 600; }
-  .member, .card { background: #ECEDE9; border: 1px solid #BABCB7; border-radius: 2px; }
-  .member .who span, .card span { color: #565B60; }
-  .member .tag { background: #D3D4D0; color: #565B60; border-radius: 2px; }
-  .member .tag.safe { background: #3F7D4F; color: #fff; } .member .tag.help { background: #C8102E; color: #fff; }
-  .member.help { border-color: #C8102E; }
-  .card.warn { border-color: #E5A100; border-left-width: 4px; } .card.alarm { border-color: #C8102E; border-left-width: 4px; } .card.ok { border-color: #3F7D4F; border-left-width: 4px; }
-  .msg { background: #ECEDE9; border: 1px solid #D0D2CD; border-radius: 2px; color: #1F2326; }
-  .msg.me { background: #DCE6F2; } .msg.help { background: #F6D9DD; border-color: #C8102E; } .msg.safe { background: #DDE9DF; }
-  .msg .meta { color: #565B60; } .msg .code { color: #2D6FB7; }
-  .empty, .note { color: #85898D; }
-  .note code { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
-  dialog { background: #E2E3DF; color: #1F2326; border: 2px solid #1F2326; border-radius: 2px; }
-  dialog label, dialog small { color: #565B60; }
-  dialog input, dialog select { background: #ECEDE9; color: #1F2326; border: 1px solid #9DA09B; border-radius: 2px; }
-  dialog .row button { background: #ECEDE9; border: 1px solid #9DA09B; border-radius: 2px; color: #1F2326; }
-  dialog .row button.primary { background: #33383D; border-color: #33383D; color: #fff; }
-  .app .pagenav a { color: inherit; font-weight: 600; }
+  /* ---------- iOS-style finish ----------
+     System fonts (SF Pro on Apple devices, Segoe UI on Windows), grouped white cards on a soft gray, iOS system
+     colours, and spring curves taken from iOS sheets and buttons. No web fonts, so nothing waits on a font server. */
+  :root {
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --round: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --label: #1C1C1E; --label2: rgba(60,60,67,.62); --label3: rgba(60,60,67,.36); --sep: rgba(60,60,67,.16);
+    --fill: rgba(118,118,128,.12); --fill-dark: rgba(118,118,128,.26);
+    --blue: #007AFF; --green: #34C759; --red: #FF3B30; --orange: #FF9500;
+    --spring: cubic-bezier(.32,.72,0,1); --bounce: cubic-bezier(.34,1.56,.64,1);
+    --ok: #30D158; --ok-hi: #30D158; --danger: #FF453A; --danger-lo: #FF453A; --warn: #FF9F0A; --info: #64D2FF;
+  }
+  html, body, button, input, select { font-family: var(--font); }
+  body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  html:not(.embed), html:not(.embed) body { background: #F2F2F7; color: var(--label); }
+  html:not(.embed) { background: #ECECF1; }
+  html:not(.embed) body { min-height: 100vh; background: radial-gradient(1200px 700px at 30% -10%, #FFFFFF 0%, #F2F2F7 50%, #ECECF1 100%) no-repeat; padding-top: calc(32px + env(safe-area-inset-top)); gap: 40px; }
+  button { transition: transform .35s var(--bounce), background-color .25s, color .25s, box-shadow .25s; }
+  button:active { transform: scale(.96); transition-duration: .08s; }
+  button:focus-visible { outline: 3px solid rgba(0,122,255,.5); outline-offset: 2px; }
+
+  /* the watch: a black face in a graphite case, like the real thing */
+  .face { background: #000; border: 0; color: #fff; font-family: var(--font); }
+  html:not(.embed) .face { box-shadow: 0 0 0 9px #2C2C2E, 0 0 0 10px #48484A, 0 0 0 11px #1C1C1E, 0 30px 60px -10px rgba(0,0,0,.35), 0 12px 24px -8px rgba(0,0,0,.25); }
+  html:not(.embed) .face.cut { box-shadow: 0 0 0 9px #2C2C2E, 0 0 0 10px #FF453A, 0 0 0 11px #1C1C1E, 0 30px 60px -10px rgba(255,59,48,.30), 0 12px 24px -8px rgba(0,0,0,.25); }
+  .clock { font-family: var(--round); font-size: 26px; font-weight: 600; letter-spacing: -.3px; font-variant-numeric: tabular-nums; }
+  .where, .pwr, .talk-hint { font-family: var(--round); letter-spacing: .4px; }
+  .where { color: rgba(235,235,245,.55); }
+  .radio-badge { color: #FF6961; font-family: var(--round); font-weight: 600; }
+  .radio-badge svg { width: 11px; height: 11px; vertical-align: -1px; margin-right: 3px; }
+  .okbtn { font-family: var(--round); font-weight: 700; letter-spacing: -.2px; background: linear-gradient(180deg, #4ADE6B, #28B446);
+    box-shadow: 0 0 0 6px rgba(48,209,88,.16), 0 10px 26px rgba(48,209,88,.32), inset 0 1px 0 rgba(255,255,255,.35); transition: transform .4s var(--bounce), box-shadow .3s; }
+  .okbtn:active { transform: scale(.9); }
+  .okbtn.busy { background: linear-gradient(180deg, #FFB340, #FF9500); box-shadow: 0 0 0 6px rgba(255,159,10,.18); animation: breathe 1.6s ease-in-out infinite; }
+  @keyframes breathe { 50% { box-shadow: 0 0 0 12px rgba(255,159,10,.08); } }
+  .helpbtn { border: 0; background: rgba(255,69,58,.22); color: #FF6961; font-family: var(--round); letter-spacing: .4px; padding: 7px 18px; }
+  .helpbtn.arm { background: #FF453A; color: #fff; animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 8px rgba(255,69,58,.25); } }
+  .sickbtn { border: 0; background: var(--fill-dark); color: rgba(235,235,245,.85); opacity: 1; padding: 5px 14px; }
+  .status { color: rgba(235,235,245,.6); }
+  .status b { color: #fff; }
+  .tabs { gap: 10px; }
+  .tabs button { border: 0; width: 38px; height: 28px; background: var(--fill-dark); color: rgba(235,235,245,.6); display: inline-flex; align-items: center; justify-content: center; }
+  .tabs button.on { background: #fff; color: #000; }
+  .tabs button svg { width: 16px; height: 16px; }
+  .tabs button .pip { position: absolute; top: 3px; right: 6px; }
+  .tabs button { position: relative; }
+  .fam .row { background: rgba(118,118,128,.20); border: 0; border-radius: 12px; }
+  .fam .row span { color: rgba(235,235,245,.6); }
+  .row.help { background: rgba(255,69,58,.22); }
+  .chip { border: 0; background: rgba(118,118,128,.24); border-radius: 14px; color: #fff; }
+  .chip.morse { border: 0; background: rgba(10,132,255,.28); color: #9BD1FF; }
+  .key { border: 0; background: rgba(10,132,255,.22); color: #9BD1FF; box-shadow: inset 0 0 0 2px rgba(10,132,255,.6); transition: transform .3s var(--bounce), background-color .1s; }
+  .key.down { background: #0A84FF; transform: scale(.94); }
+  .mrow button { border: 0; background: rgba(118,118,128,.24); }
+  .mrow .send { background: #0A84FF; }
+  .alert { background: rgba(0,0,0,.92); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+  .alert.show { animation: alertIn .5s var(--bounce); }
+  .alert .txt { font-family: var(--round); letter-spacing: -.2px; }
+  @keyframes alertIn { from { opacity: 0; transform: scale(.86); } to { opacity: 1; transform: none; } }
+  .screen.on { animation: screenIn .45s var(--spring); }
+  @keyframes screenIn { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
+  .s.help { animation: none; box-shadow: 0 0 0 0 rgba(255,59,48,.6); animation: ring 1.4s ease-out infinite; }
+  @keyframes ring { from { box-shadow: 0 0 0 0 rgba(255,59,48,.55); } to { box-shadow: 0 0 0 8px rgba(255,59,48,0); } }
+
+  /* under the watch */
+  .devlabel { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 8px; border-radius: 999px; background: rgba(255,255,255,.75);
+    -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); box-shadow: 0 0 0 .5px var(--sep), 0 2px 8px rgba(0,0,0,.05);
+    font-size: 12px; font-weight: 500; color: var(--label2); margin-bottom: 6px; }
+  .devlabel b { display: inline-flex; align-items: center; gap: 5px; color: var(--label); font-weight: 600; }
+  .devlabel b::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(52,199,89,.18); }
+  .devlabel span::before { content: "· "; }
+  html:not(.embed) .net { color: var(--label2); font-size: 13px; margin-top: 10px; }
+  .dot.up { background: var(--green); } .dot.down { background: var(--red); } .dot.none { background: var(--orange); }
+  html:not(.embed) .bar button { border: 0; border-radius: 12px; padding: 10px 18px; background: var(--fill); color: var(--blue); font-size: 15px; font-weight: 600; }
+  html:not(.embed) .bar button:hover { background: rgba(118,118,128,.18); }
+  html:not(.embed) .bar button.on { background: rgba(255,59,48,.12); color: var(--red); }
+  html:not(.embed) .route { gap: 0; }
+  html:not(.embed) .route .n { border: 0; border-radius: 999px; padding: 5px 10px; background: var(--fill); color: var(--label2); font-size: 12px; font-weight: 500; transition: background-color .4s var(--spring), color .4s; }
+  html:not(.embed) .route .n.lit { background: var(--blue); color: #fff; box-shadow: 0 4px 12px rgba(0,122,255,.3); }
+  .route .w { display: inline-block; width: 18px; height: 2px; border-radius: 1px; background: rgba(60,60,67,.2); transition: background-color .4s; }
+  .route .w.lit { background: var(--blue); }
+
+  /* the family app: an iOS inset-grouped screen */
+  .app { width: min(92vw, 390px); background: rgba(242,242,247,.86); -webkit-backdrop-filter: blur(30px) saturate(180%); backdrop-filter: blur(30px) saturate(180%);
+    border: 0; border-radius: 36px; padding: 26px 18px 22px; color: var(--label); overflow: hidden;
+    box-shadow: 0 0 0 .5px rgba(0,0,0,.08), 0 40px 80px -20px rgba(0,0,0,.22), 0 16px 32px -12px rgba(0,0,0,.12); }
+  .app::before { content: none; }
+  .app h1 { font-size: 30px; font-weight: 700; letter-spacing: -.6px; margin: 0 0 0 4px; }
+  .app .sub { color: var(--label2); font-size: 13px; margin: 2px 0 6px 4px; }
+  .app h2 { font-size: 13px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--label2); margin: 20px 0 7px 16px; }
+  .card { background: #fff; border: 0; border-radius: 14px; padding: 12px 16px; font-size: 15px; color: var(--label); position: relative; overflow: hidden; }
+  .card b { font-size: 15px; font-weight: 600; } .card span { color: var(--label2); font-size: 13px; }
+  .card.warn, .card.alarm, .card.ok { border: 0; padding-left: 22px; }
+  .card.warn::before, .card.alarm::before, .card.ok::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; }
+  .card.warn::before { background: var(--orange); } .card.alarm::before { background: var(--red); } .card.ok::before { background: var(--green); }
+  #fam-app { background: #fff; border-radius: 14px; overflow: hidden; }
+  .member { background: none; border: 0; border-radius: 0; margin: 0; padding: 11px 16px; gap: 12px; position: relative; }
+  .member + .member::before { content: ""; position: absolute; top: 0; left: 60px; right: 0; height: .5px; background: var(--sep); }
+  .member .s { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; font-style: normal; font-size: 14px; font-weight: 600; color: #fff;
+    background: linear-gradient(180deg, #AEAEB2, #8E8E93); box-shadow: none; }
+  .member .s.safe { background: linear-gradient(180deg, #4CD964, #30B94D); }
+  .member .s.help { background: linear-gradient(180deg, #FF6B5E, #FF3B30); }
+  .member .who b { font-size: 16px; font-weight: 500; } .member .who span { color: var(--label2); font-size: 13px; }
+  .member .tag { border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 600; background: var(--fill); color: var(--label2); }
+  .member .tag.safe { background: rgba(52,199,89,.14); color: #248A3D; } .member .tag.help { background: rgba(255,59,48,.12); color: #D70015; }
+  .member.help { border: 0; }
+  .log { gap: 4px; padding: 2px 2px 0; }
+  .msg { border: 0; border-radius: 18px; padding: 8px 13px; font-size: 15px; background: #fff; color: var(--label); max-width: 80%; align-self: flex-start; }
+  .msg.me { align-self: flex-end; background: var(--blue); color: #fff; }
+  .msg.me .meta { color: rgba(255,255,255,.75); }
+  .msg.help { background: var(--red); color: #fff; border: 0; } .msg.help .meta { color: rgba(255,255,255,.8); }
+  .msg.safe:not(.me) { background: #E3F6E8; }
+  .msg .meta { color: var(--label2); font-size: 11px; }
+  .msg .code { font-family: var(--mono); color: inherit; opacity: .8; }
+  .log .msg:first-child { animation: bubbleIn .5s var(--bounce); transform-origin: bottom left; }
+  .log .msg.me:first-child { transform-origin: bottom right; }
+  @keyframes bubbleIn { from { opacity: 0; transform: scale(.7) translateY(10px); } to { opacity: 1; transform: none; } }
+  .empty { color: var(--label3); font-size: 14px; padding: 4px 16px; }
+  .note { color: var(--label3); font-size: 12px; margin: 14px 6px 0; line-height: 1.45; }
+  .note code { font-family: var(--mono); font-size: 11px; }
+  .app .pagenav { color: var(--label2); } .app .pagenav a { color: var(--blue); font-weight: 500; text-decoration: none; }
+
+  /* settings: an iOS sheet */
+  dialog { background: #F2F2F7; color: var(--label); border: 0; border-radius: 22px; padding: 22px 20px; width: min(92vw, 440px);
+    box-shadow: 0 40px 100px rgba(0,0,0,.3); }
+  dialog[open] { animation: sheetIn .55s var(--spring); }
+  @keyframes sheetIn { from { opacity: 0; transform: translateY(40px) scale(.97); } to { opacity: 1; transform: none; } }
+  dialog::backdrop { background: rgba(0,0,0,.25); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  dialog h2 { font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
+  dialog label { color: var(--label2); font-size: 13px; margin: 14px 0 6px 4px; }
+  dialog small { color: var(--label3); font-size: 12px; display: block; margin: 6px 4px 0; }
+  dialog input, dialog select { background: #fff; color: var(--label); border: 0; border-radius: 10px; padding: 11px 12px; font-size: 15px; box-shadow: 0 0 0 .5px var(--sep); }
+  dialog input:focus, dialog select:focus { outline: none; box-shadow: 0 0 0 3px rgba(0,122,255,.35); }
+  dialog .row button { border: 0; border-radius: 12px; padding: 11px 20px; background: var(--fill); color: var(--blue); font-weight: 600; font-size: 15px; }
+  dialog .row button.primary { background: var(--blue); color: #fff; }
+  @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
@@ -200,7 +299,7 @@
       <div class="clock" id="clock">--:--</div>
       <div class="where" id="where">—</div>
       <div class="pwr" id="pwr"></div>
-      <div class="radio-badge">📡 RADIO ONLY · NETWORK CUT</div>
+      <div class="radio-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M8.5 15.5a5 5 0 0 1 0-7M15.5 8.5a5 5 0 0 1 0 7M5.6 18.4a9 9 0 0 1 0-12.8M18.4 5.6a9 9 0 0 1 0 12.8"/></svg>RADIO ONLY · NETWORK CUT</div>
     </div>
 
     <!-- home: tell the family you're safe, or that you need help -->
@@ -231,9 +330,9 @@
     </div>
 
     <div class="tabs">
-      <button data-s="home" class="on" aria-label="Home">●</button>
-      <button data-s="family" aria-label="Family">👪<span class="pip"></span></button>
-      <button data-s="talk" aria-label="Talk">📻</button>
+      <button data-s="home" class="on" aria-label="Home"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3.2 2.8 11a1 1 0 0 0 1.3 1.5l.9-.8V20a1 1 0 0 0 1 1h4v-5.5h4V21h4a1 1 0 0 0 1-1v-8.3l.9.8a1 1 0 1 0 1.3-1.5Z"/></svg></button>
+      <button data-s="family" aria-label="Family"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="8" r="3.6"/><circle cx="17" cy="9.5" r="2.8"/><path d="M2.5 19.5c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6v.5h-13Z"/><path d="M16.5 20h5v-.4c0-2.8-2-4.6-4.6-4.6-.8 0-1.5.1-2.1.4 1 1.1 1.7 2.6 1.7 4.6Z"/></svg><span class="pip"></span></button>
+      <button data-s="talk" aria-label="Talk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M8.5 15.5a5 5 0 0 1 0-7M15.5 8.5a5 5 0 0 1 0 7M5.6 18.4a9 9 0 0 1 0-12.8M18.4 5.6a9 9 0 0 1 0 12.8"/></svg></button>
     </div>
 
     <div class="alert" id="alert" role="alert">
@@ -545,10 +644,10 @@ function neighbour(b) {
 }
 function drawRoute(lit = -1) {
   const nodes = ['Watch', 'Relay · ' + shortName(cfg.block), 'Relay · ' + shortName(neighbour(cfg.block)), 'Uplink'];
-  $('route').innerHTML = nodes.map((n, i) => (i ? `<span class="w${i <= lit ? ' lit' : ''}">〰</span>` : '') + `<span class="n${i <= lit ? ' lit' : ''}">${n}</span>`).join('');
+  $('route').innerHTML = nodes.map((n, i) => (i ? `<span class="w${i <= lit ? ' lit' : ''}"></span>` : '') + `<span class="n${i <= lit ? ' lit' : ''}">${n}</span>`).join('');
 }
 async function sendByRadio(msgs) {
-  const steps = [`📡 Radio → <b>${shortName(cfg.block)}</b> relay`, `📡 Radio → <b>${shortName(neighbour(cfg.block))}</b> relay`, `↑ ${shortName(neighbour(cfg.block))} still has a line out`];
+  const steps = [`Radio → <b>${shortName(cfg.block)}</b> relay`, `Radio → <b>${shortName(neighbour(cfg.block))}</b> relay`, `↑ ${shortName(neighbour(cfg.block))} still has a line out`];
   show('home'); drawRoute(0);
   for (let i = 0; i < steps.length; i++) { await wait(650); drawRoute(i + 1); say(steps[i]); }
   for (const m of msgs) if (!m.via.length) { m.hops = 2; m.via = [`relay-${cfg.block}`, `relay-${neighbour(cfg.block)}`]; }
@@ -706,6 +805,7 @@ function familyRows() {
   });
 }
 
+let lastLogHtml = '';
 function paint() {
   $('clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   $('where').textContent = pretty(cfg.block) + ' · ' + cfg.name;
@@ -728,17 +828,18 @@ function paint() {
 
   const rows = familyRows();
   $('fam-watch').innerHTML = rows.map(r => `<div class="row ${r.st}"><i class="s ${r.st}"></i><b>${esc(r.name)}</b><span>${r.label}</span></div>`).join('');
-  $('fam-app').innerHTML = rows.map(r => `<div class="member ${r.st}"><i class="s ${r.st}"></i><div class="who"><b>${esc(r.name)}</b><span>${esc(r.detail)}</span></div><span class="tag ${r.st}">${r.label}</span></div>`).join('');
+  $('fam-app').innerHTML = rows.map(r => `<div class="member ${r.st}"><i class="s ${r.st}">${esc((r.name || '?').slice(0, 1).toUpperCase())}</i><div class="who"><b>${esc(r.name)}</b><span>${esc(r.detail)}</span></div><span class="tag ${r.st}">${r.label}</span></div>`).join('');
   $('app-sub').textContent = `${cfg.name} · ${cfg.device} · family ${cfg.family}`;
 
   if (log.length) {
-    $('log').innerHTML = log.slice().reverse().map(e => {
+    const logHtml = log.slice().reverse().map(e => {
       const p = parse(e.status), me = e.from === cfg.device;
-      const body = p.type === 'safe' ? `✅ ${me ? "I'm safe" : 'Safe'}` : p.type === 'help' ? `🆘 ${me ? 'I need help' : 'Needs help'}` : esc(p.text);
+      const body = p.type === 'safe' ? `${me ? "I'm safe" : 'Safe'}` : p.type === 'help' ? `${me ? 'I need help' : 'Needs help'}` : esc(p.text);
       const code = p.type === 'morse' ? `<span class="code">${showCode(toCode(p.text))}</span>` : '';
       const meta = `${esc(nameOf(e.from))} · ${hhmm(e.time)}${p.type === 'morse' ? ' · Morse' : ''}${e.hops ? ` · radio, ${hops(e.hops)}` : ''}`;
       return `<div class="msg ${me ? 'me' : ''} ${p.type}"><span class="meta">${meta}</span>${body}${code}</div>`;
     }).join('');
+    if (logHtml !== lastLogHtml) { lastLogHtml = logHtml; $('log').innerHTML = logHtml; }
   }
 }
 
