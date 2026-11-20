@@ -181,6 +181,17 @@
   #intro p { margin: 0 0 14px; font-size: 14px; line-height: 1.5; }
   #intro p.small { margin: 12px 0 0; font-size: 12px; color: var(--dim); }
   #intro button { padding: 9px 12px; font-size: 13px; }
+  #intro ol.path { margin: 0 0 14px; padding: 0; list-style: none; counter-reset: p; }
+  #intro ol.path li { counter-increment: p; display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: baseline; padding: 7px 0; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.4; }
+  #intro ol.path li::before { content: counter(p); font-weight: 600; text-align: center; background: var(--ink); color: var(--panel); border-radius: 2px; line-height: 22px; }
+  #intro ol.path a { color: var(--ink); font-weight: 600; }
+  #intro ol.path span { color: var(--dim); }
+  #next { position: absolute; right: 16px; bottom: 36px; z-index: 7; display: none; width: min(360px, calc(100% - 32px)); background: var(--panel); border: 1px solid var(--line-2); border-radius: 3px; padding: 14px 16px 12px; box-shadow: 0 10px 30px rgba(0,0,0,.45); font-size: 13px; line-height: 1.45; }
+  #next h2 { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
+  #next ul { margin: 0 0 10px; padding-left: 18px; }
+  #next li { margin: 4px 0; }
+  #next a { color: var(--ink); font-weight: 600; }
+  #next button { padding: 6px 10px; font-size: 12px; }
   button.primary { background: var(--sel); color: #fff; border-color: var(--sel); }
   #story { position: fixed; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 20; width: min(1000px, calc(100% - 24px)); background: var(--panel); border: 1px solid var(--line-2); border-radius: 3px; padding: 10px 14px 12px; box-shadow: 0 8px 30px rgba(0,0,0,.45); display: none; }
   #story .head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
@@ -279,14 +290,29 @@
       <div class="card">
         <h1>Hollow Twin</h1>
         <p>A working model of one sector of the Hollow. It warns blocks before they go dark, shares power fairly when there is not enough, and gets a family's "I'm OK" through when the Directorate cuts the network.</p>
-        <div class="row"><button id="intro-play" class="primary">Play the 75-second story</button><button id="intro-explore">Explore on my own</button></div>
-        <p class="small">Everything shown is simulated unless it is tagged as coming from a device.</p>
+        <ol class="path" aria-label="Start here">
+          <li><div>Play the story <span>(75 s). It shows a power failure under the Directorate's rule, then the same failure shared fairly.</span></div></li>
+          <li><div><a href="watch/device/" target="hollow-watch">Open the family watch</a> <span>and press I'M OK, then Cut network and hold HELP.</span></div></li>
+          <li><div><a href="ar/" target="hollow-ar">Try the watch on your wrist</a> <span>with your phone's camera, or put the rover in your room.</span></div></li>
+        </ol>
+        <div class="row"><button id="intro-play" class="primary">Start: play the story</button><button id="intro-explore">Explore on my own</button></div>
+        <p class="small">Everything shown is simulated unless it is tagged as coming from a device. You can replay the story any time from the button at the top right of the 3D view.</p>
       </div>
     </div>
     <div id="story">
       <div class="head"><span class="ttl" id="story-title"></span><span class="step" id="story-step"></span><button id="story-back">Back</button><button id="story-next">Next</button><button id="story-exit">Exit</button></div>
       <div class="cap" id="story-cap"></div>
       <div class="bar"><span id="story-bar"></span></div>
+    </div>
+    <div id="next" role="dialog" aria-label="Try it yourself">
+      <h2>Now try it yourself</h2>
+      <ul>
+        <li>Switch <b>Power policy</b> on the left between Directorate and Fair share, and watch the deep levels.</li>
+        <li>Press <b>Cut Directorate network</b>: messages reroute relay to relay.</li>
+        <li>Click any block to step inside and read its card.</li>
+        <li><a href="watch/device/" target="hollow-watch">Open the family watch</a> or <a href="ar/" target="hollow-ar">try it in AR</a>.</li>
+      </ul>
+      <div class="row"><button id="next-close">Got it</button></div>
     </div>
     <div class="corner tl">Drag to orbit, scroll to zoom, click a block to step inside. Esc steps back.</div>
     <div class="corner br" id="corner-br"></div>
@@ -2194,10 +2220,10 @@ function apiPaint() {
   const pill = $('h-api'), r = api.status && api.status.readings;
   if (!api.url) { pill.textContent = 'Twin simulation'; pill.className = 'pill ok'; }
   else if (api.state === 'on') { pill.textContent = r && r.live ? `API connected, ${fmtInt(r.live)} device reading${r.live > 1 ? 's' : ''}` : 'API connected'; pill.className = 'pill ' + (r && r.live ? 'live' : 'ok'); }
-  else if (api.state === 'error') { pill.textContent = 'API unreachable'; pill.className = 'pill ok'; }
+  else if (api.state === 'error') { pill.textContent = 'API unreachable, showing simulation'; pill.className = 'pill ok'; pill.title = 'See Data source at the bottom of the left panel.'; }
   else { pill.textContent = 'API connecting'; pill.className = 'pill ok'; }
-  $('api-note').textContent = !api.url ? 'No API connected. Every number is the twin\'s own simulation.'
-    : api.state === 'error' ? `Could not reach ${api.url}. Showing the twin's own simulation.`
+  $('api-note').textContent = !api.url ? 'No API connected. Every number is the twin\'s own simulation. To see real device check-ins, paste the team\'s API address (in the README) and press Connect.'
+    : api.state === 'error' ? `Could not reach ${api.url}. Check the address, or clear it and press Connect to go back to the simulation. Until then the twin shows its own simulation.`
     : api.state !== 'on' || !r ? `Connecting to ${api.url}.`
     : `Connected. ${fmtInt(r.total)} readings stored: ${fmtInt(r.live)} from devices (${fmtInt(r.verified)} with a verified signature), ${fmtInt(r.simulated)} scripted. Blocks without API data keep the twin's simulation.`;
   $('api-go').textContent = api.url ? 'Reconnect' : 'Connect';
@@ -2567,11 +2593,13 @@ function endStory() {
   $('story').style.display = 'none'; $('story-btn').style.display = ''; $('story-btn').textContent = 'Replay the 75-second story';
   document.querySelectorAll('.corner').forEach(c => c.style.display = '');
   if (speed !== 1) setSpeed(1);
+  $('next').style.display = 'block';
 }
 function closeIntro() { $('intro').style.display = 'none'; $('story-btn').style.display = ''; try { sessionStorage.setItem('hollow.seen', '1'); } catch (e) { /* storage blocked: the intro shows again next load */ } }
 $('intro-play').onclick = () => { closeIntro(); startStory(); };
 $('intro-explore').onclick = closeIntro;
-$('story-btn').onclick = startStory;
+$('story-btn').onclick = () => { $('next').style.display = 'none'; startStory(); };
+$('next-close').onclick = () => { $('next').style.display = 'none'; };
 $('story-next').onclick = () => { if (story.i + 1 < BEATS.length) playBeat(story.i + 1); else endStory(); };
 $('story-back').onclick = () => { if (story.i > 0) playBeat(story.i - 1); };
 $('story-exit').onclick = endStory;
