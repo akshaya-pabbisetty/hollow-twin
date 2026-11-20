@@ -39,5 +39,18 @@ python3 -m http.server 8080        # then open http://localhost:8080
 cp firmware/watch/web/index.html twin/watch/index.html
 ```
 
+The 3D watch is at `/watch/device/` ([`watch/device/`](watch/device/)): the CAD model, with the watch above running on its screen. Its `cad/` folder is written by `firmware/watch/cad/watch.py`.
+
 A new watch uses the API this browser's twin is connected to (`hollow.api`), or `TWIN_API` in the watch file. Once the API is hosted, set `TWIN_API` there as well as `DEFAULT_API` here.
+
+## AR at `/ar`
+
+[`ar/`](ar/) is two things to do with a phone, at https://hollow-twin.vercel.app/ar/:
+
+- **Try on the watch** (`/ar/#watch`): the camera and hand tracking (MediaPipe Hand Landmarker, running in the browser, so nothing from the camera leaves the phone) put the family watch on your wrist. It follows the wrist as it turns, the strap goes behind the arm, and the screen is the real watch (the phone watch in embed mode). The buttons under the picture press I'M OK and HELP, cut the network (radio rings spread from the wrist) and simulate a fall. Show the back of your wrist to the camera. **Flip camera** switches front and back, and **Size** sets the wrist size. **No camera? Watch a demo instead** shows the watch turning without a camera.
+- **Robot in your room** (`/ar/#robot`): the scout rover at real size, and the watch, through `<model-viewer>`. **View in your room** opens Quick Look on an iPhone, and Scene Viewer or WebXR on Android. On Android the rover's wheels turn, the lidar spins and the head looks round. On a laptop the page shows a QR code to open it on a phone.
+
+`ar/scout.glb` and `ar/watch.glb` are written by [`tools/ar_models.py`](../tools/ar_models.py) from the two CAD exports (`scout/cad/`, `watch/device/cad/`). Run it after either CAD script: `pip install numpy pygltflib pillow`, then `python3 tools/ar_models.py`. Both pass the Khronos glTF validator with no errors or warnings.
+
+The camera needs HTTPS (the Vercel site) or `localhost`.
 

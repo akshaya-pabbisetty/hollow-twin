@@ -7,7 +7,9 @@ Two watches are built:
 | [`watch.ino`](watch.ino) | An Arduino with I'm OK, help and I feel sick buttons and a buzzer, wired by USB to a Raspberry Pi relay ([`../relay/relay.py`](../relay/relay.py)) that signs its messages and holds them through a real network cut | [`docs/HARDWARE.md`](../../docs/HARDWARE.md) |
 | [`web/index.html`](web/index.html) | The family watch on a phone: I'M OK, help, I feel sick, family status, its block's power, its help call, walkie-talkie presets and Morse. Its relays are simulated | below |
 
-The ESP32 wrist watch described next is the original design and is not built.
+| [`cad/watch.py`](cad/watch.py) | The wearable in CAD (CadQuery): case, buttons, strap and everything inside. Shown in 3D at **https://hollow-twin.vercel.app/watch/device/**, with the phone watch running on its screen. | [The family watch in 3D](#the-family-watch-in-3d-twinwatchdevice) |
+
+The ESP32 wrist watch described next is the original design. It is not built, but it is now drawn in CAD: see [the family watch in 3D](#the-family-watch-in-3d-twinwatchdevice).
 
 An ESP32 board with a small screen and battery, a MAX30102 pulse and oxygen sensor, a temperature sensor, three buttons (help, symptom, I'm OK) and a buzzer, on a wrist strap.
 
@@ -68,3 +70,28 @@ cd firmware/watch/web && python3 -m http.server 8000
 Dad never checks in, so he shows "No word". For two phones on the same Wi-Fi, use the laptop's address instead of `localhost` in both places. Every setting can go in the link: `api`, `device`, `name`, `block`, `family`, `to`.
 
 On camera, say "watch and family app, prototyped on a phone, with simulated relays". Real ESP32 relays would carry the same messages; nothing else changes.
+
+## The family watch in 3D: [`twin/watch/device/`](../../twin/watch/device/)
+
+**https://hollow-twin.vercel.app/watch/device/** The wearable the prototypes become, built the same way as the scout rover: one CAD script, [`cad/watch.py`](cad/watch.py), writes `watch.step` (any CAD program), `watch.json` (parts, bill of materials) and a mesh per part into `twin/watch/device/cad/`. Run it again after a change: `pip install cadquery`, then `python3 firmware/watch/cad/watch.py`.
+
+**What's in it:** a 45 mm nylon case with a sapphire glass and an aluminium bezel; a 1.28 in round touch screen; an ESP32-S3 (Wi-Fi and Bluetooth to the relay box); a **LoRa radio** (SX1262) with a flexible antenna along the case wall, for when the network is cut; a heart-rate and blood-oxygen sensor (MAX30102) behind a window in the back, a skin temperature sensor (MAX30208) and a motion sensor (BMI270) for falls; a vibration motor and a buzzer; a 260 mAh battery that charges from two pads on a relay box's dock. Three buttons: green **I'M OK** (2 o'clock), red **HELP** (4 o'clock, hold) and a blue **Morse key** (9 o'clock). 28 parts, about 48 g with the strap and $64 in parts. Each line of the parts list says what it does and which HackFest problem it serves.
+
+**Wear it** (the first tab): the screen is the real watch. It is this folder's `web/index.html` in embed mode (`?embed=1`), so it talks to the API exactly as the phone watch does. The page around it plays the hardware:
+
+- **The buttons** on the 3D watch (or the buttons in the panel, or O, hold H, Space) press the watch's I'M OK, HELP and Morse key. HELP needs a 1.5 second hold.
+- **Cut the network** and messages go out by LoRa radio: the antenna lights up and radio rings spread from the watch.
+- **The wearer**: heart rate, blood oxygen and temperature (presets: resting, working, lung sickness) go to the API as `vitals` every 30 seconds, tagged `source: simulated`. The API uses them to rank a help call: with "lung sickness" a help call scores 115 ("SpO2 89 % is below 92 %").
+- **Fall**: the watch asks "Are you OK?" and calls for help by itself after 15 seconds with no answer.
+- **Inside, right now** lights each part while it works (radio sending, motor buzzing, buzzer beeping), and the motor shakes the watch when an alert arrives.
+
+**On your own wrist:** https://hollow-twin.vercel.app/ar/ puts this watch on your wrist through the phone's camera, with the same live screen. See [`twin/README.md`](../../twin/README.md#ar-at-ar).
+
+**Parts** (the second tab): pull it apart, see inside the case, hide the strap, and click any part for what it is and what it's for.
+
+With no API address the page runs in local mode, and the family answers on its own. With one (the address the twin uses, or `?api=`), every press reaches the API and the twin; sending needs the API key, typed once in **Connect**.
+
+The case is a design: the working watches are the phone watch and the Arduino. The page says so in its header.
+
+**Embed mode, for anyone building on it:** `web/index.html?embed=1` inside a same-origin frame shows only the round face, and talks to its parent with `postMessage`. It sends `{hollowWatch: 1, type}` with `tx` (radio `wifi` or `lora`, and the message), `alert`, `vibrate`, `beep`, `tone` and a `state` report every second. It takes `{hollowHw: 1, type}` with `button` (`ok` or `help`), `morse-down`, `morse-up`, `morse-send`, `cut` (`on`), `fall` and `config` (`api`, `key`).
+

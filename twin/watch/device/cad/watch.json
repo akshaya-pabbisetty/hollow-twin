@@ -1,0 +1,1224 @@
+{
+ "name": "Family watch",
+ "device": "watch-0071",
+ "units": "mm",
+ "axes": "X toward 3 o'clock, Y toward 12 o'clock, Z out of the screen",
+ "status": "Design for the wearable. The working prototypes are the phone watch and the Arduino watch; this case has not been built.",
+ "size": {
+  "across": 45.0,
+  "lug_to_lug": 54.4,
+  "thick": 15.3,
+  "strap_width": 22.0,
+  "display_mm": 35.5,
+  "display_px": 240,
+  "lo": [
+   -26.5,
+   -27.2,
+   -0.9
+  ],
+  "hi": [
+   24.15,
+   27.2,
+   14.4
+  ],
+  "screen_z": 12.6,
+  "glass_z": 13.8,
+  "active_r": 16.2
+ },
+ "mass_g": 48.3,
+ "mass_body_g": 32.4,
+ "cost_usd": 64.2,
+ "links": {
+  "watch": {
+   "parent": null,
+   "origin": [
+    0,
+    0,
+    0
+   ],
+   "joint": null
+  }
+ },
+ "parts": [
+  {
+   "mesh": "meshes/case.stl",
+   "link": "watch",
+   "color": "#34383C",
+   "finish": "plastic",
+   "bom": "case",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    0
+   ],
+   "bbox": [
+    [
+     -22.5,
+     -27.2,
+     -0.0
+    ],
+    [
+     22.5,
+     27.2,
+     12.6
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/back_cover.stl",
+   "link": "watch",
+   "color": "#34383C",
+   "finish": "plastic",
+   "bom": "back",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    -20
+   ],
+   "bbox": [
+    [
+     -19.45,
+     -19.45,
+     -0.4
+    ],
+    [
+     19.45,
+     19.45,
+     2.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/screws.stl",
+   "link": "watch",
+   "color": "#C7CACD",
+   "finish": "metal",
+   "bom": "back",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    -26
+   ],
+   "bbox": [
+    [
+     -12.96,
+     -12.96,
+     -0.3
+    ],
+    [
+     12.96,
+     12.96,
+     2.1
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/sensor_window.stl",
+   "link": "watch",
+   "color": "#0E1A24",
+   "finish": "glass",
+   "bom": "window",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    -30
+   ],
+   "bbox": [
+    [
+     -5.95,
+     -5.95,
+     -0.9
+    ],
+    [
+     5.95,
+     5.95,
+     2.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/pogo_pads.stl",
+   "link": "watch",
+   "color": "#C9A13B",
+   "finish": "metal",
+   "bom": "pogo",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    -24
+   ],
+   "bbox": [
+    [
+     -5.6,
+     -13.6,
+     -0.3
+    ],
+    [
+     5.6,
+     -10.4,
+     2.1
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/ppg_sensor.stl",
+   "link": "watch",
+   "color": "#222428",
+   "finish": "plastic",
+   "bom": "ppg",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    -12
+   ],
+   "bbox": [
+    [
+     -2.8,
+     -1.65,
+     0.9
+    ],
+    [
+     2.8,
+     1.65,
+     2.45
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/ppg_board.stl",
+   "link": "watch",
+   "color": "#2F6B45",
+   "finish": "plastic",
+   "bom": "ppg",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    -9
+   ],
+   "bbox": [
+    [
+     -6.6,
+     -6.6,
+     2.15
+    ],
+    [
+     6.6,
+     6.6,
+     2.75
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/temp_sensor.stl",
+   "link": "watch",
+   "color": "#222428",
+   "finish": "plastic",
+   "bom": "temp",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    -6,
+    0,
+    -14
+   ],
+   "bbox": [
+    [
+     -13.7,
+     0.3,
+     2.0
+    ],
+    [
+     -10.3,
+     3.7,
+     2.75
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/battery.stl",
+   "link": "watch",
+   "color": "#2C5F86",
+   "finish": "plastic",
+   "bom": "battery",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    -3
+   ],
+   "bbox": [
+    [
+     -13.0,
+     -8.5,
+     2.9
+    ],
+    [
+     13.0,
+     11.5,
+     7.4
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/vibration_motor.stl",
+   "link": "watch",
+   "color": "#C7CACD",
+   "finish": "metal",
+   "bom": "motor",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    -8,
+    -3
+   ],
+   "bbox": [
+    [
+     -5.0,
+     -19.0,
+     2.9
+    ],
+    [
+     5.0,
+     -9.0,
+     5.6
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/main_board.stl",
+   "link": "watch",
+   "color": "#2F6B45",
+   "finish": "plastic",
+   "bom": "pcb",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    6
+   ],
+   "bbox": [
+    [
+     -18.54,
+     -18.6,
+     7.6
+    ],
+    [
+     18.6,
+     18.6,
+     8.6
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/esp32.stl",
+   "link": "watch",
+   "color": "#C7CACD",
+   "finish": "metal",
+   "bom": "esp32",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    11
+   ],
+   "bbox": [
+    [
+     -12.7,
+     -7.75,
+     8.6
+    ],
+    [
+     2.7,
+     12.75,
+     11.0
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/lora.stl",
+   "link": "watch",
+   "color": "#C7CACD",
+   "finish": "metal",
+   "bom": "lora",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    4,
+    0,
+    11
+   ],
+   "bbox": [
+    [
+     4.5,
+     -8.0,
+     8.6
+    ],
+    [
+     14.5,
+     2.0,
+     10.4
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/imu.stl",
+   "link": "watch",
+   "color": "#222428",
+   "finish": "plastic",
+   "bom": "imu",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    2,
+    4,
+    11
+   ],
+   "bbox": [
+    [
+     4.75,
+     8.0,
+     8.6
+    ],
+    [
+     7.25,
+     11.0,
+     9.4
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/charger.stl",
+   "link": "watch",
+   "color": "#222428",
+   "finish": "plastic",
+   "bom": "power",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    4,
+    3,
+    11
+   ],
+   "bbox": [
+    [
+     9.75,
+     4.25,
+     8.6
+    ],
+    [
+     13.5,
+     10.0,
+     9.5
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/buzzer.stl",
+   "link": "watch",
+   "color": "#17181A",
+   "finish": "plastic",
+   "bom": "buzzer",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    -4,
+    11
+   ],
+   "bbox": [
+    [
+     -8.25,
+     -16.25,
+     8.6
+    ],
+    [
+     0.25,
+     -7.75,
+     10.6
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/switches.stl",
+   "link": "watch",
+   "color": "#C7CACD",
+   "finish": "metal",
+   "bom": "switches",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    8
+   ],
+   "bbox": [
+    [
+     -18.35,
+     -10.47,
+     8.6
+    ],
+    [
+     16.64,
+     10.47,
+     10.2
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/antenna.stl",
+   "link": "watch",
+   "color": "#B8733A",
+   "finish": "glow",
+   "bom": "antenna",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    -10,
+    9
+   ],
+   "bbox": [
+    [
+     -18.09,
+     -19.25,
+     8.6
+    ],
+    [
+     18.09,
+     -6.5,
+     11.8
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/display.stl",
+   "link": "watch",
+   "color": "#06080A",
+   "finish": "glass",
+   "bom": "display",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    19
+   ],
+   "bbox": [
+    [
+     -17.75,
+     -19.75,
+     10.5
+    ],
+    [
+     17.75,
+     17.75,
+     12.6
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/cover_glass.stl",
+   "link": "watch",
+   "color": "#0E1A24",
+   "finish": "glass",
+   "bom": "glass",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    25
+   ],
+   "bbox": [
+    [
+     -18.4,
+     -18.4,
+     12.7
+    ],
+    [
+     18.4,
+     18.4,
+     13.8
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/bezel.stl",
+   "link": "watch",
+   "color": "#7E848A",
+   "finish": "metal",
+   "bom": "bezel",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    31
+   ],
+   "bbox": [
+    [
+     -23.0,
+     -23.0,
+     12.6
+    ],
+    [
+     23.0,
+     23.0,
+     14.4
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/button_ok.stl",
+   "link": "watch",
+   "color": "#3F9A57",
+   "finish": "paint",
+   "bom": "btn_ok",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    8.66,
+    5.0,
+    0
+   ],
+   "bbox": [
+    [
+     15.64,
+     8.19,
+     5.1
+    ],
+    [
+     24.15,
+     15.33,
+     9.9
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/button_help.stl",
+   "link": "watch",
+   "color": "#C8102E",
+   "finish": "paint",
+   "bom": "btn_help",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    8.66,
+    -5.0,
+    0
+   ],
+   "bbox": [
+    [
+     15.64,
+     -15.33,
+     5.1
+    ],
+    [
+     24.15,
+     -8.19,
+     9.9
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/button_morse.stl",
+   "link": "watch",
+   "color": "#2D6FB7",
+   "finish": "paint",
+   "bom": "btn_morse",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    -10.0,
+    0.0,
+    0
+   ],
+   "bbox": [
+    [
+     -26.5,
+     -2.4,
+     5.1
+    ],
+    [
+     -18.9,
+     2.4,
+     9.9
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/spring_bars.stl",
+   "link": "watch",
+   "color": "#C7CACD",
+   "finish": "metal",
+   "bom": "strap",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    0,
+    0
+   ],
+   "bbox": [
+    [
+     -12.25,
+     -26.3,
+     4.7
+    ],
+    [
+     12.25,
+     26.3,
+     6.3
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/strap_top.stl",
+   "link": "watch",
+   "color": "#2B2E31",
+   "finish": "rubber",
+   "bom": "strap",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    14,
+    0
+   ],
+   "bbox": [
+    [
+     -11.0,
+     3.99,
+     -56.89
+    ],
+    [
+     11.0,
+     31.2,
+     7.2
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/strap_bottom.stl",
+   "link": "watch",
+   "color": "#2B2E31",
+   "finish": "rubber",
+   "bom": "strap",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    -14,
+    0
+   ],
+   "bbox": [
+    [
+     -11.0,
+     -31.2,
+     -57.12
+    ],
+    [
+     11.0,
+     -1.99,
+     7.2
+    ]
+   ]
+  },
+  {
+   "mesh": "meshes/buckle.stl",
+   "link": "watch",
+   "color": "#C7CACD",
+   "finish": "metal",
+   "bom": "strap",
+   "xyz": [
+    0,
+    0,
+    0
+   ],
+   "yaw": 0.0,
+   "explode": [
+    0,
+    14,
+    -6
+   ],
+   "bbox": [
+    [
+     -13.0,
+     -2.5,
+     -57.3
+    ],
+    [
+     13.0,
+     6.5,
+     -54.7
+    ]
+   ]
+  }
+ ],
+ "bom": [
+  {
+   "id": "case",
+   "group": "Case",
+   "name": "Case",
+   "what": "Glass-filled nylon (PA12), printed and dyed, 45 mm across, 12.6 mm thick",
+   "does": "Holds everything, takes the knocks of tunnel work, and seals with an O-ring under the bezel and the back.",
+   "solves": [],
+   "qty": 1,
+   "mass_g": 5.2,
+   "mass_from": "CAD volume x density",
+   "cost_usd": 6
+  },
+  {
+   "id": "bezel",
+   "group": "Case",
+   "name": "Bezel",
+   "what": "6061 aluminium ring, anodised, with hour marks",
+   "does": "Clamps the cover glass and protects its edge. The marks make the time readable with the screen off.",
+   "solves": [],
+   "qty": 1,
+   "mass_g": 2.7,
+   "mass_from": "CAD volume x density",
+   "cost_usd": 4
+  },
+  {
+   "id": "glass",
+   "group": "Case",
+   "name": "Cover glass",
+   "what": "Sapphire, 36.8 mm, 1.1 mm",
+   "does": "Scratch-proof window over the screen and the touch layer.",
+   "solves": [],
+   "qty": 1,
+   "mass_g": 4.6,
+   "mass_from": "CAD volume x density",
+   "cost_usd": 5
+  },
+  {
+   "id": "back",
+   "group": "Case",
+   "name": "Back cover and screws",
+   "what": "Same nylon as the case, four M1.4 stainless screws",
+   "does": "Closes the watch against the skin, with the sensor window and charging pads through it.",
+   "solves": [],
+   "qty": 1,
+   "mass_g": 1.9,
+   "mass_from": "CAD volume x density",
+   "cost_usd": 2
+  },
+  {
+   "id": "window",
+   "group": "Case",
+   "name": "Sensor window",
+   "what": "Sapphire dome, 12 mm",
+   "does": "Lets the heart-rate sensor's light into the skin and back out, and presses the sensor against the wrist.",
+   "solves": [
+    9,
+    10
+   ],
+   "qty": 1,
+   "mass_g": 1.3,
+   "mass_from": "CAD volume x density",
+   "cost_usd": 2
+  },
+  {
+   "id": "strap",
+   "group": "Case",
+   "name": "Strap, buckle and spring bars",
+   "what": "22 mm fluoroelastomer (FKM) strap, stainless buckle and quick-release bars",
+   "does": "Stays on through sweat, dust and water. Quick-release bars, so a strap is swapped in seconds.",
+   "solves": [],
+   "qty": 1,
+   "mass_g": 15.9,
+   "mass_from": "CAD volume x density",
+   "cost_usd": 5
+  },
+  {
+   "id": "btn_ok",
+   "group": "Controls",
+   "name": "I'M OK button (2 o'clock)",
+   "what": "Green aluminium push button on a sealed stem",
+   "does": "One press tells the whole family you are safe, even with the screen dark.",
+   "solves": [
+    8
+   ],
+   "qty": 1,
+   "mass_g": 0.4,
+   "mass_from": "typical for the part",
+   "cost_usd": 0.5
+  },
+  {
+   "id": "btn_help",
+   "group": "Controls",
+   "name": "HELP button (4 o'clock)",
+   "what": "Red push button, recessed so a knock can't press it",
+   "does": "Hold two seconds to call for help: the family is told and the call joins the rescue queue with your vitals.",
+   "solves": [
+    8,
+    10
+   ],
+   "qty": 1,
+   "mass_g": 0.4,
+   "mass_from": "typical for the part",
+   "cost_usd": 0.5
+  },
+  {
+   "id": "btn_morse",
+   "group": "Controls",
+   "name": "Morse key (9 o'clock)",
+   "what": "Blue push button with a short throw",
+   "does": "Tap a dot, hold a dash. Sends a message by feel when you can't look at the screen or speak.",
+   "solves": [
+    7,
+    8
+   ],
+   "qty": 1,
+   "mass_g": 0.4,
+   "mass_from": "typical for the part",
+   "cost_usd": 0.5
+  },
+  {
+   "id": "switches",
+   "group": "Controls",
+   "name": "Button switches",
+   "what": "Three side-actuated tactile switches on the main board",
+   "does": "What each button presses.",
+   "solves": [],
+   "qty": 1,
+   "mass_g": 0.2,
+   "mass_from": "typical for the part",
+   "cost_usd": 0.6
+  },
+  {
+   "id": "esp32",
+   "group": "Brain and radio",
+   "name": "ESP32-S3 module",
+   "what": "ESP32-S3-MINI-1: two 240 MHz cores, Wi-Fi, Bluetooth LE",
+   "does": "Runs the watch: the screen, the buttons, the family list. Talks to the block's relay box over Bluetooth, and straight to the API over Wi-Fi when the network is up.",
+   "solves": [
+    7,
+    8
+   ],
+   "qty": 1,
+   "mass_g": 1.6,
+   "mass_from": "typical for the part",
+   "cost_usd": 3.5
+  },
+  {
+   "id": "lora",
+   "group": "Brain and radio",
+   "name": "LoRa radio",
+   "what": "Semtech SX1262, 915 MHz, up to 22 dBm, under a shield can",
+   "does": "The radio the Directorate can't switch off. When the network is cut, check-ins, help calls and Morse go out by radio to the nearest relay, which passes them on.",
+   "solves": [
+    7,
+    8
+   ],
+   "qty": 1,
+   "mass_g": 0.8,
+   "mass_from": "typical for the part",
+   "cost_usd": 4.5
+  },
+  {
+   "id": "antenna",
+   "group": "Brain and radio",
+   "name": "LoRa antenna",
+   "what": "Flexible printed antenna, curved along the inside of the case wall",
+   "does": "Puts the radio's signal through the case. Along the wall it stays clear of the battery and the wrist.",
+   "solves": [
+    7
+   ],
+   "qty": 1,
+   "mass_g": 0.2,
+   "mass_from": "typical for the part",
+   "cost_usd": 1.5
+  },
+  {
+   "id": "pcb",
+   "group": "Brain and radio",
+   "name": "Main board",
+   "what": "Round 4-layer board, 37 mm, made and assembled to order",
+   "does": "Joins everything. Has notches for the three button switches.",
+   "solves": [],
+   "qty": 1,
+   "mass_g": 2.0,
+   "mass_from": "CAD volume x density",
+   "cost_usd": 6
+  },
+  {
+   "id": "imu",
+   "group": "Brain and radio",
+   "name": "Motion sensor",
+   "what": "Bosch BMI270, accelerometer and gyroscope",
+   "does": "Notices a fall or a sudden stop and no movement after it, then asks the wearer if they are OK. No answer in 30 seconds and it calls for help by itself.",
+   "solves": [
+    10
+   ],
+   "qty": 1,
+   "mass_g": 0.1,
+   "mass_from": "typical for the part",
+   "cost_usd": 2
+  },
+  {
+   "id": "ppg",
+   "group": "Body sensors",
+   "name": "Heart rate and blood oxygen",
+   "what": "Maxim MAX30102 on its own small board, behind the window",
+   "does": "Red and infrared light through the skin gives heart rate and blood oxygen. Low oxygen is the first sign of the lung sickness, so readings feed the outbreak map.",
+   "solves": [
+    9,
+    10
+   ],
+   "qty": 1,
+   "mass_g": 0.4,
+   "mass_from": "typical for the part",
+   "cost_usd": 3
+  },
+  {
+   "id": "temp",
+   "group": "Body sensors",
+   "name": "Skin temperature",
+   "what": "Maxim MAX30208 (0.1 C accuracy) on a thermal pad against the back",
+   "does": "Spots a fever. With the heart rate, it sets how urgent a help call is.",
+   "solves": [
+    9,
+    10
+   ],
+   "qty": 1,
+   "mass_g": 0.1,
+   "mass_from": "typical for the part",
+   "cost_usd": 2
+  },
+  {
+   "id": "display",
+   "group": "Screen and sound",
+   "name": "Round display",
+   "what": "1.28 in round 240 x 240 IPS screen (GC9A01) with touch",
+   "does": "Shows the time, the family, alerts and the Morse being typed. This page runs the real watch software on it.",
+   "solves": [
+    8
+   ],
+   "qty": 1,
+   "mass_g": 3.0,
+   "mass_from": "typical for the part",
+   "cost_usd": 8
+  },
+  {
+   "id": "motor",
+   "group": "Screen and sound",
+   "name": "Vibration motor",
+   "what": "10 mm coin motor",
+   "does": "Buzzes Morse and alerts into the wrist, so a message gets through in the dark or in noise.",
+   "solves": [
+    7,
+    8
+   ],
+   "qty": 1,
+   "mass_g": 0.9,
+   "mass_from": "typical for the part",
+   "cost_usd": 0.8
+  },
+  {
+   "id": "buzzer",
+   "group": "Screen and sound",
+   "name": "Buzzer",
+   "what": "8.5 mm magnetic buzzer, port at 6 o'clock",
+   "does": "Beeps alerts and plays Morse out loud. Loud enough to help a rescuer find someone.",
+   "solves": [
+    10
+   ],
+   "qty": 1,
+   "mass_g": 0.6,
+   "mass_from": "typical for the part",
+   "cost_usd": 0.7
+  },
+  {
+   "id": "battery",
+   "group": "Power",
+   "name": "Battery",
+   "what": "LiPo pouch, 3.7 V, 260 mAh (0.96 Wh), 26 x 20 x 4.5 mm",
+   "does": "About 4 days with vitals every 5 minutes and the radio listening; weeks with only check-ins.",
+   "solves": [
+    1
+   ],
+   "qty": 1,
+   "mass_g": 5.5,
+   "mass_from": "typical for the part",
+   "cost_usd": 4
+  },
+  {
+   "id": "power",
+   "group": "Power",
+   "name": "Charger and regulator",
+   "what": "TI BQ25180 charger and a 3.3 V regulator",
+   "does": "Charges from the two pads on the back, and reports battery level with every message so the twin can warn before a watch dies.",
+   "solves": [
+    1
+   ],
+   "qty": 1,
+   "mass_g": 0.1,
+   "mass_from": "typical for the part",
+   "cost_usd": 1.5
+  },
+  {
+   "id": "pogo",
+   "group": "Power",
+   "name": "Charging pads",
+   "what": "Two gold-plated contacts through the back cover",
+   "does": "Charge from any relay box's dock: no socket to let water or dust in.",
+   "solves": [],
+   "qty": 1,
+   "mass_g": 0.1,
+   "mass_from": "typical for the part",
+   "cost_usd": 0.6
+  }
+ ],
+ "buttons": {
+  "ok": {
+   "angle": 30.0,
+   "z": 7.5
+  },
+  "help": {
+   "angle": -30.0,
+   "z": 7.5
+  },
+  "morse": {
+   "angle": 180.0,
+   "z": 7.5
+  }
+ },
+ "power": {
+  "battery_mah": 260,
+  "sleep_ma": 0.08,
+  "screen_on_ma": 28,
+  "ble_ma": 3.5,
+  "lora_tx_ma": 118,
+  "lora_rx_ma": 5.3,
+  "ppg_ma": 1.2,
+  "note": "Typical datasheet currents at 3.7 V. An estimate for a design, not a measurement."
+ }
+}
