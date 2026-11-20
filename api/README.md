@@ -516,6 +516,8 @@ GET /family?family=fam-0007
   { "device": "watch-0110", "last_ok": null, "block": null, "hops": null, "via": null } ]
 ```
 
+A group nobody has registered or checked in for yet returns `[]`, and no `?family=` at all returns 400.
+
 ```
 GET /inbox?device=watch-0110&after_seq=40
 ```

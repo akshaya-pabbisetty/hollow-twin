@@ -569,8 +569,11 @@ function route(req, res) {
     send(res, 200, { ok: true });
   });
   if (p === "/family") {
-    const devs = familyOf(q.group ?? q.family); // ?group= (the original name) or ?family= (the contract's word)
-    if (!devs.length) return send(res, 404, { error: "unknown group" });
+    const group = q.group ?? q.family; // ?group= (the original name) or ?family= (the contract's word)
+    if (!group) return send(res, 400, { error: "family required (?family=fam-0007)" });
+    // A group nobody has registered or checked in for yet is empty, not an error: watches poll this from the
+    // moment they start, before their first "I'm OK" registers the group.
+    const devs = familyOf(group);
     return send(res, 200, devs.map((d) => {
       const last = O.newest(usable.filter((r) => r.device === d && isOk(r)));
       return { device: d, last_ok: last ? last.time : null, block: last ? last.block : null, hops: last ? last.hops : null, via: last ? last.via : null };
