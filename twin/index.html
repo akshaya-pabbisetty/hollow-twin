@@ -1945,7 +1945,7 @@ addEventListener('keydown', e => {
 // With an API address set, the twin stops being a closed simulation: real messages override the simulated values
 // block by block, the API's power allocation and battery forecast replace the twin's own, and every number says
 // where it came from. With no API it runs on its built-in simulation and says so.
-const DEFAULT_API = ''; // the deployed API address, once lane 1 has one
+const DEFAULT_API = 'https://hollow-twin-api.onrender.com'; // the deployed API address, once lane 1 has one
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 for (const n of NBHDS) { n.bid = `${LEVELS[n.level].code.toLowerCase()}-${slug(n.name)}`; n.api = {}; n.ov = null; }
 const BYID = Object.fromEntries(NBHDS.map(n => [n.bid, n]));
@@ -2298,6 +2298,8 @@ function apiInit() {
     if (q === 'off') localStorage.removeItem('hollow.api');
     else if (q) localStorage.setItem('hollow.api', q);
     url = q === 'off' ? '' : q || localStorage.getItem('hollow.api') || DEFAULT_API;
+    // Remember the default too, so the pages this one links to (rover, watch, broadcast, research) use the same API.
+    if (!q && url && !localStorage.getItem('hollow.api')) localStorage.setItem('hollow.api', url);
   } catch (e) { url = q && q !== 'off' ? q : DEFAULT_API; }
   $('api-url').value = url;
   if (url) apiConnect(url); else apiPaint();
