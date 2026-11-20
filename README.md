@@ -59,7 +59,7 @@ flowchart LR
 
 ![A check-in sent during a network cut arrives through the API and is drawn travelling to the family's block](docs/img/check-in-through-the-api.jpg)
 
-## What is real and what is simulated
+## Real or simulated?
 
 We would rather tell you than have you find out.
 
