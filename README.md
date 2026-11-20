@@ -6,7 +6,7 @@
 
 Patriot HackFest Fall 2026, Life Underground track. Problems 1, 2, 7, 8 and 10.
 
-### ▶ [Watch the 2-minute video](VIDEO_LINK)
+### ▶ [Watch the 3-minute video](VIDEO_LINK)
 
 ## Try it in 30 seconds
 

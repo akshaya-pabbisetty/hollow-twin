@@ -1,6 +1,6 @@
 <!doctype html>
 <html><head><meta charset="utf-8">
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Special+Elite&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=IBM+Plex+Sans:wght@500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <!-- Source of docs/img/hollow-twin-hero.jpg, hollow-twin-thumbnail.jpg and title-card.jpg. Open in Chrome at 1600 x 900 and take a screenshot at 2x. Original art. -->
 <style>
 :root { --red: #C8102E; --cream: #EADFC8; --ink: #141210; --wall: #1B1C1D; --yellow: #F2B705; }
@@ -30,7 +30,8 @@ body { position: relative; font-family: 'IBM Plex Mono', monospace; }
 .false { position: absolute; left: 232px; top: 168px; transform: rotate(-7deg); font-family: 'Archivo Black'; font-size: 100px; line-height: 1; color: #C8102E; letter-spacing: 10px;
   background: #FFFFFF; padding: 14px 40px 18px; border: 6px solid #141210; box-shadow: 0 10px 22px rgba(0,0,0,.45); }
 .false small { display: block; font: 21px 'IBM Plex Mono'; letter-spacing: 3px; color: #141210; margin-top: 6px; text-align: center; }
-.scrap { position: absolute; background: #F4F1E8; color: #111; font-family: 'Special Elite'; box-shadow: 0 8px 18px rgba(0,0,0,.45); filter: url(#torn); }
+.scrap { position: absolute; background: #F4F1E8; color: #111; font-family: 'IBM Plex Sans'; font-weight: 500; background: none; isolation: isolate; filter: drop-shadow(0 8px 12px rgba(0,0,0,.45)); }
+.scrap::before { content: ''; position: absolute; inset: 0; background: #F4F1E8; filter: url(#torn); z-index: -1; }
 .scrap.s1 { left: 532px; top: 506px; width: 336px; padding: 16px 24px 18px 22px; transform: rotate(3deg); font-size: 22px; line-height: 1.3; }
 .scrap.s1 b.h { font-family: 'Archivo Black'; font-size: 36px; color: #C8102E; display: block; line-height: 1; margin-bottom: 8px; letter-spacing: 1px; }
 .scrap.s1 .row { display: grid; grid-template-columns: 1fr auto; align-items: baseline; border-top: 2px dashed #999; padding-top: 6px; margin-top: 6px; }
@@ -45,10 +46,10 @@ body { position: relative; font-family: 'IBM Plex Mono', monospace; }
 .zine .issue { position: absolute; left: 40px; top: 74px; font: 18px 'IBM Plex Mono'; letter-spacing: 3px; color: #333; }
 .zine h1 { position: absolute; left: 36px; top: 108px; font-family: 'Archivo Black'; font-size: 94px; line-height: .9; color: var(--ink); letter-spacing: -2px; }
 .zine h1 span { color: var(--red); }
-.zine .tag { position: absolute; left: 40px; top: 312px; font-family: 'Special Elite'; font-size: 34px; color: #111; }
+.zine .tag { position: absolute; left: 40px; top: 312px; font-family: 'IBM Plex Sans'; font-weight: 600; font-size: 34px; color: #111; }
 .zine .tag u { text-decoration: none; background: linear-gradient(transparent 62%, rgba(200,16,46,.35) 62%); }
 .zine ol { position: absolute; left: 40px; right: 34px; top: 384px; list-style: none; }
-.zine li { display: grid; grid-template-columns: 54px 1fr; gap: 14px; align-items: start; margin-bottom: 20px; font-family: 'Special Elite'; font-size: 25px; line-height: 1.22; color: #111; }
+.zine li { display: grid; grid-template-columns: 54px 1fr; gap: 14px; align-items: start; margin-bottom: 20px; font-family: 'IBM Plex Sans'; font-weight: 500; font-size: 25px; line-height: 1.22; color: #111; }
 .zine li i { font-style: normal; font-family: 'Archivo Black'; font-size: 34px; color: #F7F5EF; background: var(--ink); text-align: center; line-height: 54px; height: 54px; }
 .zine li:nth-child(3) i { background: var(--red); }
 .zine .foot { position: absolute; left: 0; right: 0; bottom: 0; height: 66px; background: var(--ink); color: #F7F5EF; display: flex; align-items: center; justify-content: space-between; padding: 0 30px; font: 17px 'IBM Plex Mono'; letter-spacing: 2.5px; }
